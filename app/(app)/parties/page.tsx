@@ -87,7 +87,7 @@ export default async function PartiesPage({
                   </TableCell>
                   <TableCell
                     className={`text-right tabular-nums font-semibold ${
-                      p.net > 0 ? 'text-emerald-600' : p.net < 0 ? 'text-amber-600' : ''
+                      p.net > 0 ? 'text-positive' : p.net < 0 ? 'text-warning' : ''
                     }`}
                   >
                     {p.net !== 0 ? inr(p.net) : '—'}

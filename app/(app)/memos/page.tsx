@@ -41,7 +41,7 @@ export default async function MemosPage() {
             <div className="text-xs text-muted-foreground">
               {inr(summary.in.value)} · {summary.in.open} open
               {summary.in.overdue > 0 && (
-                <span className="text-red-600"> · {summary.in.overdue} overdue to return or bill</span>
+                <span className="text-negative"> · {summary.in.overdue} overdue to return or bill</span>
               )}
             </div>
           </CardContent>
@@ -55,7 +55,7 @@ export default async function MemosPage() {
             <div className="text-xs text-muted-foreground">
               {inr(summary.out.value)} at risk · {summary.out.open} open
               {summary.out.overdue > 0 && (
-                <span className="text-red-600"> · {summary.out.overdue} overdue</span>
+                <span className="text-negative"> · {summary.out.overdue} overdue</span>
               )}
             </div>
           </CardContent>

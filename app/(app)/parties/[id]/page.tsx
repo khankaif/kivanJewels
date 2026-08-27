@@ -61,9 +61,9 @@ export default async function PartyPage({ params }: { params: Promise<{ id: stri
       </div>
 
       <div className="grid gap-4 sm:grid-cols-4">
-        <Stat label="They owe me" value={inr(party.receivable)} tone="text-emerald-600" />
-        <Stat label="I owe them" value={inr(party.payable)} tone="text-amber-600" />
-        <Stat label="Net" value={inr(party.net)} tone={party.net >= 0 ? 'text-emerald-600' : 'text-amber-600'} />
+        <Stat label="They owe me" value={inr(party.receivable)} tone="text-positive" />
+        <Stat label="I owe them" value={inr(party.payable)} tone="text-warning" />
+        <Stat label="Net" value={inr(party.net)} tone={party.net >= 0 ? 'text-positive' : 'text-warning'} />
         <Stat label="Stones traded" value={`${ct(activity.bought)} in · ${ct(activity.sold)} out`} />
       </div>
 
@@ -114,7 +114,7 @@ export default async function PartyPage({ params }: { params: Promise<{ id: stri
                       </TableCell>
                       <TableCell
                         className={`text-right tabular-nums font-medium ${
-                          s.running >= 0 ? 'text-emerald-600' : 'text-amber-600'
+                          s.running >= 0 ? 'text-positive' : 'text-warning'
                         }`}
                       >
                         {inr(s.running)}
@@ -155,7 +155,7 @@ export default async function PartyPage({ params }: { params: Promise<{ id: stri
                       <TableCell className="tabular-nums">{b.billedOn ?? '—'}</TableCell>
                       <TableCell><Badge variant="outline">{b.direction}</Badge></TableCell>
                       <TableCell className="text-right tabular-nums">{inr(b.gross)}</TableCell>
-                      <TableCell className="text-right tabular-nums font-semibold text-amber-600">
+                      <TableCell className="text-right tabular-nums font-semibold text-warning">
                         {inr(b.balance)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-xs">
@@ -193,7 +193,7 @@ export default async function PartyPage({ params }: { params: Promise<{ id: stri
                 </TableHeader>
                 <TableBody>
                   {activity.memos.map((m) => (
-                    <TableRow key={m.memoId} className={m.overdue ? 'bg-red-50' : undefined}>
+                    <TableRow key={m.memoId} className={m.overdue ? 'bg-negative-surface' : undefined}>
                       <TableCell className="font-mono text-xs">{m.memoNo}</TableCell>
                       <TableCell>
                         <Badge variant={m.direction === 'in' ? 'outline' : 'default'}>
@@ -201,7 +201,7 @@ export default async function PartyPage({ params }: { params: Promise<{ id: stri
                         </Badge>
                       </TableCell>
                       <TableCell className="tabular-nums">{m.issuedOn}</TableCell>
-                      <TableCell className={`tabular-nums ${m.overdue ? 'font-semibold text-red-600' : ''}`}>
+                      <TableCell className={`tabular-nums ${m.overdue ? 'font-semibold text-negative' : ''}`}>
                         {m.dueOn ?? '—'}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{ct(m.carats)}</TableCell>

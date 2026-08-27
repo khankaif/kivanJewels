@@ -46,7 +46,7 @@ export default async function LotPage({ params }: { params: Promise<{ lotNo: str
       <div className="grid gap-4 sm:grid-cols-3">
         <Stat label="Total in" value={ct(inCt)} />
         <Stat label="Total out" value={ct(outCt)} />
-        <Stat label="Balance" value={ct(balance)} tone={balance > 0.0005 ? 'text-emerald-600' : ''} />
+        <Stat label="Balance" value={ct(balance)} tone={balance > 0.0005 ? 'text-positive' : ''} />
       </div>
 
       <Card>
@@ -87,10 +87,10 @@ export default async function LotPage({ params }: { params: Promise<{ lotNo: str
                     </Badge>
                   </TableCell>
                   <TableCell className="font-mono text-xs">{m.memoNo ?? '—'}</TableCell>
-                  <TableCell className="text-right tabular-nums text-emerald-600">
+                  <TableCell className="text-right tabular-nums text-positive">
                     {m.isInward ? ct(m.carats) : ''}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-amber-600">
+                  <TableCell className="text-right tabular-nums text-warning">
                     {!m.isInward ? ct(-m.carats) : ''}
                   </TableCell>
                   <TableCell className="text-right tabular-nums font-medium">

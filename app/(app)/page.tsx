@@ -5,8 +5,8 @@ import { getDashboard, getWorklist } from '@/features/dashboard/queries';
 import { inr, ct, pct } from '@/lib/format';
 
 const URGENCY: Record<string, { badge: 'destructive' | 'default' | 'secondary'; ring: string }> = {
-  critical: { badge: 'destructive', ring: 'border-red-300' },
-  warning: { badge: 'default', ring: 'border-amber-300' },
+  critical: { badge: 'destructive', ring: 'border-negative/40' },
+  warning: { badge: 'default', ring: 'border-warning/40' },
   info: { badge: 'secondary', ring: '' },
 };
 
@@ -19,15 +19,15 @@ export default async function DashboardPage() {
     { label: 'Revenue', value: inr(d.revenue) },
     {
       label: 'Gross profit', value: inr(d.profit),
-      sub: `${pct(d.markup)} on cost`, tone: d.profit >= 0 ? 'text-emerald-600' : 'text-red-600',
+      sub: `${pct(d.markup)} on cost`, tone: d.profit >= 0 ? 'text-positive' : 'text-negative',
     },
-    { label: 'Receivable', value: inr(d.receivable), tone: 'text-emerald-600' },
-    { label: 'Payable', value: inr(d.payable), tone: 'text-amber-600' },
+    { label: 'Receivable', value: inr(d.receivable), tone: 'text-positive' },
+    { label: 'Payable', value: inr(d.payable), tone: 'text-warning' },
     { label: 'In vault', value: ct(d.carats), sub: `${inr(d.value)} at cost · ${d.lots} lots` },
     {
       label: 'Out on memo', value: ct(d.exposure),
       sub: `${d.openMemos} open${d.overdueMemos ? ` · ${d.overdueMemos} overdue` : ''}`,
-      tone: d.overdueMemos ? 'text-red-600' : undefined,
+      tone: d.overdueMemos ? 'text-negative' : undefined,
     },
   ];
 
@@ -96,7 +96,7 @@ export default async function DashboardPage() {
                 </span>
                 <span
                   className={`w-44 text-right font-bold tabular-nums ${
-                    s.profit >= 0 ? 'text-emerald-600' : 'text-red-600'
+                    s.profit >= 0 ? 'text-positive' : 'text-negative'
                   }`}
                 >
                   {inr(s.profit)} ({pct(s.markup)} on cost)

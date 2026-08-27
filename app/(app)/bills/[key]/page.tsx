@@ -56,7 +56,7 @@ export default async function BillPage({
       <div className="grid gap-4 sm:grid-cols-4">
         <Stat label="Amount" value={inr(bill.gross)} />
         <Stat label="Settled" value={inr(bill.paid)} />
-        <Stat label="Balance" value={inr(bill.balance)} tone={bill.balance > 0.005 ? 'text-amber-600' : 'text-emerald-600'} />
+        <Stat label="Balance" value={inr(bill.balance)} tone={bill.balance > 0.005 ? 'text-warning' : 'text-positive'} />
         <Stat label="Goods" value={totalCarats > 0 ? ct(totalCarats) : `${bill.lines} lines`} />
       </div>
 

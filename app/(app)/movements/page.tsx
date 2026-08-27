@@ -60,8 +60,8 @@ export default async function MovementsPage({
 
           <div className="flex flex-wrap gap-6 border-y py-3 text-sm">
             <Sum label="Movements" value={total.toLocaleString('en-IN')} />
-            <Sum label="Carats in" value={ct(inCarats)} tone="text-emerald-600" />
-            <Sum label="Carats out" value={ct(outCarats)} tone="text-amber-600" />
+            <Sum label="Carats in" value={ct(inCarats)} tone="text-positive" />
+            <Sum label="Carats out" value={ct(outCarats)} tone="text-warning" />
             <Sum label="Net" value={ct(inCarats - outCarats)} />
           </div>
 
@@ -105,10 +105,10 @@ export default async function MovementsPage({
                       {m.partyName ?? '—'}
                       {m.memoNo && <div className="font-mono text-muted-foreground">{m.memoNo}</div>}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-emerald-600">
+                    <TableCell className="text-right tabular-nums text-positive">
                       {m.isInward ? ct(m.carats) : ''}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-amber-600">
+                    <TableCell className="text-right tabular-nums text-warning">
                       {!m.isInward ? ct(-m.carats) : ''}
                     </TableCell>
                     <TableCell className="text-right tabular-nums font-medium">

@@ -28,7 +28,7 @@ export default async function AccountsPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Receivable</div>
-            <div className="mt-1 text-2xl font-bold tabular-nums text-emerald-600">
+            <div className="mt-1 text-2xl font-bold tabular-nums text-positive">
               {inr(totals.receivable)}
             </div>
             <Link href="/bills?direction=sale&status=unpaid"
@@ -40,7 +40,7 @@ export default async function AccountsPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Payable</div>
-            <div className="mt-1 text-2xl font-bold tabular-nums text-amber-600">
+            <div className="mt-1 text-2xl font-bold tabular-nums text-warning">
               {inr(totals.payable)}
             </div>
             <Link href="/bills?direction=purchase&status=unpaid"
@@ -86,7 +86,7 @@ export default async function AccountsPage() {
                       <TableCell className="text-right tabular-nums">{inr(a.d0_30)}</TableCell>
                       <TableCell className="text-right tabular-nums">{inr(a.d31_60)}</TableCell>
                       <TableCell className="text-right tabular-nums">{inr(a.d61_90)}</TableCell>
-                      <TableCell className="text-right tabular-nums font-semibold text-red-600">
+                      <TableCell className="text-right tabular-nums font-semibold text-negative">
                         {inr(a.d90_plus)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-bold">{inr(a.total)}</TableCell>
@@ -126,7 +126,7 @@ export default async function AccountsPage() {
                       <TableCell className="text-right tabular-nums">{inr(b.payable)}</TableCell>
                       <TableCell
                         className={`text-right tabular-nums font-bold ${
-                          b.net < 0 ? 'text-amber-600' : 'text-emerald-600'
+                          b.net < 0 ? 'text-warning' : 'text-positive'
                         }`}
                       >
                         {inr(b.net)}

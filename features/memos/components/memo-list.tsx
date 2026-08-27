@@ -23,7 +23,7 @@ export function MemoList({ memos, direction }: { memos: Memo[]; direction: 'in' 
   return (
     <div className="space-y-4">
       {memos.map((m) => (
-        <Card key={m.memoId} className={m.overdue ? 'border-red-300' : undefined}>
+        <Card key={m.memoId} className={m.overdue ? 'border-negative/40' : undefined}>
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>

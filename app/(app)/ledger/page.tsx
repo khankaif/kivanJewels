@@ -94,11 +94,11 @@ export default async function LedgerPage({
             </div>
             <div>
               <div className="text-xs uppercase tracking-wide text-muted-foreground">Debit (owed to me)</div>
-              <div className="font-bold tabular-nums text-emerald-600">{inr(agg.debit)}</div>
+              <div className="font-bold tabular-nums text-positive">{inr(agg.debit)}</div>
             </div>
             <div>
               <div className="text-xs uppercase tracking-wide text-muted-foreground">Credit</div>
-              <div className="font-bold tabular-nums text-amber-600">{inr(agg.credit)}</div>
+              <div className="font-bold tabular-nums text-warning">{inr(agg.credit)}</div>
             </div>
           </div>
 

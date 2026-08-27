@@ -83,7 +83,7 @@ export default async function StockPage({
                   <TableCell>{l.partyName ?? '—'}</TableCell>
                   <TableCell className="text-right tabular-nums">{ct(l.balance)}</TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {l.exposure > 0 ? <span className="text-amber-600">{ct(l.exposure)}</span> : '—'}
+                    {l.exposure > 0 ? <span className="text-warning">{ct(l.exposure)}</span> : '—'}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{inr(l.costRate)}</TableCell>
                   <TableCell className="text-right tabular-nums font-medium">{inr(l.value)}</TableCell>

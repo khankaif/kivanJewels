@@ -77,7 +77,7 @@ export default async function BillsPage({
             <Sum label="Bills" value={total.toLocaleString('en-IN')} />
             <Sum label="Gross" value={inr(totals.gross)} />
             <Sum label="Settled" value={inr(totals.paid)} />
-            <Sum label="Outstanding" value={inr(totals.balance)} tone="text-amber-600" />
+            <Sum label="Outstanding" value={inr(totals.balance)} tone="text-warning" />
           </div>
 
           <div className="overflow-x-auto">
@@ -120,7 +120,7 @@ export default async function BillsPage({
                     </TableCell>
                     <TableCell
                       className={`text-right tabular-nums font-semibold ${
-                        b.balance > 0.005 ? 'text-amber-600' : 'text-emerald-600'
+                        b.balance > 0.005 ? 'text-warning' : 'text-positive'
                       }`}
                     >
                       {b.balance > 0.005 ? inr(b.balance) : 'settled'}
