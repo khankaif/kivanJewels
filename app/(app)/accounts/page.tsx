@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -30,6 +31,10 @@ export default async function AccountsPage() {
             <div className="mt-1 text-2xl font-bold tabular-nums text-emerald-600">
               {inr(totals.receivable)}
             </div>
+            <Link href="/bills?direction=sale&status=unpaid"
+                  className="text-xs text-muted-foreground underline underline-offset-4">
+              see unpaid sale bills
+            </Link>
           </CardContent>
         </Card>
         <Card>
@@ -38,6 +43,10 @@ export default async function AccountsPage() {
             <div className="mt-1 text-2xl font-bold tabular-nums text-amber-600">
               {inr(totals.payable)}
             </div>
+            <Link href="/bills?direction=purchase&status=unpaid"
+                  className="text-xs text-muted-foreground underline underline-offset-4">
+              see unpaid purchase bills
+            </Link>
           </CardContent>
         </Card>
       </div>
@@ -69,7 +78,11 @@ export default async function AccountsPage() {
                 <TableBody>
                   {aging.map((a) => (
                     <TableRow key={a.partyId}>
-                      <TableCell className="font-medium">{a.partyName}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link href={`/parties/${a.partyId}`} className="underline underline-offset-4">
+                          {a.partyName}
+                        </Link>
+                      </TableCell>
                       <TableCell className="text-right tabular-nums">{inr(a.d0_30)}</TableCell>
                       <TableCell className="text-right tabular-nums">{inr(a.d31_60)}</TableCell>
                       <TableCell className="text-right tabular-nums">{inr(a.d61_90)}</TableCell>
@@ -104,7 +117,11 @@ export default async function AccountsPage() {
                 <TableBody>
                   {balances.map((b) => (
                     <TableRow key={b.partyId}>
-                      <TableCell className="font-medium">{b.partyName}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link href={`/parties/${b.partyId}`} className="underline underline-offset-4">
+                          {b.partyName}
+                        </Link>
+                      </TableCell>
                       <TableCell className="text-right tabular-nums">{inr(b.receivable)}</TableCell>
                       <TableCell className="text-right tabular-nums">{inr(b.payable)}</TableCell>
                       <TableCell

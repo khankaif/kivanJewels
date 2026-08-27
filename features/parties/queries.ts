@@ -45,3 +45,66 @@ export async function getPartyOptions(role?: 'supplier' | 'client') {
     id: r.id, name: r.name, defaultTermsDays: r.default_terms_days,
   }));
 }
+
+export type PartyStatementRow = {
+  id: string; datedOn: string; kind: string; billNo: string | null;
+  refId: string | null; notes: string | null; amount: number; running: number;
+};
+
+export async function getParty(id: string) {
+  const rows = await sql`
+    SELECT p.*, COALESCE(b.receivable,0) receivable, COALESCE(b.payable,0) payable,
+           COALESCE(b.net,0) net
+    FROM parties p LEFT JOIN party_balances b ON b.party_id = p.id
+    WHERE p.id = ${id}`;
+  if (!rows.length) return null;
+  const r = rows[0] as any;
+  return {
+    id: r.id, name: r.name, kind: r.kind, defaultTermsDays: r.default_terms_days,
+    phone: r.phone, email: r.email, gstin: r.gstin, notes: r.notes, isActive: r.is_active,
+    receivable: Number(r.receivable), payable: Number(r.payable), net: Number(r.net),
+  };
+}
+
+/**
+ * Statement of account: every money row for one party in date order, with a
+ * running balance. Positive means they owe us.
+ */
+export async function getPartyStatement(id: string, limit = 500): Promise<PartyStatementRow[]> {
+  const rows = await sql`
+    SELECT id, dated_on::text AS dated_on, kind, bill_no, ref_id, notes, amount,
+           SUM(amount) OVER (ORDER BY dated_on, created_at, id
+                             ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running
+    FROM ledger WHERE party_id = ${id}
+    -- Tie-breakers must mirror the window's ORDER BY exactly, or the running
+    -- balance appears to jump around within a single day.
+    ORDER BY dated_on DESC, created_at DESC, id DESC
+    LIMIT ${limit}`;
+  return (rows as any[]).map((r) => ({
+    id: r.id, datedOn: r.dated_on, kind: r.kind, billNo: r.bill_no,
+    refId: r.ref_id, notes: r.notes, amount: Number(r.amount), running: Number(r.running),
+  }));
+}
+
+export async function getPartyActivity(id: string) {
+  const [stones] = await sql`
+    SELECT
+      COALESCE(SUM(ABS(m.carats)) FILTER (WHERE m.kind = 'purchase'),0) AS bought,
+      COALESCE(SUM(ABS(m.carats)) FILTER (WHERE m.kind = 'sale'),0)     AS sold
+    FROM movements m JOIN lots l ON l.id = m.lot_id
+    WHERE l.party_id = ${id}`;
+  const memos = await sql`
+    SELECT memo_id, memo_no, direction, issued_on, due_on, memo_status, overdue,
+           SUM(carats) AS carats, SUM(outstanding) AS outstanding, SUM(carats * rate) AS value
+    FROM memo_line_status WHERE party_id = ${id}
+    GROUP BY memo_id, memo_no, direction, issued_on, due_on, memo_status, overdue
+    ORDER BY issued_on DESC LIMIT 50`;
+  return {
+    bought: Number(stones.bought), sold: Number(stones.sold),
+    memos: (memos as any[]).map((m) => ({
+      memoId: m.memo_id, memoNo: m.memo_no, direction: m.direction as 'in' | 'out',
+      issuedOn: m.issued_on, dueOn: m.due_on, status: m.memo_status, overdue: !!m.overdue,
+      carats: Number(m.carats), outstanding: Number(m.outstanding), value: Number(m.value),
+    })),
+  };
+}

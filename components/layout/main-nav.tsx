@@ -8,6 +8,8 @@ export const NAV_ITEMS = [
   { href: '/', label: 'Dashboard' },
   { href: '/stock', label: 'Stock' },
   { href: '/memos', label: 'Memos' },
+  { href: '/bills', label: 'Bills' },
+  { href: '/ledger', label: 'Register' },
   { href: '/accounts', label: 'Accounts' },
   { href: '/parties', label: 'Parties' },
 ] as const;

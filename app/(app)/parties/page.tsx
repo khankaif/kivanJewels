@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -62,7 +63,9 @@ export default async function PartiesPage({
               {parties.map((p) => (
                 <TableRow key={p.id} className={p.isActive ? undefined : 'opacity-50'}>
                   <TableCell className="font-medium">
-                    {p.name}
+                    <Link href={`/parties/${p.id}`} className="underline underline-offset-4">
+                      {p.name}
+                    </Link>
                     {p.phone && <div className="text-xs text-muted-foreground">{p.phone}</div>}
                   </TableCell>
                   <TableCell>

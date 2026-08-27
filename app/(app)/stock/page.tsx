@@ -38,9 +38,15 @@ export default async function StockPage({
             <CardTitle>Lots</CardTitle>
             <CardDescription>Showing {lots.length} lots with a balance or exposure.</CardDescription>
           </div>
-          <form className="max-w-xs">
-            <Input name="q" defaultValue={q ?? ''} placeholder="Search lot, party, sieve, shape…" />
-          </form>
+          <div className="flex flex-wrap items-center gap-3">
+            <form className="max-w-xs flex-1">
+              <Input name="q" defaultValue={q ?? ''} placeholder="Search lot, party, sieve, shape…" />
+            </form>
+            <a href="/api/export?view=lot_balances"
+               className="text-sm text-muted-foreground underline underline-offset-4">
+              Export CSV
+            </a>
+          </div>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>

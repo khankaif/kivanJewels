@@ -46,6 +46,14 @@ export async function checkReconciliation(): Promise<Check[]> {
       SELECT count(*)::int t FROM lot_balances WHERE balance < -0.0005`),
     // Scoped to IMPORTED rows by their deterministic lot_no prefixes. Counting
     // every lot would assert that the app may never create one, which is its job.
+    // The bills view must never drop or duplicate money: its grouped totals
+    // have to equal the flat ledger. This guards the bill_key fallback logic.
+    one('bills gross = ledger sale invoices', 0, 0.01, sql`
+      SELECT COALESCE((SELECT SUM(gross) FROM bills WHERE direction='sale'),0)
+           - COALESCE((SELECT SUM(amount) FROM ledger WHERE kind='sale_invoice'),0) AS t`),
+    one('bills gross = ledger purchase invoices', 0, 0.01, sql`
+      SELECT COALESCE((SELECT SUM(gross) FROM bills WHERE direction='purchase'),0)
+           - COALESCE((SELECT -SUM(amount) FROM ledger WHERE kind='purchase_invoice'),0) AS t`),
     one('imported lots', 1993, 0, sql`
       SELECT count(*)::int t FROM lots WHERE lot_no LIKE 'DH-%' OR lot_no LIKE 'KS-%'`),
     one('imported jewellery orders', 35, 0, sql`
