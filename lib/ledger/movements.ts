@@ -84,31 +84,123 @@ export const recordConsumedForJewellery = (e: Entry, ctx?: Ctx) =>
   insertMovement('consumed_jewellery', e, ctx);
 
 // ------------------------------------------------------------ memo lifecycle
+//
+// Inward and outward memos are mirror images and share one settlement path:
+//
+//                    INWARD (supplier -> you)      OUTWARD (you -> client)
+//   receive / issue  memo_in_receipt   +carats     memo_out_issue   -carats
+//   return           memo_in_return    -carats     memo_out_return  +carats
+//   bill             purchase_invoice, no movement sale_invoice, no movement
+//
+// Billing never moves carats in either direction: inward goods are already in
+// the vault, outward goods already left it. Posting a movement at billing time
+// would double-count. A line settles across ANY number of partial returns and
+// billings until nothing is outstanding.
 
+export type MemoDirection = 'in' | 'out';
 export type MemoLineInput = { lotId: string; carats: number; rate: number };
+/** Inward lines describe goods arriving, so they carry the parcel's attributes. */
+export type InwardLineInput = {
+  carats: number; rate: number; stoneType: string;
+  shape?: string | null; sieveSize?: string | null; mmSize?: string | null;
+  clarity?: string | null; colour?: string | null;
+};
+
+const addDays = (iso: string, days: number) => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+
+async function partyTerms(partyId: string, c: PoolClientLike): Promise<number> {
+  const rows = await q(c)('SELECT default_terms_days FROM parties WHERE id = $1', [partyId]);
+  return rows.length ? Number(rows[0].default_terms_days) : 7;
+}
 
 /**
- * Issues an outward (jangad) memo. Carats LEAVE the vault at issue -- the goods
- * are physically with the client -- so each line writes a negative
- * `memo_out_issue` movement. The database trigger refuses the whole
- * transaction if any line overdraws its lot, so a partly-written memo can
- * never survive.
+ * Receives goods from a supplier on memo (jangad in).
+ *
+ * The goods are NOT purchased yet -- no payable is created. Each line creates a
+ * new lot (a parcel arriving is a new parcel) marked source='memo_in', and a
+ * positive movement so the carats are immediately available to issue onward.
+ * That matters for this business: a parcel routinely arrives on a supplier memo
+ * and goes straight out on a client memo before it is ever bought.
  */
-export async function issueOutwardMemo(
+export async function receiveInwardMemo(
   a: {
-    memoNo: string; partyId: string; issuedOn: string;
-    dueOn: string | null; lines: MemoLineInput[]; notes?: string;
+    memoNo: string; partyId: string; issuedOn: string; dueOn?: string | null;
+    termsDays?: number | null; agent?: string | null; notes?: string;
+    lines: InwardLineInput[];
   },
   ctx?: Ctx,
 ): Promise<string> {
+  if (!a.memoNo.trim()) throw new SettlementError('a memo number is required');
+  if (!a.lines.length) throw new SettlementError('a memo needs at least one line');
+  for (const l of a.lines) {
+    if (!(l.carats > 0)) throw new SettlementError('every line needs carats greater than zero');
+    if (!(l.rate >= 0)) throw new SettlementError('every line needs a valid rate');
+  }
+
+  return inCtx(ctx, async (c) => {
+    const run = q(c);
+    const terms = a.termsDays ?? (await partyTerms(a.partyId, c));
+    const dueOn = a.dueOn ?? addDays(a.issuedOn, terms);
+
+    const [memo] = await run(
+      `INSERT INTO memos (memo_no, direction, party_id, issued_on, due_on, agent, terms_days, notes)
+       VALUES ($1,'in',$2,$3,$4,$5,$6,$7) RETURNING id`,
+      [a.memoNo, a.partyId, a.issuedOn, dueOn, a.agent ?? null, terms, a.notes ?? null],
+    );
+
+    let i = 0;
+    for (const l of a.lines) {
+      i += 1;
+      const [lot] = await run(
+        `INSERT INTO lots (lot_no, party_id, stone_type, shape, sieve_size, mm_size,
+                           clarity, colour, cost_rate, source, opened_on)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'memo_in',$10) RETURNING id`,
+        [`${a.memoNo}/${i}`, a.partyId, l.stoneType, l.shape ?? null, l.sieveSize ?? null,
+         l.mmSize ?? null, l.clarity ?? null, l.colour ?? null, l.rate, a.issuedOn],
+      );
+      const [line] = await run(
+        `INSERT INTO memo_lines (memo_id, lot_id, carats, rate)
+         VALUES ($1,$2,$3,$4) RETURNING id`,
+        [memo.id, lot.id, l.carats, l.rate],
+      );
+      await insertMovement(
+        'memo_in_receipt',
+        { lotId: lot.id, carats: l.carats, rate: l.rate, on: a.issuedOn, memoLineId: line.id },
+        c,
+      );
+    }
+    return memo.id as string;
+  });
+}
+
+/**
+ * Issues an outward (jangad) memo to a client.
+ *
+ * Carats LEAVE the vault at issue -- the goods are physically with the client.
+ * The database trigger refuses the whole transaction if any line overdraws its
+ * lot, so a partly-written memo can never survive. Lots still held on a supplier
+ * memo can be issued onward; that is the normal back-to-back case.
+ */
+export async function issueOutwardMemo(
+  a: {
+    memoNo: string; partyId: string; issuedOn: string; dueOn: string | null;
+    agent?: string | null; notes?: string; lines: MemoLineInput[];
+  },
+  ctx?: Ctx,
+): Promise<string> {
+  if (!a.memoNo.trim()) throw new SettlementError('a memo number is required');
   if (!a.lines.length) throw new SettlementError('a memo needs at least one line');
 
   return inCtx(ctx, async (c) => {
     const run = q(c);
     const [memo] = await run(
-      `INSERT INTO memos (memo_no, direction, party_id, issued_on, due_on, notes)
-       VALUES ($1,'out',$2,$3,$4,$5) RETURNING id`,
-      [a.memoNo, a.partyId, a.issuedOn, a.dueOn, a.notes ?? null],
+      `INSERT INTO memos (memo_no, direction, party_id, issued_on, due_on, agent, notes)
+       VALUES ($1,'out',$2,$3,$4,$5,$6) RETURNING id`,
+      [a.memoNo, a.partyId, a.issuedOn, a.dueOn, a.agent ?? null, a.notes ?? null],
     );
     for (const l of a.lines) {
       const [line] = await run(
@@ -126,25 +218,33 @@ export async function issueOutwardMemo(
   });
 }
 
-/** Carats on this line neither returned nor billed yet. */
-export async function memoLineOutstanding(memoLineId: string, ctx?: Ctx): Promise<number> {
+type LineState = {
+  lineId: string; direction: MemoDirection; lotId: string; partyId: string;
+  rate: number; carats: number; outstanding: number;
+};
+
+async function lineState(memoLineId: string, ctx: Ctx): Promise<LineState> {
   const rows = await q(ctx)(
-    `SELECT ml.carats
-            - COALESCE((SELECT SUM(ABS(m.carats)) FROM movements m
-                        WHERE m.memo_line_id = ml.id AND m.kind = 'memo_out_return'), 0)
-            - COALESCE((SELECT SUM(b.carats) FROM memo_line_billings b
-                        WHERE b.memo_line_id = ml.id), 0) AS outstanding
-     FROM memo_lines ml WHERE ml.id = $1`,
+    `SELECT line_id, direction, lot_id, party_id, rate, carats, outstanding
+     FROM memo_line_status WHERE line_id = $1`,
     [memoLineId],
   );
   if (!rows.length) throw new SettlementError(`memo line ${memoLineId} not found`);
-  return Number(rows[0].outstanding);
+  const r = rows[0];
+  return {
+    lineId: r.line_id, direction: r.direction, lotId: r.lot_id, partyId: r.party_id,
+    rate: Number(r.rate), carats: Number(r.carats), outstanding: Number(r.outstanding),
+  };
+}
+
+/** Carats on this line neither returned nor billed yet. Works both directions. */
+export async function memoLineOutstanding(memoLineId: string, ctx?: Ctx): Promise<number> {
+  return (await lineState(memoLineId, ctx)).outstanding;
 }
 
 async function closeIfSettled(c: PoolClientLike, memoLineId: string) {
   const run = q(c);
-  const remaining = await memoLineOutstanding(memoLineId, c);
-  if (remaining > EPS) return;
+  if ((await lineState(memoLineId, c)).outstanding > EPS) return;
   await run(`UPDATE memo_lines SET status = 'settled' WHERE id = $1`, [memoLineId]);
   await run(
     `UPDATE memos SET status = 'closed'
@@ -156,28 +256,35 @@ async function closeIfSettled(c: PoolClientLike, memoLineId: string) {
   );
 }
 
-async function assertWithinOutstanding(memoLineId: string, carats: number, verb: string, c: PoolClientLike) {
-  if (carats <= 0) throw new SettlementError(`${verb} quantity must be positive`);
-  const outstanding = await memoLineOutstanding(memoLineId, c);
-  if (carats - outstanding > EPS) {
+function assertWithin(state: LineState, carats: number, verb: string) {
+  if (!(carats > 0)) throw new SettlementError(`${verb} quantity must be greater than zero`);
+  if (carats - state.outstanding > EPS) {
     throw new SettlementError(
-      `${verb} of ${carats} ct exceeds outstanding ${outstanding} ct on this memo line`,
+      `${verb} of ${carats} ct exceeds outstanding ${state.outstanding} ct on this memo line`,
     );
   }
 }
 
-/** Client hands goods back. Carats re-enter the vault. Repeatable. */
+/**
+ * Returns carats against a memo line, in whichever direction the memo runs:
+ * an outward memo return brings goods back INTO the vault, an inward memo
+ * return sends them back OUT to the vendor.
+ *
+ * The inward case is also constrained by the vault: goods already sold or
+ * issued onward cannot be returned to the vendor, and the overdraw trigger
+ * enforces that independently of this check.
+ */
 export async function returnFromMemo(
   a: { memoLineId: string; carats: number; on: string; notes?: string },
   ctx?: Ctx,
 ): Promise<void> {
   await inCtx(ctx, async (c) => {
-    await assertWithinOutstanding(a.memoLineId, a.carats, 'return', c);
-    const [ml] = await q(c)('SELECT lot_id, rate FROM memo_lines WHERE id = $1', [a.memoLineId]);
+    const st = await lineState(a.memoLineId, c);
+    assertWithin(st, a.carats, 'return');
     await insertMovement(
-      'memo_out_return',
+      st.direction === 'out' ? 'memo_out_return' : 'memo_in_return',
       {
-        lotId: ml.lot_id, carats: a.carats, rate: Number(ml.rate), on: a.on,
+        lotId: st.lotId, carats: a.carats, rate: st.rate, on: a.on,
         memoLineId: a.memoLineId, notes: a.notes,
       },
       c,
@@ -187,36 +294,72 @@ export async function returnFromMemo(
 }
 
 /**
- * Client keeps goods and is invoiced.
+ * Bills carats against a memo line.
  *
- * Writes NO movement: the carats already left the vault at `memo_out_issue`.
- * Posting one here would double-count every sale. It records the billing and
- * posts a receivable to the money ledger. Repeatable, like returns.
+ * Outward: the client keeps the goods -> a receivable (sale_invoice).
+ * Inward:  the vendor invoices you    -> a payable  (purchase_invoice), and the
+ *          lot is promoted from consignment to owned stock at the billed rate.
+ *
+ * Writes NO movement in either direction. Repeatable until settled.
  */
 export async function billMemoLine(
-  a: { memoLineId: string; carats: number; on: string; invoiceNo: string },
+  a: {
+    memoLineId: string; carats: number; on: string; invoiceNo: string;
+    rate?: number; dueOn?: string | null;
+  },
   ctx?: Ctx,
 ): Promise<void> {
   if (!a.invoiceNo.trim()) throw new SettlementError('an invoice number is required');
   await inCtx(ctx, async (c) => {
     const run = q(c);
-    await assertWithinOutstanding(a.memoLineId, a.carats, 'billing', c);
-    const [ml] = await run(
-      `SELECT ml.rate, m.party_id FROM memo_lines ml
-       JOIN memos m ON m.id = ml.memo_id WHERE ml.id = $1`,
-      [a.memoLineId],
-    );
-    const amount = round2(a.carats * Number(ml.rate));
+    const st = await lineState(a.memoLineId, c);
+    assertWithin(st, a.carats, 'billing');
+
+    const rate = a.rate ?? st.rate;
+    if (!(rate >= 0)) throw new SettlementError('billing rate must not be negative');
+    const amount = round2(a.carats * rate);
+
     await run(
-      `INSERT INTO memo_line_billings (memo_line_id, carats, amount, invoice_no, billed_on)
-       VALUES ($1,$2,$3,$4,$5)`,
-      [a.memoLineId, a.carats, amount, a.invoiceNo, a.on],
+      `INSERT INTO memo_line_billings (memo_line_id, carats, amount, rate, invoice_no, billed_on, due_on)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [a.memoLineId, a.carats, amount, rate, a.invoiceNo, a.on, a.dueOn ?? null],
     );
-    await run(
-      `INSERT INTO ledger (party_id, kind, amount, dated_on, ref_type, ref_id)
-       VALUES ($1,'sale_invoice',$2,$3,'memo_line',$4)`,
-      [ml.party_id, amount, a.on, a.invoiceNo],
-    );
+
+    if (st.direction === 'out') {
+      await run(
+        `INSERT INTO ledger (party_id, kind, amount, dated_on, ref_type, ref_id)
+         VALUES ($1,'sale_invoice',$2,$3,'memo_line',$4)`,
+        [st.partyId, amount, a.on, a.invoiceNo],
+      );
+    } else {
+      await run(
+        `INSERT INTO ledger (party_id, kind, amount, dated_on, ref_type, ref_id)
+         VALUES ($1,'purchase_invoice',$2,$3,'memo_line',$4)`,
+        [st.partyId, -amount, a.on, a.invoiceNo],
+      );
+      // Consignment goods become owned stock once the vendor has invoiced them.
+      await run(
+        `UPDATE lots SET source = 'purchase', cost_rate = $2 WHERE id = $1`,
+        [st.lotId, rate],
+      );
+    }
     await closeIfSettled(c, a.memoLineId);
+  });
+}
+
+/** Records a payment against a party. Positive amount = money you paid out. */
+export async function recordPayment(
+  a: { partyId: string; direction: 'in' | 'out'; amount: number; on: string; ref?: string; notes?: string },
+  ctx?: Ctx,
+): Promise<void> {
+  if (!(a.amount > 0)) throw new SettlementError('payment amount must be greater than zero');
+  await inCtx(ctx, async (c) => {
+    await q(c)(
+      `INSERT INTO ledger (party_id, kind, amount, dated_on, ref_type, ref_id, notes)
+       VALUES ($1,$2,$3,$4,'payment',$5,$6)`,
+      [a.partyId, a.direction === 'in' ? 'payment_in' : 'payment_out',
+       a.direction === 'in' ? -round2(a.amount) : round2(a.amount),
+       a.on, a.ref ?? null, a.notes ?? null],
+    );
   });
 }

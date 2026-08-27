@@ -9,6 +9,7 @@ export const NAV_ITEMS = [
   { href: '/stock', label: 'Stock' },
   { href: '/memos', label: 'Memos' },
   { href: '/accounts', label: 'Accounts' },
+  { href: '/parties', label: 'Parties' },
 ] as const;
 
 export function MainNav() {

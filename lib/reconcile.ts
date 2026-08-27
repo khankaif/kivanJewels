@@ -44,7 +44,11 @@ export async function checkReconciliation(): Promise<Check[]> {
       SELECT COALESCE(SUM(amount),0) t FROM ledger WHERE ref_type='jewellery'`),
     one('negative lot balances', 0, 0, sql`
       SELECT count(*)::int t FROM lot_balances WHERE balance < -0.0005`),
-    one('lots imported', 1993, 0, sql`SELECT count(*)::int t FROM lots`),
-    one('jewellery orders', 35, 0, sql`SELECT count(*)::int t FROM jewellery_orders`),
+    // Scoped to IMPORTED rows by their deterministic lot_no prefixes. Counting
+    // every lot would assert that the app may never create one, which is its job.
+    one('imported lots', 1993, 0, sql`
+      SELECT count(*)::int t FROM lots WHERE lot_no LIKE 'DH-%' OR lot_no LIKE 'KS-%'`),
+    one('imported jewellery orders', 35, 0, sql`
+      SELECT count(*)::int t FROM jewellery_orders`),
   ]);
 }

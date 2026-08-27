@@ -10,9 +10,10 @@ import {
 import { settleLineAction, type ActionState } from '../actions';
 
 export function SettleLineDialog({
-  lineId, lotNo, outstanding, rate, action,
+  lineId, lotNo, outstanding, rate, action, direction,
 }: {
-  lineId: string; lotNo: string; outstanding: number; rate: number; action: 'return' | 'bill';
+  lineId: string; lotNo: string; outstanding: number; rate: number;
+  action: 'return' | 'bill'; direction: 'in' | 'out';
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(
@@ -24,7 +25,19 @@ export function SettleLineDialog({
     null,
   );
   const isBill = action === 'bill';
+  const inward = direction === 'in';
   const today = new Date().toISOString().slice(0, 10);
+
+  const title = isBill
+    ? inward ? 'Supplier bills you' : 'Bill the client'
+    : inward ? 'Return to supplier' : 'Client returns goods';
+  const explain = isBill
+    ? inward
+      ? 'Creates a payable and promotes the goods from consignment to owned stock. No carats move — they are already in your vault.'
+      : 'Creates a receivable. No carats move — they left the vault when the memo was issued.'
+    : inward
+      ? 'Sends goods back to the supplier. Carats leave the vault, so anything already issued to a client cannot be returned.'
+      : 'Carats re-enter your vault.';
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -33,13 +46,10 @@ export function SettleLineDialog({
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isBill ? 'Bill carats' : 'Return carats to vault'}</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Lot {lotNo} · {outstanding.toFixed(3)} ct outstanding.{' '}
-            {isBill
-              ? 'Billing posts a receivable and moves no stock — the carats left the vault at issue.'
-              : 'Returned carats re-enter the vault immediately.'}{' '}
-            You can do this repeatedly until the line is settled.
+            Lot {lotNo} · {outstanding.toFixed(3)} ct outstanding. {explain} You can do this
+            repeatedly until the line is settled.
           </DialogDescription>
         </DialogHeader>
 
@@ -65,8 +75,19 @@ export function SettleLineDialog({
             <div className="space-y-2">
               <Label htmlFor={`i-${lineId}`}>Invoice no.</Label>
               <Input id={`i-${lineId}`} name="invoiceNo" required placeholder="INV-2026-001" />
+            </div>
+          )}
+
+          {isBill && (
+            <div className="space-y-2">
+              <Label htmlFor={`r-${lineId}`}>Rate (₹/ct)</Label>
+              <Input
+                id={`r-${lineId}`} name="rate" type="number" step="0.01" min="0"
+                defaultValue={rate}
+              />
               <p className="text-xs text-muted-foreground">
-                Rate ₹{rate.toLocaleString('en-IN')}/ct on this line.
+                Memo rate was ₹{rate.toLocaleString('en-IN')}/ct. Override if the
+                {inward ? ' supplier invoiced' : ' client is billed'} at a different rate.
               </p>
             </div>
           )}

@@ -10,9 +10,11 @@ import {
 import { issueMemoAction, type ActionState } from '../actions';
 
 type Lot = { lotId: string; lotNo: string; stoneType: string; sieveSize: string | null; balance: number; costRate: number };
-type Party = { id: string; name: string };
+type Party = { id: string; name: string; defaultTermsDays: number };
 
-export function IssueMemoDialog({ lots, parties }: { lots: Lot[]; parties: Party[] }) {
+export function IssueMemoDialog({
+  lots, parties, agents,
+}: { lots: Lot[]; parties: Party[]; agents: string[] }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(
     async (prev, fd) => {
@@ -92,6 +94,14 @@ export function IssueMemoDialog({ lots, parties }: { lots: Lot[]; parties: Party
               <Label htmlFor="dueOn">Due back</Label>
               <Input id="dueOn" name="dueOn" type="date" defaultValue={due} />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="out-agent">Placed by</Label>
+            <Input id="out-agent" name="agent" list="agent-list-out" placeholder="Rushabh" />
+            <datalist id="agent-list-out">
+              {agents.map((a) => <option key={a} value={a} />)}
+            </datalist>
           </div>
 
           {state && 'error' in state && (
