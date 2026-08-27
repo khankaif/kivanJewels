@@ -1,11 +1,19 @@
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
-import { getDashboard } from '@/features/dashboard/queries';
+import { Badge } from '@/components/ui/badge';
+import { getDashboard, getWorklist } from '@/features/dashboard/queries';
 import { inr, ct, pct } from '@/lib/format';
+
+const URGENCY: Record<string, { badge: 'destructive' | 'default' | 'secondary'; ring: string }> = {
+  critical: { badge: 'destructive', ring: 'border-red-300' },
+  warning: { badge: 'default', ring: 'border-amber-300' },
+  info: { badge: 'secondary', ring: '' },
+};
 
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  const d = await getDashboard();
+  const [d, work] = await Promise.all([getDashboard(), getWorklist()]);
 
   const cards: { label: string; value: string; sub?: string; tone?: string }[] = [
     { label: 'Revenue', value: inr(d.revenue) },
@@ -26,11 +34,42 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Today</h1>
         <p className="text-sm text-muted-foreground">
-          Every figure is an aggregate over the movement and money ledgers — nothing is stored.
+          What needs acting on first, then the numbers. Every figure is an aggregate over the
+          movement and money ledgers — nothing is stored.
         </p>
       </div>
+
+      <section className="space-y-3">
+        {work.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              Nothing outstanding. No open memos, no bills past terms.
+            </CardContent>
+          </Card>
+        ) : (
+          work.map((w) => {
+            const u = URGENCY[w.urgency];
+            return (
+              <Link key={w.key} href={w.href} className="block">
+                <Card className={`transition-colors hover:bg-accent/40 ${u.ring}`}>
+                  <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
+                    <div className="flex items-center gap-3">
+                      <Badge variant={u.badge}>{w.count}</Badge>
+                      <div>
+                        <div className="font-medium">{w.label}</div>
+                        <div className="text-xs text-muted-foreground">{w.detail}</div>
+                      </div>
+                    </div>
+                    <div className="text-right font-bold tabular-nums">{inr(w.value)}</div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })
+        )}
+      </section>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((c) => (
           <Card key={c.label}>
