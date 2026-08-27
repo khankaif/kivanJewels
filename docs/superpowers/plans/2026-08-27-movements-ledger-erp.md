@@ -6,7 +6,102 @@
 
 **Architecture:** Two append-only ledgers and nothing else holds a balance. `movements` is the carat ledger (signed rows against a `lots` parcel); `ledger` is the money ledger (signed rows against a `parties` row). Every balance in the app — vault stock, memo exposure, receivables, payables, aging — is a SQL view or aggregate over those two tables. Mutations go through domain functions in `lib/` that wrap a transaction and are guarded by a database trigger, so no code path can oversell a lot even if a future API route forgets to check.
 
-**Tech Stack:** Next.js 15 (App Router, TypeScript), Neon Postgres via `@neondatabase/serverless`, raw SQL migrations (no ORM), `node --test` + `tsx` for tests, Neon database branching for test isolation.
+**Tech Stack:** Next.js 16.3.3 (App Router, TypeScript, React 19), Tailwind v4 + shadcn/ui, Neon Postgres via `@neondatabase/serverless`, Neon Auth (Managed Better Auth) via `@neondatabase/auth`, raw SQL migrations (no ORM), `node --test` + `tsx` for tests, Neon database branching for test isolation.
+
+## Build status (updated 2026-08-27)
+
+Tasks 1–5 and the migrations for Tasks 6 and 11 are **built and verified against the live Neon branch**. What remains starts at Task 6 Step 4.
+
+| Done | Evidence |
+|---|---|
+| Next.js 16.3.3 scaffolded in repo root, Tailwind v4, shadcn/ui initialised (13 components) | `npx tsc --noEmit` exits 0 |
+| Neon Auth (Managed Better Auth) wired: `lib/auth/{server,client}.ts`, `app/api/auth/[...path]/route.ts`, `proxy.ts`, sign-in/sign-up pages | pages render; route protection via `auth.middleware` |
+| `db/client.ts` with `sql`, `withTx`, `runSqlFile` | smoke test below |
+| Migrations `000`–`004` applied to the live branch | `npm run migrate` → `5 migration(s) applied` |
+| 8 tables + `lot_balances` + `party_balances` + both triggers | `information_schema` listing verified |
+| Overdraw guard fires | live: `insufficient stock in lot …: balance 10.000, requested 99.000`, rolled back clean |
+| `lib/dates.ts`, `lib/normalize.ts` + tests | **12/12 pass**, including sweeps over all 2,001 real workbook rows |
+| `scripts/import.ts` + `lib/reconcile.ts` | workbook imported; **11/11 reconciliation checks pass** |
+
+**Corrections made to this plan while building it:**
+- Neon Auth is **Managed Better Auth** (`@neondatabase/auth`), not Stack Auth. Stack Auth is the documented legacy path.
+- Next.js 16 uses **`proxy.ts`**, not `middleware.ts`.
+- `db/client.ts` must read **`DATABASE_URL` only**. Preferring `TEST_DATABASE_URL` when set means a stale placeholder silently captures the real app. Tests swap the variable via `tests/use-test-db.ts` (`--import`), which refuses to run if it is unset, still the placeholder, or equal to `DATABASE_URL`.
+- `lot_balances.exposure` must subtract **billed** carats as well as returned ones; billed carats are no longer exposure.
+- `memo_line_billings` moved into `001_schema.sql` (the plan created it later, in Task 7).
+
+**Tasks 8, 9 and 10 are also done.** `scripts/import.ts` bulk-loads via `UNNEST`
+(one round trip per table, ~32s) rather than the row-at-a-time loop the task
+below describes, which would have issued ~8,000 statements. Positive movements
+insert before negative ones so the overdraw guard never sees a sale before its
+purchase. Reconciliation lives in `lib/reconcile.ts` with two entry points:
+`npm run reconcile` (script) and `tests/reconcile.test.ts` (gate).
+**All 11 checks pass.**
+
+Five data problems the import surfaced, each handled explicitly rather than
+silently:
+
+| Source row | Problem | Handling |
+|---|---|---|
+| `kaivan_stock` Sr.23 | `Carats 0.43`, `Used 0.46`, `Balance −0.03` — an impossible negative physical balance | `adjust_in` plug of 0.030 ct tagged `ref_type='reconciliation'`, so it is queryable and excluded from source-total checks. Generalised: any lot whose movements net negative gets one. |
+| `DH-7` | CZ sale, 107 pcs, `Carats: '-'` — sold by piece, no weight | No lot or movement (they require `carats <> 0`); the ₹6,000 still posts to the ledger. |
+| `DH-1`, `DH-271` | ₹1,140 sale and ₹1,980 purchase with a blank counterparty | Posted against an explicit `(Unidentified)` party rather than dropped. |
+| `JM-10`, `JM-18` | `Cust Order No` holds the literal text `Adjusted Against Diamonds`; no customer, product or amount | Skipped as annotations, detected by absence of content rather than by matching that string. |
+| `JM-29` | A real order (Karan, Screw Bck, ₹1,645, fully paid) with no order number | Order number synthesised; the order and its money are preserved. |
+
+Final counts: **1,993 lots** (1,963 diamond_hisab + 30 kaivan_stock), **3,983
+movements**, **7,263 ledger rows**, **35 jewellery orders**, **118 parties**.
+
+Money tolerances are ₹1, not zero: 125 source rows carry more than two decimal
+places, and the workbook sums them unrounded while `numeric(14,2)` rounds each
+row to paise. Observed drift is ₹0.10 across ₹1.59 crore. Carats reconcile
+exactly.
+
+**Tasks 6, 7, 11, 12 and 13 are also done.** The memo lifecycle lives in
+`lib/ledger/movements.ts`; every function takes an **optional transaction
+context**, so callers can compose operations atomically and the test suite can
+run inside a transaction it rolls back. That last part matters: `movements` is
+append-only, so rollback is the only way to remove a fixture. The suite
+therefore runs safely against the live branch — **20/20 pass, zero residue.**
+
+UI shipped on shadcn/Base UI: `/stock`, `/memos`, `/accounts`, and a real
+dashboard. `npm run build` is clean; unauthenticated requests 307 to `/sign-in`.
+
+**Two P&L bugs found and fixed while wiring the dashboard:**
+
+1. `aging_as_of` summed `sale_invoice` and ignored payments, so it aged *gross
+   invoiced* rather than *outstanding* — Carpe Diam showed ₹96.9 L against a
+   ₹13.8 L receivable. Now nets per `(ref_type, ref_id)`, which is exact because
+   the import links each payment to its invoice's reference. Carpe Diam now
+   reads ₹7,48,782.
+2. COGS was taken from the money ledger, which excludes the 164 sold-from-own-
+   stock rows, then from all purchases, which wrongly counted unsold inventory.
+   Now: **cost of lots that have actually sold**, split by segment.
+
+Final P&L, which independently reproduces the figure computed from the raw
+workbook at the very start of this project (₹22,55,538 / 11.8%):
+
+| Segment | Revenue | Cost | Profit | Margin |
+|---|---|---|---|---|
+| Diamond trading | ₹1,80,99,078.77 | ₹1,59,20,488.36 | ₹21,78,590.41 | 12.0% |
+| Jewellery | ₹10,89,973.14 | ₹10,13,025.91 | ₹76,947.23 | 7.1% |
+| **Total** | **₹1,91,89,051.91** | **₹1,69,33,514.27** | **₹22,55,537.64** | **11.8%** |
+
+**Open item — jewellery/diamond cost overlap.** The source `Product Costing`
+column bundles ₹2,63,937 of diamonds set into jewellery. Where those stones were
+sourced internally (`Purchase Party` = Kaivan Stock, Naice Jewels, A.B.Creation…)
+they are also counted in the diamond segment, so combined profit is understated
+by up to that amount. The workbook records the same stones on two sheets with no
+key linking them; resolving it needs a business decision, not code. The
+dashboard states this on screen rather than hiding it.
+
+**Still to do:** inward (vendor) memo UI, the jangad print voucher, payment
+recording against ledger balances, and Task 12's REST routes (the UI uses server
+actions directly, so those routes are only needed for an external client).
+
+**Superseded below:** Task 6 Step 4 onward — `lib/ledger/movements.ts`, the memo lifecycle, the import script, the reconciliation gate, aging queries, API routes, and the feature UIs.
+
+---
 
 **Spec:** This document is self-contained. It supersedes the earlier "Consignment Memo (Jangad) Lifecycle, Accounts & P&L Suite" plan, which specified features already shipped in `app.js` while leaving the stock↔memo linkage — its actual subject — unimplemented.
 
@@ -27,7 +122,7 @@
 
 ## Source Data — measured, not assumed
 
-All figures below are computed from `initial_data.json` and are the reconciliation targets for Task 9.
+All figures below are computed from `ref/initial_data.json` and are the reconciliation targets for Task 9.
 
 | Sheet | Rows | Measured totals |
 |---|---|---|
@@ -49,39 +144,59 @@ Structural facts that drive the migration design:
 
 ## File Structure
 
+Feature-sliced. `lib/ledger/` is the shared domain kernel — movements and money
+are used by stock, memos, accounts and the dashboard alike, so they do not live
+inside any one feature. Everything a feature owns (its queries, server actions
+and components) sits in its own folder, so a feature can be read, changed or
+deleted without touching its neighbours.
+
 ```
-db/
-  migrations/001_schema.sql        tables, constraints, append-only grants
-  migrations/002_views.sql         lot_balances, party_balances, aging
-  migrations/003_guard.sql         overdraw trigger
-  client.ts                        Neon connection + sql tag + tx helper
-lib/
-  dates.ts                         parseLooseDate — the 5 source formats + sentinels
-  normalize.ts                     canonicalPartyName
-  movements.ts                     recordPurchase, recordSale, issueMemo,
-                                   returnFromMemo, billMemoLine, consumeForJewellery
-  ledger.ts                        postLedger, partyBalances, agingBuckets
-scripts/
-  migrate.ts                       applies db/migrations/*.sql in order
-  import.ts                        initial_data.json -> Postgres, with reconciliation
-tests/
-  dates.test.ts
-  normalize.test.ts
-  movements.test.ts                overdraw guard, memo lifecycle, partial splits
-  ledger.test.ts                   balances + aging
-  reconcile.test.ts                totals match the Excel figures above
 app/
-  api/memos/route.ts               POST issue, GET list
-  api/memos/[id]/lines/route.ts    POST return, POST bill
-  api/stock/route.ts               GET lot_balances
-  api/accounts/route.ts            GET party_balances + aging
-  (dashboard)/page.tsx             KPIs from views
-  stock/page.tsx                   lot balances, exposure column
-  memos/page.tsx                   memo lifecycle UI
-  accounts/page.tsx                aging buckets by party
+  (auth)/                        public: layout, sign-in/page.tsx, sign-up/page.tsx
+  (app)/                         protected: layout.tsx (session gate + nav), page.tsx
+    stock/page.tsx  memos/page.tsx  accounts/page.tsx      [Task 13]
+  api/
+    auth/[...path]/route.ts      Neon Auth proxy                          [done]
+    stock|memos|accounts/route.ts                                      [Task 12]
+proxy.ts                         route protection (Next 16 name)          [done]
+
+components/
+  ui/                            shadcn primitives (13 installed)         [done]
+  layout/main-nav.tsx            nav; add an entry per feature page       [done]
+
+features/
+  auth/       actions.ts  components/credentials-form.tsx                 [done]
+  dashboard/  queries.ts  components/                                  [Task 13]
+  stock/      queries.ts  components/                                  [Task 13]
+  memos/      queries.ts  actions.ts  components/                   [Tasks 7,13]
+  accounts/   queries.ts  components/                                 [Task 11,13]
+
+lib/
+  auth/       server.ts  client.ts                                        [done]
+  ledger/     movements.ts  money.ts   <- domain kernel              [Tasks 6,7,11]
+  dates.ts  normalize.ts  format.ts  utils.ts                             [done]
+
+db/
+  client.ts                      sql, withTx, runSqlFile                  [done]
+  migrations/000..004.sql        applied                                  [done]
+
+scripts/    migrate.ts [done]   import.ts [Tasks 8,9]
+tests/      use-test-db.ts, dates, normalize [done]; the rest per task
+ref/        the original workbook, initial_data.json, and the retired prototype
 ```
 
-`lib/movements.ts` and `lib/ledger.ts` are split by ledger, not by layer — the carat rules and the money rules change for different reasons and are tested separately.
+**Conventions.** A feature's `queries.ts` holds read-only SQL returning plain
+objects; `actions.ts` holds `'use server'` mutations that call `lib/ledger/`;
+`components/` holds that feature's UI. Pages in `app/` compose features and hold
+no SQL of their own. Adding a page means adding one entry to `NAV_ITEMS` in
+`components/layout/main-nav.tsx`.
+
+**Note on task numbering below:** the plan was written before the scaffold
+existed, so Task 6 Step 3 creates `db/migrations/003_guard.sql` and Task 7 Step 4
+creates the billings table — both are already applied. Task 11 Step 3 creates
+`005_aging.sql`, which shipped as `004_aging.sql`. Skip those steps; the code
+steps around them still stand. Where a task says `lib/movements.ts` or
+`lib/ledger.ts`, write `lib/ledger/movements.ts` and `lib/ledger/money.ts`.
 
 ---
 
@@ -560,7 +675,7 @@ git commit -m "feat: lot_balances and party_balances views, append-only movement
 
 - [ ] **Step 1: Write the failing test**
 
-Every case below is a real value measured in `initial_data.json`.
+Every case below is a real value measured in `ref/initial_data.json`.
 
 ```typescript
 // tests/dates.test.ts
@@ -1291,7 +1406,7 @@ async function upsertParties(raws: string[]): Promise<Map<string, string>> {
 }
 
 export async function importAll(): Promise<ImportReport> {
-  const data = JSON.parse(readFileSync('initial_data.json', 'utf8'));
+  const data = JSON.parse(readFileSync('ref/initial_data.json', 'utf8'));
   const dh: Row[] = data.diamond_hisab;
   const skipped: string[] = [];
 
@@ -2173,7 +2288,7 @@ git rm app.js data.js index.html styles.css
 git commit -m "chore: retire localStorage prototype, superseded by Next.js + Neon"
 ```
 
-Keep `initial_data.json` and the `.xlsx` — they are the import source and the
+Keep `ref/initial_data.json` and the `.xlsx` — they are the import source and the
 audit trail for the reconciliation gate.
 
 - [ ] **Step 8: Full suite**
