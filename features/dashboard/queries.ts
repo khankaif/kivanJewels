@@ -29,15 +29,19 @@ export async function getDashboard() {
   ]);
   const revenue = segments.reduce((s, x) => s + x.revenue, 0);
   const cost = segments.reduce((s, x) => s + x.cost, 0);
-  const profit = revenue - cost;
+  const uncosted = segments.reduce((s, x) => s + x.uncosted, 0);
+  const profit = segments.reduce((s, x) => s + x.profit, 0);
   return {
     ...stock,
     ...money,
     segments,
     revenue,
     cost,
+    uncosted,
     profit,
-    margin: revenue > 0 ? (profit / revenue) * 100 : 0,
+    // The sheet's "Profit %" is profit over cost. Match it, so the headline
+    // number is the one already trusted.
+    markup: cost > 0 ? (profit / cost) * 100 : 0,
     openMemos: memo[0].open as number,
     overdueMemos: memo[0].overdue as number,
   };

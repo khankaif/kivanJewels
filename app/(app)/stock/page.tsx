@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -65,7 +66,12 @@ export default async function StockPage({
             <TableBody>
               {lots.map((l) => (
                 <TableRow key={l.lotId}>
-                  <TableCell className="font-mono text-xs">{l.lotNo}</TableCell>
+                  <TableCell>
+                    <Link href={`/stock/${encodeURIComponent(l.lotNo)}`}
+                          className="font-mono text-xs underline underline-offset-4">
+                      {l.lotNo}
+                    </Link>
+                  </TableCell>
                   <TableCell>
                     <Badge variant={l.stoneType.toLowerCase().includes('lab') ? 'secondary' : 'outline'}>
                       {l.stoneType}

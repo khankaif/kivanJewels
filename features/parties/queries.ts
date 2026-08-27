@@ -48,7 +48,8 @@ export async function getPartyOptions(role?: 'supplier' | 'client') {
 
 export type PartyStatementRow = {
   id: string; datedOn: string; kind: string; billNo: string | null;
-  refId: string | null; notes: string | null; amount: number; running: number;
+  refId: string | null; notes: string | null; mode: string | null;
+  amount: number; running: number;
 };
 
 export async function getParty(id: string) {
@@ -72,7 +73,7 @@ export async function getParty(id: string) {
  */
 export async function getPartyStatement(id: string, limit = 500): Promise<PartyStatementRow[]> {
   const rows = await sql`
-    SELECT id, dated_on::text AS dated_on, kind, bill_no, ref_id, notes, amount,
+    SELECT id, dated_on::text AS dated_on, kind, bill_no, ref_id, notes, mode, amount,
            SUM(amount) OVER (ORDER BY dated_on, created_at, id
                              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running
     FROM ledger WHERE party_id = ${id}
@@ -82,7 +83,8 @@ export async function getPartyStatement(id: string, limit = 500): Promise<PartyS
     LIMIT ${limit}`;
   return (rows as any[]).map((r) => ({
     id: r.id, datedOn: r.dated_on, kind: r.kind, billNo: r.bill_no,
-    refId: r.ref_id, notes: r.notes, amount: Number(r.amount), running: Number(r.running),
+    refId: r.ref_id, notes: r.notes, mode: r.mode,
+    amount: Number(r.amount), running: Number(r.running),
   }));
 }
 

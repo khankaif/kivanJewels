@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/table';
 import { getParty, getPartyStatement, getPartyActivity } from '@/features/parties/queries';
 import { getBills } from '@/features/bills/queries';
+import { PaymentDialog } from '@/features/payments/components/payment-dialog';
 import { inr, ct } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -47,6 +48,16 @@ export default async function PartyPage({ params }: { params: Promise<{ id: stri
           {party.phone && ` · ${party.phone}`}
           {party.gstin && ` · ${party.gstin}`}
         </p>
+        <div className="mt-4 flex gap-2">
+          <PaymentDialog
+            partyId={party.id} partyName={party.name} direction="in" size="sm"
+            label="Record receipt"
+          />
+          <PaymentDialog
+            partyId={party.id} partyName={party.name} direction="out" size="sm"
+            label="Record payment"
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-4">
@@ -78,6 +89,7 @@ export default async function PartyPage({ params }: { params: Promise<{ id: stri
                     <TableHead>Date</TableHead>
                     <TableHead>Entry</TableHead>
                     <TableHead>Bill / ref</TableHead>
+                    <TableHead>Mode</TableHead>
                     <TableHead className="text-right">Debit</TableHead>
                     <TableHead className="text-right">Credit</TableHead>
                     <TableHead className="text-right">Balance</TableHead>
@@ -90,6 +102,9 @@ export default async function PartyPage({ params }: { params: Promise<{ id: stri
                       <TableCell>{KIND_LABEL[s.kind] ?? s.kind}</TableCell>
                       <TableCell className="font-mono text-xs">
                         {realBillNo(s.billNo) ?? s.refId ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {s.mode ?? ''}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {s.amount > 0 ? inr(s.amount) : ''}

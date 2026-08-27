@@ -6,6 +6,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { getBill, getBillLines } from '@/features/bills/queries';
+import { PaymentDialog } from '@/features/payments/components/payment-dialog';
 import { inr, ct } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -104,10 +105,27 @@ export default async function BillPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Settlement</CardTitle>
-          <CardDescription>
-            {payments.length ? `${payments.length} payment rows.` : 'Nothing received against this bill yet.'}
-          </CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle>Settlement</CardTitle>
+              <CardDescription>
+                {payments.length
+                  ? `${payments.length} payment rows.`
+                  : direction === 'sale'
+                    ? 'Nothing received against this bill yet.'
+                    : 'Nothing paid against this bill yet.'}
+              </CardDescription>
+            </div>
+            {bill.balance > 0.005 && bill.billNo && (
+              <PaymentDialog
+                partyId={bill.partyId}
+                partyName={bill.partyName}
+                direction={direction === 'sale' ? 'in' : 'out'}
+                billNo={bill.billNo}
+                outstanding={bill.balance}
+              />
+            )}
+          </div>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>

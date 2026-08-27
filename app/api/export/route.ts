@@ -11,6 +11,7 @@ const VIEWS: Record<string, { sql: string; order: string }> = {
   ledger_entries: { sql: 'ledger_entries', order: 'dated_on DESC' },
   lot_balances: { sql: 'lot_balances', order: 'balance DESC' },
   memo_line_status: { sql: 'memo_line_status', order: 'issued_on DESC' },
+  movement_entries: { sql: 'movement_entries', order: 'moved_on DESC' },
 };
 
 const csvCell = (v: unknown): string => {

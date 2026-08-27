@@ -36,41 +36,71 @@ export async function getAccountTotals() {
   return { receivable: Number(r.receivable), payable: Number(r.payable) };
 }
 
-export type Segment = { label: string; revenue: number; cost: number; profit: number; margin: number };
+export type Segment = {
+  label: string; revenue: number; cost: number; uncosted: number;
+  profit: number; markup: number; margin: number;
+};
 
 /**
- * P&L split by business, because the two cannot be blended honestly.
+ * P&L split by business, following the convention the source workbook uses.
  *
- * COGS is the cost of lots actually SOLD, not everything purchased -- unsold
- * inventory (the kaivan_stock opening lots) belongs on the balance sheet, not
- * in cost of sales.
+ * Two rules taken from the sheet rather than invented here:
  *
- * Caveat on the jewellery line: its cost comes from the source "Product
- * Costing" column, which bundles metal, labour AND Rs 2,63,937 of diamonds.
- * Where those diamonds were sourced internally they are also counted in the
- * diamond segment, so total profit is understated by up to that amount. The
- * source workbook records the same stones on two sheets with no key linking
- * them, so this cannot be resolved automatically -- see docs plan, open items.
+ * 1. Sales with NO cost basis are excluded from profit. Nine rows (the sheet's
+ *    first nine, opening stock sold for Rs 4,39,390.63) have a sale but no
+ *    purchase, and the sheet deliberately leaves Profit Loss blank rather than
+ *    booking them as 100% profit. They are reported separately as `uncosted`
+ *    so the money stays visible instead of quietly inflating margin.
+ *
+ * 2. `markup` is profit over COST -- the sheet's "Profit %" column, 10.92%.
+ *    `margin` (profit over revenue) is also returned because it is the more
+ *    common convention elsewhere; the UI labels which is which.
+ *
+ * COGS is the cost of lots actually SOLD, so unsold inventory stays on the
+ * balance sheet rather than in cost of sales.
+ *
+ * Caveat on the jewellery line: its cost comes from "Product Costing", which
+ * bundles Rs 2,63,937 of diamonds. Where those were sourced internally they are
+ * also counted in the diamond segment, so combined profit is understated by up
+ * to that amount. The workbook records the same stones on two sheets with no
+ * key linking them.
  */
 export async function getSegments(): Promise<Segment[]> {
   const [r] = await sql`
+    WITH sold AS (
+      SELECT m.lot_id, ABS(m.amount) AS sale_amount,
+             EXISTS (SELECT 1 FROM movements x
+                     WHERE x.lot_id = m.lot_id AND x.kind = 'purchase') AS costed
+      FROM movements m WHERE m.kind = 'sale'
+    )
     SELECT
       (SELECT COALESCE(SUM(amount),0) FROM ledger
-        WHERE kind='sale_invoice' AND ref_type IN ('diamond_hisab','memo_line'))  AS dia_rev,
+        WHERE kind='sale_invoice' AND ref_type IN ('diamond_hisab','memo_line'))   AS dia_rev,
+      (SELECT COALESCE(SUM(sale_amount),0) FROM sold WHERE costed)                 AS dia_costed_rev,
       (SELECT COALESCE(SUM(p.amount),0) FROM movements p
         WHERE p.kind='purchase'
           AND EXISTS (SELECT 1 FROM movements s
-                      WHERE s.lot_id = p.lot_id AND s.kind = 'sale'))             AS dia_cost,
+                      WHERE s.lot_id = p.lot_id AND s.kind='sale'))                AS dia_cost,
       (SELECT COALESCE(SUM(amount),0) FROM ledger
-        WHERE kind='sale_invoice' AND ref_type='jewellery')                       AS jew_rev,
-      (SELECT COALESCE(SUM(product_cost),0) FROM jewellery_orders)                AS jew_cost`;
+        WHERE kind='sale_invoice' AND ref_type='jewellery')                        AS jew_rev,
+      (SELECT COALESCE(SUM(product_cost),0) FROM jewellery_orders)                 AS jew_cost`;
 
-  const mk = (label: string, revenue: number, cost: number): Segment => ({
-    label, revenue, cost, profit: revenue - cost,
-    margin: revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0,
-  });
+  const diaRev = Number(r.dia_rev);
+  const diaCostedRev = Number(r.dia_costed_rev);
+  const diaCost = Number(r.dia_cost);
+  const jewRev = Number(r.jew_rev);
+  const jewCost = Number(r.jew_cost);
+
+  const mk = (label: string, revenue: number, costedRev: number, cost: number): Segment => {
+    const profit = costedRev - cost;
+    return {
+      label, revenue, cost, uncosted: revenue - costedRev, profit,
+      markup: cost > 0 ? (profit / cost) * 100 : 0,
+      margin: costedRev > 0 ? (profit / costedRev) * 100 : 0,
+    };
+  };
   return [
-    mk('Diamond trading', Number(r.dia_rev), Number(r.dia_cost)),
-    mk('Jewellery', Number(r.jew_rev), Number(r.jew_cost)),
+    mk('Diamond trading', diaRev, diaCostedRev, diaCost),
+    mk('Jewellery', jewRev, jewRev, jewCost),
   ];
 }
