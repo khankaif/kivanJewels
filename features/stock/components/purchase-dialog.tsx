@@ -11,7 +11,9 @@ import { recordPurchaseAction, type ActionState } from '../actions';
 
 type Party = { id: string; name: string };
 
-export function PurchaseDialog({ suppliers, shapes }: { suppliers: Party[]; shapes: string[] }) {
+export function PurchaseDialog({
+  suppliers, shapes, colours, clarities,
+}: { suppliers: Party[]; shapes: string[]; colours: string[]; clarities: string[] }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(
     async (prev, fd) => {
@@ -31,7 +33,8 @@ export function PurchaseDialog({ suppliers, shapes }: { suppliers: Party[]; shap
           <DialogTitle>Buy stock</DialogTitle>
           <DialogDescription>
             Goods you own from the moment they arrive. Carats join the existing unit for this
-            shape, sieve and MM — the rate becomes the average of what you paid.
+            shape, sieve, MM, colour and clarity — the rate becomes the average of what you paid.
+            A different colour or clarity is a different unit, priced on its own.
           </DialogDescription>
         </DialogHeader>
 
@@ -55,6 +58,23 @@ export function PurchaseDialog({ suppliers, shapes }: { suppliers: Party[]; shap
             <div className="space-y-2">
               <Label htmlFor="pu-mm">MM</Label>
               <Input id="pu-mm" name="mmSize" placeholder="2.20" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="pu-colour">Colour</Label>
+              <Input id="pu-colour" name="colour" list="pu-colour-list" placeholder="EF" />
+              <datalist id="pu-colour-list">
+                {colours.map((c) => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pu-clarity">Clarity</Label>
+              <Input id="pu-clarity" name="clarity" list="pu-clarity-list" placeholder="VVS-VS" />
+              <datalist id="pu-clarity-list">
+                {clarities.map((c) => <option key={c} value={c} />)}
+              </datalist>
             </div>
           </div>
 

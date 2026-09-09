@@ -58,6 +58,8 @@ export async function receiveMemoAction(_prev: ActionState, form: FormData): Pro
         shape: String(form.get('shape') ?? '').trim() || null,
         sieveSize: String(form.get('sieveSize') ?? '').trim() || null,
         mmSize: String(form.get('mmSize') ?? '').trim() || null,
+        colour: String(form.get('colour') ?? '').trim() || null,
+        clarity: String(form.get('clarity') ?? '').trim() || null,
       }],
     });
   } catch (e) {

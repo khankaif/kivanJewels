@@ -92,9 +92,10 @@ export type Spec = {
 /** The one owned lot for a spec, created on first purchase. */
 export async function unitLot(spec: Spec, c: PoolClientLike): Promise<string> {
   const run = q(c);
-  const key = [spec.shape ?? null, spec.sieveSize ?? null, spec.mmSize ?? null];
+  const key = [spec.shape ?? null, spec.sieveSize ?? null, spec.mmSize ?? null,
+               spec.colour ?? null, spec.clarity ?? null];
   const find = () =>
-    run(`SELECT id FROM lots WHERE source = 'unit' AND unit_key = lot_unit_key($1,$2,$3)`, key);
+    run(`SELECT id FROM lots WHERE source = 'unit' AND unit_key = lot_unit_key($1,$2,$3,$4,$5)`, key);
 
   const [found] = await find();
   if (found) return found.id as string;

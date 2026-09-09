@@ -12,10 +12,10 @@ import { inr, ct } from '@/lib/format';
 export const dynamic = 'force-dynamic';
 
 export default async function MemosPage() {
-  const [inward, outward, summary, lots, suppliers, clients, agents, shapes] = await Promise.all([
+  const [inward, outward, summary, lots, suppliers, clients, agents, picklists] = await Promise.all([
     getMemos('in'), getMemos('out'), getMemoSummary(),
     getIssuableLots(), getPartyOptions('supplier'), getPartyOptions('client'), getAgents(),
-    getDiamondPicklists().then((p) => p.shape),
+    getDiamondPicklists(),
   ]);
 
   return (
@@ -28,7 +28,10 @@ export default async function MemosPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <ReceiveMemoDialog suppliers={suppliers} agents={agents} shapes={shapes} />
+          <ReceiveMemoDialog
+            suppliers={suppliers} agents={agents} shapes={picklists.shape}
+            colours={picklists.colour} clarities={picklists.clarity}
+          />
           <IssueMemoDialog lots={lots} parties={clients} agents={agents} />
         </div>
       </div>

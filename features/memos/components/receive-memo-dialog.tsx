@@ -12,8 +12,8 @@ import { receiveMemoAction, type ActionState } from '../actions';
 type Party = { id: string; name: string; defaultTermsDays: number };
 
 export function ReceiveMemoDialog({
-  suppliers, agents, shapes,
-}: { suppliers: Party[]; agents: string[]; shapes: string[] }) {
+  suppliers, agents, shapes, colours, clarities,
+}: { suppliers: Party[]; agents: string[]; shapes: string[]; colours: string[]; clarities: string[] }) {
   const [open, setOpen] = useState(false);
   const [terms, setTerms] = useState(7);
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(
@@ -79,6 +79,23 @@ export function ReceiveMemoDialog({
             <div className="space-y-2">
               <Label htmlFor="in-mm">MM</Label>
               <Input id="in-mm" name="mmSize" placeholder="1.80" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="in-colour">Colour</Label>
+              <Input id="in-colour" name="colour" list="in-colour-list" placeholder="EF" />
+              <datalist id="in-colour-list">
+                {colours.map((c) => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="in-clarity">Clarity</Label>
+              <Input id="in-clarity" name="clarity" list="in-clarity-list" placeholder="VVS-VS" />
+              <datalist id="in-clarity-list">
+                {clarities.map((c) => <option key={c} value={c} />)}
+              </datalist>
             </div>
           </div>
 

@@ -44,6 +44,24 @@ test('a different shape is a different unit', async () => {
   });
 });
 
+test('a different colour or clarity is a different unit, priced on its own', async () => {
+  await inRollback(async (c) => {
+    const s = spec();
+    const ef = await recordPurchase(
+      { spec: { ...s, colour: 'EF', clarity: 'VVS-VS' }, carats: 2, rate: 5000, on: '2024-05-01' }, c);
+    const gh = await recordPurchase(
+      { spec: { ...s, colour: 'GH', clarity: 'SI' }, carats: 2, rate: 3800, on: '2024-05-01' }, c);
+    // Same colour spelled differently should still land on the EF unit.
+    const efAgain = await recordPurchase(
+      { spec: { ...s, colour: 'ef', clarity: 'vvs-vs' }, carats: 2, rate: 6000, on: '2024-05-02' }, c);
+
+    assert.notEqual(gh, ef, 'GH/SI stock does not blend into the EF/VVS-VS unit');
+    assert.equal(efAgain, ef, 'case does not create a third unit');
+    assert.equal(Number((await lotOf(c, ef)).cost_rate), 5500, '(2*5000 + 2*6000) / 4, not touched by GH');
+    assert.equal(Number((await lotOf(c, gh)).cost_rate), 3800);
+  });
+});
+
 test('a purchase on a bill posts a payable; one without does not', async () => {
   await inRollback(async (c) => {
     const { rows: [supplier] } = await c.query(
@@ -106,8 +124,8 @@ test('back-to-back: goods sold onward before purchase leave nothing to own', asy
     await billMemoLine({ memoLineId: line.id, carats: 6, on: '2024-05-08', invoiceNo: `ZZ-P-${uniq()}` }, c);
 
     const { rows } = await c.query(
-      `SELECT id FROM lots WHERE source = 'unit' AND unit_key = lot_unit_key($1,$2,$3)`,
-      [s.shape, s.sieveSize, s.mmSize]);
+      `SELECT id FROM lots WHERE source = 'unit' AND unit_key = lot_unit_key($1,$2,$3,$4,$5)`,
+      [s.shape, s.sieveSize, s.mmSize, null, null]);
     assert.equal(rows.length, 0, 'nothing was left to move into stock');
   });
 });

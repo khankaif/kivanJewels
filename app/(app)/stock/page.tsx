@@ -24,9 +24,9 @@ export default async function StockPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
-  const [units, memo, totals, suppliers, shapes] = await Promise.all([
+  const [units, memo, totals, suppliers, picklists] = await Promise.all([
     getOwnedUnits({ search: q }), getMemoStock({ search: q }), getStockTotals(),
-    getPartyOptions('supplier'), getDiamondPicklists().then((p) => p.shape),
+    getPartyOptions('supplier'), getDiamondPicklists(),
   ]);
 
   return (
@@ -35,11 +35,14 @@ export default async function StockPage({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Stock</h1>
           <p className="text-sm text-muted-foreground">
-            What you own is one row per sieve and MM. What you hold on a supplier memo is still
-            theirs, so it stays listed by supplier.
+            What you own is one row per shape, sieve, MM, colour and clarity. What you hold on a
+            supplier memo is still theirs, so it stays listed by supplier.
           </p>
         </div>
-        <PurchaseDialog suppliers={suppliers} shapes={shapes} />
+        <PurchaseDialog
+          suppliers={suppliers} shapes={picklists.shape}
+          colours={picklists.colour} clarities={picklists.clarity}
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-4">
@@ -73,6 +76,7 @@ export default async function StockPage({
                   <TableRow>
                     <TableHead>Sieve / MM</TableHead>
                     <TableHead>Shape</TableHead>
+                    <TableHead>Colour / Clarity</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead className="text-right">In vault</TableHead>
                     <TableHead className="text-right">With clients</TableHead>
@@ -90,6 +94,9 @@ export default async function StockPage({
                         </Link>
                       </TableCell>
                       <TableCell className="text-sm">{u.shape ?? '—'}</TableCell>
+                      <TableCell className="text-sm">
+                        {[u.colour, u.clarity].filter(Boolean).join(' · ') || '—'}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={u.stoneType.toLowerCase().includes('lab') ? 'secondary' : 'outline'}>
                           {u.stoneType}
@@ -103,7 +110,7 @@ export default async function StockPage({
                       <TableCell className="text-right tabular-nums font-medium">{inr(u.value)}</TableCell>
                     </TableRow>
                   ))}
-                  {!units.length && <Empty cols={7} what="No stock matches." />}
+                  {!units.length && <Empty cols={8} what="No stock matches." />}
                 </TableBody>
               </Table>
             </CardContent>
@@ -121,6 +128,7 @@ export default async function StockPage({
                   <TableRow>
                     <TableHead>Supplier</TableHead>
                     <TableHead>Sieve / MM</TableHead>
+                    <TableHead>Colour / Clarity</TableHead>
                     <TableHead>Memo</TableHead>
                     <TableHead>Due</TableHead>
                     <TableHead className="text-right">To settle</TableHead>
@@ -137,6 +145,9 @@ export default async function StockPage({
                         </Link>
                       </TableCell>
                       <TableCell>{spec(m)}{m.shape ? ` · ${m.shape}` : ''}</TableCell>
+                      <TableCell className="text-sm">
+                        {[m.colour, m.clarity].filter(Boolean).join(' · ') || '—'}
+                      </TableCell>
                       <TableCell className="font-mono text-xs">{m.memoNos.join(', ')}</TableCell>
                       <TableCell className="text-sm">
                         {m.overdue
@@ -154,7 +165,7 @@ export default async function StockPage({
                     </TableRow>
                   ))}
                   {!memo.length && (
-                    <Empty cols={7} what="Nothing held on a supplier memo. Settle them from Memos." />
+                    <Empty cols={8} what="Nothing held on a supplier memo. Settle them from Memos." />
                   )}
                 </TableBody>
               </Table>

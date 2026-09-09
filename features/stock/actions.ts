@@ -38,6 +38,8 @@ export async function recordPurchaseAction(_prev: ActionState, form: FormData): 
         shape: str('shape') || null,
         sieveSize: str('sieveSize') || null,
         mmSize: str('mmSize') || null,
+        colour: str('colour') || null,
+        clarity: str('clarity') || null,
       },
       carats, rate, on: str('on'), partyId, billNo,
       notes: str('notes') || undefined,
