@@ -23,7 +23,11 @@ export default async function DashboardPage() {
     },
     { label: 'Receivable', value: inr(d.receivable), tone: 'text-positive' },
     { label: 'Payable', value: inr(d.payable), tone: 'text-warning' },
-    { label: 'In vault', value: ct(d.carats), sub: `${inr(d.value)} at cost · ${d.lots} lots` },
+    {
+      label: 'My stock', value: ct(d.carats),
+      sub: `${inr(d.value)} at cost · ${d.units} units` +
+           (d.memoCarats ? ` · ${ct(d.memoCarats)} on memo` : ''),
+    },
     {
       label: 'Out on memo', value: ct(d.exposure),
       sub: `${d.openMemos} open${d.overdueMemos ? ` · ${d.overdueMemos} overdue` : ''}`,

@@ -76,12 +76,104 @@ export async function insertMovement(kind: MovementKind, e: Entry, ctx?: Ctx): P
   }
 }
 
-export const recordPurchase = (e: Entry, ctx?: Ctx) => insertMovement('purchase', e, ctx);
-export const recordSale = (e: Entry, ctx?: Ctx) => insertMovement('sale', e, ctx);
-export const recordMemoInReceipt = (e: Entry, ctx?: Ctx) => insertMovement('memo_in_receipt', e, ctx);
-export const recordMemoInReturn = (e: Entry, ctx?: Ctx) => insertMovement('memo_in_return', e, ctx);
-export const recordConsumedForJewellery = (e: Entry, ctx?: Ctx) =>
-  insertMovement('consumed_jewellery', e, ctx);
+// ------------------------------------------------------------- owned stock
+//
+// Owned stock is fungible by spec: one lot per shape/sieve/mm, so buying 2.20mm
+// twice adds carats to the unit you already have instead of minting a second
+// row. Memo stock is deliberately NOT consolidated -- that parcel goes back to
+// that supplier, so it keeps its own lot. See db/migrations/014_stock_units.sql.
+
+export type Spec = {
+  stoneType: string;
+  shape?: string | null; sieveSize?: string | null; mmSize?: string | null;
+  clarity?: string | null; colour?: string | null;
+};
+
+/** The one owned lot for a spec, created on first purchase. */
+export async function unitLot(spec: Spec, c: PoolClientLike): Promise<string> {
+  const run = q(c);
+  const key = [spec.shape ?? null, spec.sieveSize ?? null, spec.mmSize ?? null];
+  const find = () =>
+    run(`SELECT id FROM lots WHERE source = 'unit' AND unit_key = lot_unit_key($1,$2,$3)`, key);
+
+  const [found] = await find();
+  if (found) return found.id as string;
+
+  // ON CONFLICT rather than a plain insert: the partial unique index on
+  // unit_key is what makes consolidation true, so losing the race must reuse
+  // the winner's unit, not fail the purchase.
+  const [made] = await run(
+    `INSERT INTO lots (lot_no, stone_type, shape, sieve_size, mm_size, clarity, colour,
+                       cost_rate, source, opened_on)
+     VALUES ('U-' || nextval('lot_unit_seq'), $1,$2,$3,$4,$5,$6, 0, 'unit', CURRENT_DATE)
+     ON CONFLICT (unit_key) WHERE source = 'unit' DO NOTHING
+     RETURNING id`,
+    [spec.stoneType, spec.shape ?? null, spec.sieveSize ?? null, spec.mmSize ?? null,
+     spec.clarity ?? null, spec.colour ?? null],
+  );
+  if (made) return made.id as string;
+  return (await find())[0].id as string;
+}
+
+/**
+ * Moves carats into an owned unit and re-averages its cost.
+ *
+ * Cost is value / weight, carried forward: a unit holding 2 ct at 4500 that
+ * takes 2 ct at 5000 is then 4 ct at 4750. Averaging over the lot's whole
+ * purchase history instead would misprice a unit that was emptied and rebought.
+ */
+async function addToUnit(
+  a: { lotId: string; kind: MovementKind; carats: number; rate: number; on: string;
+       ref?: string; refType?: string; notes?: string },
+  c: PoolClientLike,
+): Promise<void> {
+  const held = Math.max(await lotBalance(a.lotId, c), 0);
+  await insertMovement(a.kind, { ...a, rate: a.rate }, c);
+  await q(c)(
+    `UPDATE lots
+     SET cost_rate = ($2::numeric * COALESCE(cost_rate,0) + $3::numeric * $4::numeric)
+                     / ($2::numeric + $3::numeric)
+     WHERE id = $1`,
+    [a.lotId, held, a.carats, a.rate],
+  );
+}
+
+/**
+ * Buys stock outright: goods you own from the moment they arrive.
+ *
+ * `billNo` means the supplier invoiced you, so a payable is posted alongside
+ * the carats. Without it the purchase is stock-only -- cash over the counter,
+ * or an opening balance being entered.
+ */
+export async function recordPurchase(
+  a: {
+    spec: Spec; carats: number; rate: number; on: string;
+    partyId?: string | null; billNo?: string | null; notes?: string;
+  },
+  ctx?: Ctx,
+): Promise<string> {
+  if (!(a.carats > 0)) throw new SettlementError('carats must be greater than zero');
+  if (!(a.rate >= 0)) throw new SettlementError('rate must not be negative');
+  if (a.billNo && !a.partyId) throw new SettlementError('a bill needs a supplier');
+
+  return inCtx(ctx, async (c) => {
+    const lotId = await unitLot(a.spec, c);
+    await addToUnit(
+      { lotId, kind: 'purchase', carats: a.carats, rate: a.rate, on: a.on,
+        refType: a.billNo ? 'bill' : undefined, ref: a.billNo ?? undefined, notes: a.notes },
+      c,
+    );
+
+    if (a.billNo) {
+      await q(c)(
+        `INSERT INTO ledger (party_id, kind, amount, dated_on, bill_no, ref_type, ref_id, notes)
+         VALUES ($1,'purchase_invoice',$2,$3,$4,'purchase',$5,$6)`,
+        [a.partyId, -round2(a.carats * a.rate), a.on, a.billNo, a.billNo, a.notes ?? null],
+      );
+    }
+    return lotId;
+  });
+}
 
 // ------------------------------------------------------------ memo lifecycle
 //
@@ -298,9 +390,11 @@ export async function returnFromMemo(
  *
  * Outward: the client keeps the goods -> a receivable (sale_invoice).
  * Inward:  the vendor invoices you    -> a payable  (purchase_invoice), and the
- *          lot is promoted from consignment to owned stock at the billed rate.
+ *          carats still in the vault move into the owned unit for their spec.
  *
- * Writes NO movement in either direction. Repeatable until settled.
+ * Billing moves no carats in or out of the business -- inward goods are already
+ * here, outward goods already left. The inward transfer is a change of
+ * ownership between two lots, not a change of holding. Repeatable until settled.
  */
 export async function billMemoLine(
   a: {
@@ -337,11 +431,31 @@ export async function billMemoLine(
          VALUES ($1,'purchase_invoice',$2,$3,'memo_line',$4)`,
         [st.partyId, -amount, a.on, a.invoiceNo],
       );
-      // Consignment goods become owned stock once the vendor has invoiced them.
-      await run(
-        `UPDATE lots SET source = 'purchase', cost_rate = $2 WHERE id = $1`,
-        [st.lotId, rate],
-      );
+      // Consignment goods become owned stock once the vendor has invoiced them,
+      // and owned stock lives in the spec's unit -- not in the memo parcel,
+      // which stays the supplier's document. Only what is still in the vault
+      // moves: carats already sold or issued onward are gone, and you cannot
+      // come to own what you no longer hold. That is the back-to-back case.
+      const held = Math.min(a.carats, await lotBalance(st.lotId, c));
+      if (held > EPS) {
+        const [spec] = await run(
+          `SELECT stone_type, shape, sieve_size, mm_size, clarity, colour
+           FROM lots WHERE id = $1`,
+          [st.lotId],
+        );
+        await insertMovement('adjust_out', {
+          lotId: st.lotId, carats: held, rate, on: a.on,
+          refType: 'bill', ref: a.invoiceNo, notes: `bought on ${a.invoiceNo}`,
+        }, c);
+        const unitId = await unitLot({
+          stoneType: spec.stone_type, shape: spec.shape, sieveSize: spec.sieve_size,
+          mmSize: spec.mm_size, clarity: spec.clarity, colour: spec.colour,
+        }, c);
+        await addToUnit({
+          lotId: unitId, kind: 'adjust_in', carats: held, rate, on: a.on,
+          refType: 'bill', ref: a.invoiceNo, notes: `bought on ${a.invoiceNo}`,
+        }, c);
+      }
     }
     await closeIfSettled(c, a.memoLineId);
   });

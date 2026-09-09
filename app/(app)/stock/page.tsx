@@ -1,14 +1,21 @@
 import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { getStock, getStockTotals } from '@/features/stock/queries';
+import { getOwnedUnits, getMemoStock, getStockTotals } from '@/features/stock/queries';
+import { PurchaseDialog } from '@/features/stock/components/purchase-dialog';
+import { getPartyOptions } from '@/features/parties/queries';
 import { inr, ct } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
+
+/** Sieve and MM are the name of the goods; everything else is description. */
+const spec = (s: { sieveSize: string | null; mmSize: string | null }) =>
+  [s.sieveSize, s.mmSize && `${s.mmSize}mm`].filter(Boolean).join(' · ') || '—';
 
 export default async function StockPage({
   searchParams,
@@ -16,91 +23,153 @@ export default async function StockPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
-  const [lots, totals] = await Promise.all([getStock({ search: q }), getStockTotals()]);
+  const [units, memo, totals, suppliers] = await Promise.all([
+    getOwnedUnits({ search: q }), getMemoStock({ search: q }), getStockTotals(),
+    getPartyOptions('supplier'),
+  ]);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Stock</h1>
-        <p className="text-sm text-muted-foreground">
-          Balance is what is physically in the vault. Carats out on an open memo show as exposure.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Stock</h1>
+          <p className="text-sm text-muted-foreground">
+            What you own is one row per sieve and MM. What you hold on a supplier memo is still
+            theirs, so it stays listed by supplier.
+          </p>
+        </div>
+        <PurchaseDialog suppliers={suppliers} />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Stat label="In vault" value={ct(totals.carats)} sub={`${totals.lots} lots`} />
-        <Stat label="Vault value at cost" value={inr(totals.value)} />
-        <Stat label="Out on memo" value={ct(totals.exposure)} sub="with clients on approval" />
+      <div className="grid gap-4 sm:grid-cols-4">
+        <Stat label="My stock" value={ct(totals.carats)} sub={`${totals.units} units`} />
+        <Stat label="Value at cost" value={inr(totals.value)} />
+        <Stat label="Held on memo" value={ct(totals.memoCarats)} sub="not yours yet" />
+        <Stat label="Out with clients" value={ct(totals.exposure)} sub="on approval" />
       </div>
 
-      <Card>
-        <CardHeader className="gap-3">
-          <div>
-            <CardTitle>Lots</CardTitle>
-            <CardDescription>Showing {lots.length} lots with a balance or exposure.</CardDescription>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <form className="max-w-xs flex-1">
-              <Input name="q" defaultValue={q ?? ''} placeholder="Search lot, party, sieve, shape…" />
-            </form>
-            <a href="/api/export?view=lot_balances"
-               className="text-sm text-muted-foreground underline underline-offset-4">
-              Export CSV
-            </a>
-          </div>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Lot</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Sieve / MM</TableHead>
-                <TableHead>Party</TableHead>
-                <TableHead className="text-right">In vault</TableHead>
-                <TableHead className="text-right">On memo</TableHead>
-                <TableHead className="text-right">Rate</TableHead>
-                <TableHead className="text-right">Value</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lots.map((l) => (
-                <TableRow key={l.lotId}>
-                  <TableCell>
-                    <Link href={`/stock/${encodeURIComponent(l.lotNo)}`}
-                          className="font-mono text-xs underline underline-offset-4">
-                      {l.lotNo}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={l.stoneType.toLowerCase().includes('lab') ? 'secondary' : 'outline'}>
-                      {l.stoneType}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    {l.sieveSize ?? '—'} {l.mmSize ? `· ${l.mmSize}` : ''}
-                  </TableCell>
-                  <TableCell>{l.partyName ?? '—'}</TableCell>
-                  <TableCell className="text-right tabular-nums">{ct(l.balance)}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {l.exposure > 0 ? <span className="text-warning">{ct(l.exposure)}</span> : '—'}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{inr(l.costRate)}</TableCell>
-                  <TableCell className="text-right tabular-nums font-medium">{inr(l.value)}</TableCell>
-                </TableRow>
-              ))}
-              {!lots.length && (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
-                    No lots match.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <form>
+        <Input
+          name="q" defaultValue={q ?? ''} className="max-w-sm"
+          placeholder="Search sieve, MM, shape, supplier…"
+        />
+      </form>
+
+      <Tabs defaultValue="owned">
+        <TabsList>
+          <TabsTrigger value="owned">My stock ({units.length})</TabsTrigger>
+          <TabsTrigger value="memo">On memo ({memo.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="owned">
+          <Card>
+            <CardHeader>
+              <CardTitle>Owned units</CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Sieve / MM</TableHead>
+                    <TableHead>Shape</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">In vault</TableHead>
+                    <TableHead className="text-right">With clients</TableHead>
+                    <TableHead className="text-right">Avg rate</TableHead>
+                    <TableHead className="text-right">Value</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {units.map((u) => (
+                    <TableRow key={u.lotId}>
+                      <TableCell>
+                        <Link href={`/stock/${encodeURIComponent(u.lotNo)}`}
+                              className="font-medium underline underline-offset-4">
+                          {spec(u)}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-sm">{u.shape ?? '—'}</TableCell>
+                      <TableCell>
+                        <Badge variant={u.stoneType.toLowerCase().includes('lab') ? 'secondary' : 'outline'}>
+                          {u.stoneType}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{ct(u.balance)}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {u.exposure > 0 ? <span className="text-warning">{ct(u.exposure)}</span> : '—'}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{inr(u.costRate)}</TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">{inr(u.value)}</TableCell>
+                    </TableRow>
+                  ))}
+                  {!units.length && <Empty cols={7} what="No stock matches." />}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="memo">
+          <Card>
+            <CardHeader>
+              <CardTitle>Held from suppliers</CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Supplier</TableHead>
+                    <TableHead>Sieve / MM</TableHead>
+                    <TableHead>Memo</TableHead>
+                    <TableHead>Due</TableHead>
+                    <TableHead className="text-right">To settle</TableHead>
+                    <TableHead className="text-right">Still here</TableHead>
+                    <TableHead className="text-right">Rate</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {memo.map((m) => (
+                    <TableRow key={`${m.partyId}-${m.unitKey}`}>
+                      <TableCell className="font-medium">
+                        <Link href={`/parties/${m.partyId}`} className="underline underline-offset-4">
+                          {m.partyName}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{spec(m)}{m.shape ? ` · ${m.shape}` : ''}</TableCell>
+                      <TableCell className="font-mono text-xs">{m.memoNos.join(', ')}</TableCell>
+                      <TableCell className="text-sm">
+                        {m.overdue
+                          ? <span className="text-negative">{m.dueOn} · overdue</span>
+                          : m.dueOn ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">
+                        {ct(m.outstanding)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {/* The gap is goods that went straight out to a client. */}
+                        {ct(m.inVault)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{inr(m.rate)}</TableCell>
+                    </TableRow>
+                  ))}
+                  {!memo.length && (
+                    <Empty cols={7} what="Nothing held on a supplier memo. Settle them from Memos." />
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
+  );
+}
+
+function Empty({ cols, what }: { cols: number; what: string }) {
+  return (
+    <TableRow>
+      <TableCell colSpan={cols} className="py-10 text-center text-muted-foreground">{what}</TableCell>
+    </TableRow>
   );
 }
 

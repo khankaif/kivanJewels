@@ -55,7 +55,7 @@ test('due date defaults to the party terms (source: Due = Pur.Date + Terms)', as
   });
 });
 
-test('vendor billing creates a PAYABLE and promotes the lot to owned stock', async () => {
+test('vendor billing creates a PAYABLE and moves the goods into owned stock', async () => {
   await inRollback(async (c) => {
     const supplier = await party(c, 'Supplier');
     const invoiceNo = `ZZ-PINV-${uniq()}`;
@@ -67,16 +67,22 @@ test('vendor billing creates a PAYABLE and promotes the lot to owned stock', asy
 
     await billMemoLine({ memoLineId: line.id, carats: 10, on: '2024-05-08', invoiceNo }, c);
 
-    assert.equal(await lotBalance(line.lot_id, c), 10, 'billing moves no carats: already in vault');
-
     const { rows: led } = await c.query(
       `SELECT kind, amount FROM ledger WHERE ref_id = $1`, [invoiceNo]);
     assert.equal(led[0].kind, 'purchase_invoice');
     assert.equal(Number(led[0].amount), -38000, 'payable is negative: we owe them');
 
-    const { rows: lot } = await c.query(`SELECT source, cost_rate FROM lots WHERE id = $1`, [line.lot_id]);
-    assert.equal(lot[0].source, 'purchase', 'promoted from consignment to owned');
-    assert.equal(Number(lot[0].cost_rate), 3800);
+    // Billing moves no carats in or out of the business, but it does change who
+    // owns them: the parcel stops being the supplier's and becomes a unit of
+    // owned stock. See db/migrations/014_stock_units.sql.
+    assert.equal(await lotBalance(line.lot_id, c), 0, 'no longer held on memo');
+    const { rows: unit } = await c.query(
+      `SELECT b.balance, l.cost_rate FROM lots l JOIN lot_balances b ON b.lot_id = l.id
+       WHERE l.source = 'unit'
+         AND l.unit_key = (SELECT unit_key FROM lots WHERE id = $1)`,
+      [line.lot_id]);
+    assert.equal(Number(unit[0].balance), 10, 'owned outright now');
+    assert.equal(Number(unit[0].cost_rate), 3800);
   });
 });
 
