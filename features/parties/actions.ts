@@ -34,6 +34,10 @@ export async function savePartyAction(_prev: PartyState, form: FormData): Promis
     String(form.get('gstin') ?? '').trim().toUpperCase() || null,
     String(form.get('notes') ?? '').trim() || null,
     form.get('isActive') === 'off' ? false : true,
+    String(form.get('businessName') ?? '').trim() || null,
+    String(form.get('contactPerson') ?? '').trim() || null,
+    String(form.get('address') ?? '').trim() || null,
+    String(form.get('pan') ?? '').trim().toUpperCase() || null,
   ] as const;
 
   try {
@@ -41,13 +45,15 @@ export async function savePartyAction(_prev: PartyState, form: FormData): Promis
       await sql`
         UPDATE parties SET name=${fields[0]}, kind=${fields[1]}, default_terms_days=${fields[2]},
           phone=${fields[3]}, email=${fields[4]}, gstin=${fields[5]}, notes=${fields[6]},
-          is_active=${fields[7]}, updated_at=now()
+          is_active=${fields[7]}, business_name=${fields[8]}, contact_person=${fields[9]},
+          address=${fields[10]}, pan=${fields[11]}, updated_at=now()
         WHERE id=${id}`;
     } else {
       await sql`
-        INSERT INTO parties (name, kind, default_terms_days, phone, email, gstin, notes, is_active)
+        INSERT INTO parties (name, kind, default_terms_days, phone, email, gstin, notes, is_active,
+                             business_name, contact_person, address, pan)
         VALUES (${fields[0]},${fields[1]},${fields[2]},${fields[3]},${fields[4]},
-                ${fields[5]},${fields[6]},${fields[7]})`;
+                ${fields[5]},${fields[6]},${fields[7]},${fields[8]},${fields[9]},${fields[10]},${fields[11]})`;
     }
   } catch (e) {
     if (e instanceof Error && /duplicate key/.test(e.message)) {

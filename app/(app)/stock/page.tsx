@@ -9,6 +9,7 @@ import {
 import { getOwnedUnits, getMemoStock, getStockTotals } from '@/features/stock/queries';
 import { PurchaseDialog } from '@/features/stock/components/purchase-dialog';
 import { getPartyOptions } from '@/features/parties/queries';
+import { getDiamondPicklists } from '@/features/masters/diamonds/queries';
 import { inr, ct } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -23,9 +24,9 @@ export default async function StockPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
-  const [units, memo, totals, suppliers] = await Promise.all([
+  const [units, memo, totals, suppliers, shapes] = await Promise.all([
     getOwnedUnits({ search: q }), getMemoStock({ search: q }), getStockTotals(),
-    getPartyOptions('supplier'),
+    getPartyOptions('supplier'), getDiamondPicklists().then((p) => p.shape),
   ]);
 
   return (
@@ -38,7 +39,7 @@ export default async function StockPage({
             theirs, so it stays listed by supplier.
           </p>
         </div>
-        <PurchaseDialog suppliers={suppliers} />
+        <PurchaseDialog suppliers={suppliers} shapes={shapes} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-4">

@@ -39,9 +39,18 @@ export function PartyDialog({ party }: { party?: Party }) {
         <form action={formAction} className="space-y-4">
           {editing && <input type="hidden" name="id" value={party.id} />}
 
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input id="name" name="name" required defaultValue={party?.name} placeholder="Naice Gems LLP" />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input id="name" name="name" required defaultValue={party?.name} placeholder="Naice Gems LLP" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="businessName">Business name</Label>
+              <Input
+                id="businessName" name="businessName" defaultValue={party?.businessName ?? ''}
+                placeholder="If different from name"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -71,14 +80,30 @@ export function PartyDialog({ party }: { party?: Party }) {
               <Input id="phone" name="phone" defaultValue={party?.phone ?? ''} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="gstin">GSTIN</Label>
-              <Input id="gstin" name="gstin" defaultValue={party?.gstin ?? ''} className="uppercase" />
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" name="email" type="email" defaultValue={party?.email ?? ''} />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" defaultValue={party?.email ?? ''} />
+            <Label htmlFor="contactPerson">Contact person</Label>
+            <Input id="contactPerson" name="contactPerson" defaultValue={party?.contactPerson ?? ''} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="gstin">GSTIN</Label>
+              <Input id="gstin" name="gstin" defaultValue={party?.gstin ?? ''} className="uppercase" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pan">PAN</Label>
+              <Input id="pan" name="pan" defaultValue={party?.pan ?? ''} className="uppercase" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="address">Address</Label>
+            <Input id="address" name="address" defaultValue={party?.address ?? ''} />
           </div>
 
           <div className="space-y-2">

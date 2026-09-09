@@ -4,6 +4,8 @@ export type Party = {
   id: string; name: string; kind: 'supplier' | 'client' | 'both';
   defaultTermsDays: number; phone: string | null; email: string | null;
   gstin: string | null; notes: string | null; isActive: boolean;
+  businessName: string | null; contactPerson: string | null;
+  address: string | null; pan: string | null;
   receivable: number; payable: number; net: number;
   openMemosIn: number; openMemosOut: number;
 };
@@ -12,7 +14,7 @@ export async function getParties(opts: { search?: string; includeInactive?: bool
   const like = opts.search ? `%${opts.search}%` : null;
   const rows = await sql`
     SELECT p.id, p.name, p.kind, p.default_terms_days, p.phone, p.email,
-           p.gstin, p.notes, p.is_active,
+           p.gstin, p.notes, p.is_active, p.business_name, p.contact_person, p.address, p.pan,
            COALESCE(b.receivable,0) AS receivable,
            COALESCE(b.payable,0)    AS payable,
            COALESCE(b.net,0)        AS net,
@@ -23,12 +25,15 @@ export async function getParties(opts: { search?: string; includeInactive?: bool
     FROM parties p
     LEFT JOIN party_balances b ON b.party_id = p.id
     WHERE (${opts.includeInactive ?? false}::boolean OR p.is_active)
-      AND (${like}::text IS NULL OR p.name ILIKE ${like} OR p.phone ILIKE ${like} OR p.gstin ILIKE ${like})
+      AND (${like}::text IS NULL
+           OR p.name ILIKE ${like} OR p.business_name ILIKE ${like}
+           OR p.phone ILIKE ${like} OR p.gstin ILIKE ${like})
     ORDER BY ABS(COALESCE(b.net,0)) DESC, p.name`;
 
   return rows.map((r: any) => ({
     id: r.id, name: r.name, kind: r.kind, defaultTermsDays: r.default_terms_days,
     phone: r.phone, email: r.email, gstin: r.gstin, notes: r.notes, isActive: r.is_active,
+    businessName: r.business_name, contactPerson: r.contact_person, address: r.address, pan: r.pan,
     receivable: Number(r.receivable), payable: Number(r.payable), net: Number(r.net),
     openMemosIn: r.open_in, openMemosOut: r.open_out,
   }));
@@ -63,6 +68,7 @@ export async function getParty(id: string) {
   return {
     id: r.id, name: r.name, kind: r.kind, defaultTermsDays: r.default_terms_days,
     phone: r.phone, email: r.email, gstin: r.gstin, notes: r.notes, isActive: r.is_active,
+    businessName: r.business_name, contactPerson: r.contact_person, address: r.address, pan: r.pan,
     receivable: Number(r.receivable), payable: Number(r.payable), net: Number(r.net),
   };
 }

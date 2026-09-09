@@ -11,7 +11,7 @@ import { recordPurchaseAction, type ActionState } from '../actions';
 
 type Party = { id: string; name: string };
 
-export function PurchaseDialog({ suppliers }: { suppliers: Party[] }) {
+export function PurchaseDialog({ suppliers, shapes }: { suppliers: Party[]; shapes: string[] }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(
     async (prev, fd) => {
@@ -43,7 +43,10 @@ export function PurchaseDialog({ suppliers }: { suppliers: Party[] }) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="pu-shape">Shape</Label>
-              <Input id="pu-shape" name="shape" defaultValue="Round" />
+              <Input id="pu-shape" name="shape" list="pu-shape-list" defaultValue="Round" />
+              <datalist id="pu-shape-list">
+                {shapes.map((s) => <option key={s} value={s} />)}
+              </datalist>
             </div>
             <div className="space-y-2">
               <Label htmlFor="pu-sieve">Sieve</Label>

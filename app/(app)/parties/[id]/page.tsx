@@ -43,11 +43,15 @@ export default async function PartyPage({ params }: { params: Promise<{ id: stri
           <Badge variant="outline">{party.kind === 'both' ? 'supplier & client' : party.kind}</Badge>
           {!party.isActive && <Badge variant="secondary">inactive</Badge>}
         </h1>
+        {party.businessName && <p className="text-sm font-medium">{party.businessName}</p>}
         <p className="text-sm text-muted-foreground">
           {party.defaultTermsDays}-day terms
           {party.phone && ` · ${party.phone}`}
-          {party.gstin && ` · ${party.gstin}`}
+          {party.gstin && ` · GSTIN ${party.gstin}`}
+          {party.pan && ` · PAN ${party.pan}`}
+          {party.contactPerson && ` · Contact: ${party.contactPerson}`}
         </p>
+        {party.address && <p className="text-sm text-muted-foreground">{party.address}</p>}
         <div className="mt-4 flex gap-2">
           <PaymentDialog
             partyId={party.id} partyName={party.name} direction="in" size="sm"

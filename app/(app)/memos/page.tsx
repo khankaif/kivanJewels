@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getMemos, getMemoSummary, getAgents } from '@/features/memos/queries';
 import { getIssuableLots } from '@/features/stock/queries';
 import { getPartyOptions } from '@/features/parties/queries';
+import { getDiamondPicklists } from '@/features/masters/diamonds/queries';
 import { MemoList } from '@/features/memos/components/memo-list';
 import { IssueMemoDialog } from '@/features/memos/components/issue-memo-dialog';
 import { ReceiveMemoDialog } from '@/features/memos/components/receive-memo-dialog';
@@ -11,9 +12,10 @@ import { inr, ct } from '@/lib/format';
 export const dynamic = 'force-dynamic';
 
 export default async function MemosPage() {
-  const [inward, outward, summary, lots, suppliers, clients, agents] = await Promise.all([
+  const [inward, outward, summary, lots, suppliers, clients, agents, shapes] = await Promise.all([
     getMemos('in'), getMemos('out'), getMemoSummary(),
     getIssuableLots(), getPartyOptions('supplier'), getPartyOptions('client'), getAgents(),
+    getDiamondPicklists().then((p) => p.shape),
   ]);
 
   return (
@@ -26,7 +28,7 @@ export default async function MemosPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <ReceiveMemoDialog suppliers={suppliers} agents={agents} />
+          <ReceiveMemoDialog suppliers={suppliers} agents={agents} shapes={shapes} />
           <IssueMemoDialog lots={lots} parties={clients} agents={agents} />
         </div>
       </div>

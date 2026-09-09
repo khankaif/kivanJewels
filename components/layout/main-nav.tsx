@@ -13,6 +13,7 @@ export const NAV_ITEMS = [
   { href: '/ledger', label: 'Register' },
   { href: '/accounts', label: 'Accounts' },
   { href: '/parties', label: 'Parties' },
+  { href: '/masters/diamonds', label: 'Diamond master' },
 ] as const;
 
 export function MainNav() {

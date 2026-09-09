@@ -11,7 +11,9 @@ import { receiveMemoAction, type ActionState } from '../actions';
 
 type Party = { id: string; name: string; defaultTermsDays: number };
 
-export function ReceiveMemoDialog({ suppliers, agents }: { suppliers: Party[]; agents: string[] }) {
+export function ReceiveMemoDialog({
+  suppliers, agents, shapes,
+}: { suppliers: Party[]; agents: string[]; shapes: string[] }) {
   const [open, setOpen] = useState(false);
   const [terms, setTerms] = useState(7);
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(
@@ -65,7 +67,10 @@ export function ReceiveMemoDialog({ suppliers, agents }: { suppliers: Party[]; a
             </div>
             <div className="space-y-2">
               <Label htmlFor="in-shape">Shape</Label>
-              <Input id="in-shape" name="shape" placeholder="Round" />
+              <Input id="in-shape" name="shape" list="in-shape-list" placeholder="Round" />
+              <datalist id="in-shape-list">
+                {shapes.map((s) => <option key={s} value={s} />)}
+              </datalist>
             </div>
             <div className="space-y-2">
               <Label htmlFor="in-sieve">Sieve</Label>

@@ -38,7 +38,7 @@ export default async function PartiesPage({
             <CardDescription>Sorted by size of outstanding balance.</CardDescription>
           </div>
           <form className="flex gap-2">
-            <Input name="q" defaultValue={q ?? ''} placeholder="Search name, phone, GSTIN…" className="max-w-xs" />
+            <Input name="q" defaultValue={q ?? ''} placeholder="Search name, business name, phone, GSTIN…" className="max-w-xs" />
             <label className="flex items-center gap-2 text-sm text-muted-foreground">
               <input type="checkbox" name="all" value="1" defaultChecked={all === '1'} className="size-4" />
               show inactive
@@ -66,7 +66,11 @@ export default async function PartiesPage({
                     <Link href={`/parties/${p.id}`} className="underline underline-offset-4">
                       {p.name}
                     </Link>
-                    {p.phone && <div className="text-xs text-muted-foreground">{p.phone}</div>}
+                    {(p.businessName || p.phone) && (
+                      <div className="text-xs text-muted-foreground">
+                        {[p.businessName, p.phone].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">
