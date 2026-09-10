@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth/server';
 import { MainNav } from '@/components/layout/main-nav';
+import { CommandPalette } from '@/components/layout/command-palette';
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/features/auth/actions';
 
@@ -19,6 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <MainNav />
           </div>
           <div className="flex items-center gap-3">
+            <span className="hidden text-xs text-muted-foreground sm:inline">⌘K to search</span>
             <span className="text-sm text-muted-foreground">{session.user.email}</span>
             <form action={signOut}>
               <Button type="submit" variant="ghost" size="sm">
@@ -28,6 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </header>
+      <CommandPalette />
       <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
     </div>
   );
