@@ -5,7 +5,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { FilterBar } from '@/components/layout/filter-bar';
-import { getBills } from '@/features/bills/queries';
+import { getBills } from '@/features/accounts/bills';
 import { getPartyOptions } from '@/features/parties/queries';
 import { inr } from '@/lib/format';
 

@@ -5,7 +5,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { FilterBar } from '@/components/layout/filter-bar';
-import { getMovements, MOVEMENT_LABEL } from '@/features/stock/movements';
+import { getMovements, MOVEMENT_LABEL } from '@/features/stock/register';
 import { inr, ct } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';

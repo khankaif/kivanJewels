@@ -74,8 +74,12 @@ export async function getSegments(): Promise<Segment[]> {
       FROM movements m WHERE m.kind = 'sale'
     )
     SELECT
+      -- Everything that is NOT jewellery, rather than a whitelist of the
+      -- ref_types that existed when this was written: a new sale path
+      -- (a direct sale off a requirement, say) must not silently drop out
+      -- of revenue because nobody remembered to add it here.
       (SELECT COALESCE(SUM(amount),0) FROM ledger
-        WHERE kind='sale_invoice' AND ref_type IN ('diamond_hisab','memo_line'))   AS dia_rev,
+        WHERE kind='sale_invoice' AND ref_type IS DISTINCT FROM 'jewellery')       AS dia_rev,
       (SELECT COALESCE(SUM(sale_amount),0) FROM sold WHERE costed)                 AS dia_costed_rev,
       (SELECT COALESCE(SUM(p.amount),0) FROM movements p
         WHERE p.kind='purchase'

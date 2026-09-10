@@ -5,8 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { getBill, getBillLines } from '@/features/bills/queries';
-import { PaymentDialog } from '@/features/payments/components/payment-dialog';
+import { getBill, getBillLines } from '@/features/accounts/bills';
+import { PaymentDialog } from '@/features/accounts/components/payment-dialog';
 import { inr, ct } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';

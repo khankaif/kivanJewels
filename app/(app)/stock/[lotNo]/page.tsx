@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { getLotHistory, MOVEMENT_LABEL } from '@/features/stock/movements';
+import { getLotHistory, MOVEMENT_LABEL } from '@/features/stock/register';
 import { inr, ct } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';

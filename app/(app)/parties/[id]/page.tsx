@@ -7,8 +7,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { getParty, getPartyStatement, getPartyActivity } from '@/features/parties/queries';
-import { getBills } from '@/features/bills/queries';
-import { PaymentDialog } from '@/features/payments/components/payment-dialog';
+import { getBills } from '@/features/accounts/bills';
+import { PaymentDialog } from '@/features/accounts/components/payment-dialog';
 import { inr, ct } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
