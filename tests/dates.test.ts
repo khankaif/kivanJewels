@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseLooseDate } from '../lib/dates';
+import { addDays, parseLooseDate } from '../lib/dates';
 
 test('passes ISO through', () => {
   assert.equal(parseLooseDate('2024-06-28'), '2024-06-28');
@@ -51,4 +51,11 @@ test('every date value in the real workbook parses or is a known sentinel', asyn
   // The single known bad cell: a Due Date holding a bill number.
   assert.deepEqual([...unparsed.keys()], ['LOC-26-27-00164'],
     `unexpected unparsed date values: ${JSON.stringify([...unparsed])}`);
+});
+
+test('addDays counts whole calendar days', () => {
+  assert.equal(addDays('2026-09-11', 7), '2026-09-18');
+  assert.equal(addDays('2026-02-25', 4), '2026-03-01');
+  assert.equal(addDays('2026-09-11', 0), '2026-09-11');
+  assert.equal(addDays('', 7), '');
 });

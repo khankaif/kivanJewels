@@ -2,10 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth/server';
+import { withTx } from '@/db/client';
 import {
   OverdrawError, recordBill, recordDirectSale, recordPayment, recordPurchase,
   SettlementError, type PaymentMode,
 } from '@/lib/ledger/movements';
+import { checkSpec, type StoredSpec } from '@/features/masters/diamonds/spec';
+import { docNoOr } from '@/lib/doc-numbers';
 
 export type PaymentState = { error: string } | { ok: string } | null;
 
@@ -52,10 +55,22 @@ export type BillState = { error: string } | { ok: string } | null;
 
 const BILL_PATHS = ['/', '/accounts', '/accounts/bills', '/stock', '/sales', '/parties'];
 
+/** One line of a bill. Which fields matter depends on what the bill is for. */
+type BillLineInput = {
+  lotId?: string;                       // sale off stock
+  spec?: Record<string, string>;        // purchase into stock
+  carats?: number; rate?: number;
+  amount?: number;                      // charges, no diamonds
+  notes?: string;
+};
+
 /**
  * Records a bill three ways, because a bill means three different things:
  * a firm sale off stock, diamonds bought in, or charges with no diamonds at
  * all. The first two move carats and money together; the third only money.
+ *
+ * All the lines of one bill go in a single transaction: a two-line invoice
+ * that half-posted would leave a document whose total is a lie.
  */
 export async function addBillAction(_prev: BillState, form: FormData): Promise<BillState> {
   const { data: session } = await auth.getSession();
@@ -65,42 +80,77 @@ export async function addBillAction(_prev: BillState, form: FormData): Promise<B
   const partyId = s('partyId');
   const direction = s('direction');
   const withGoods = s('goods') === 'stock';
-  const billNo = s('billNo');
+  let billNo = s('billNo');
   const on = s('on');
+  const dueOn = s('dueOn') || null;
   const notes = s('notes') || null;
 
   if (!partyId) return { error: 'Select the party.' };
   if (direction !== 'sale' && direction !== 'purchase') return { error: 'Choose sale or purchase.' };
-  if (!billNo) return { error: 'Enter the bill number.' };
+  // Ours to issue on a sale; theirs to quote on a purchase.
+  if (!billNo && direction === 'purchase') return { error: "Enter the supplier's bill number." };
   if (!on) return { error: 'Enter the bill date.' };
+  if (dueOn && dueOn < on) return { error: 'The due date cannot fall before the bill date.' };
 
-  const carats = Number(form.get('carats'));
-  const rate = Number(form.get('rate'));
-  if (withGoods) {
-    if (!Number.isFinite(carats) || carats <= 0) return { error: 'Enter carats greater than zero.' };
-    if (!Number.isFinite(rate) || rate < 0) return { error: 'Enter a valid rate.' };
+  let lines: BillLineInput[];
+  try {
+    lines = JSON.parse(String(form.get('lines') ?? '[]'));
+  } catch {
+    return { error: 'Could not read the bill lines.' };
+  }
+  if (!lines.length) return { error: 'Add at least one line.' };
+
+  // Validate every line before writing any of them, so a bad third line does
+  // not roll back two good ones after the fact.
+  const prepared: { line: BillLineInput; spec?: StoredSpec }[] = [];
+  for (const [i, line] of lines.entries()) {
+    const at = lines.length > 1 ? ` on line ${i + 1}` : '';
+    if (withGoods) {
+      if (!Number.isFinite(line.carats) || (line.carats ?? 0) <= 0) {
+        return { error: `Enter carats greater than zero${at}.` };
+      }
+      if (!Number.isFinite(line.rate) || (line.rate ?? 0) < 0) return { error: `Enter a valid rate${at}.` };
+      if (direction === 'sale') {
+        if (!line.lotId) return { error: `Pick the stock this sale comes out of${at}.` };
+        prepared.push({ line });
+      } else {
+        const checked = await checkSpec(line.spec ?? {});
+        if (!checked.ok) return { error: `${checked.error.replace(/\.$/, '')}${at}.` };
+        prepared.push({ line, spec: checked.spec });
+      }
+    } else {
+      if (!Number.isFinite(line.amount) || (line.amount ?? 0) <= 0) {
+        return { error: `Enter an amount greater than zero${at}.` };
+      }
+      prepared.push({ line });
+    }
   }
 
   try {
-    if (withGoods && direction === 'sale') {
-      const lotId = s('lotId');
-      if (!lotId) return { error: 'Pick the stock this sale comes out of.' };
-      await recordDirectSale({ lotId, carats, rate, on, invoiceNo: billNo, partyId, notes: notes ?? undefined });
-    } else if (withGoods) {
-      if (!s('sieveSize') && !s('mmSize')) return { error: 'Enter a sieve or an MM size.' };
-      await recordPurchase({
-        spec: {
-          stoneType: s('stoneType') || 'Lab Grown',
-          shape: s('shape') || null, sieveSize: s('sieveSize') || null, mmSize: s('mmSize') || null,
-          colour: s('colour') || null, clarity: s('clarity') || null,
-        },
-        carats, rate, on, partyId, billNo,
-      });
-    } else {
-      const amount = Number(form.get('amount'));
-      if (!Number.isFinite(amount) || amount <= 0) return { error: 'Enter an amount greater than zero.' };
-      await recordBill({ partyId, direction, amount, on, billNo, notes });
-    }
+    await withTx(async (tx) => {
+      // Our own sale invoice gets the next number in the series when the field
+      // was left blank; a purchase carries the supplier's number, never ours.
+      if (direction === 'sale') billNo = await docNoOr(billNo, 'invoice', tx);
+      for (const { line, spec } of prepared) {
+        if (withGoods && direction === 'sale') {
+          await recordDirectSale({
+            lotId: line.lotId!, carats: line.carats!, rate: line.rate!, on,
+            invoiceNo: billNo, partyId, dueOn, notes: line.notes ?? notes ?? undefined,
+          }, tx);
+        } else if (withGoods) {
+          await recordPurchase({
+            spec: spec!,
+            carats: line.carats!, rate: line.rate!, on, partyId, billNo, dueOn,
+            notes: line.notes ?? notes ?? undefined,
+          }, tx);
+        } else {
+          await recordBill({
+            partyId, direction, amount: line.amount!, on, billNo, dueOn,
+            notes: line.notes ?? notes,
+          }, tx);
+        }
+      }
+    });
   } catch (e) {
     if (e instanceof OverdrawError) return { error: 'That lot does not hold enough carats.' };
     if (e instanceof SettlementError) return { error: e.message };
@@ -110,5 +160,7 @@ export async function addBillAction(_prev: BillState, form: FormData): Promise<B
 
   for (const p of BILL_PATHS) revalidatePath(p);
   revalidatePath(`/parties/${partyId}`);
-  return { ok: `Bill ${billNo} recorded.` };
+  return {
+    ok: `Bill ${billNo} recorded${lines.length > 1 ? ` — ${lines.length} lines` : ''}.`,
+  };
 }

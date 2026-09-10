@@ -6,6 +6,7 @@ export default auth.middleware({
 });
 
 export const config = {
-  // Everything except auth pages, the auth API, and static assets.
-  matcher: ['/((?!sign-in|sign-up|api/auth|_next/static|_next/image|favicon.ico).*)'],
+  // Everything except the sign-in page, the auth API, and static assets.
+  // There is no sign-up route: accounts come from Settings -> Staff.
+  matcher: ['/((?!sign-in|api/auth|_next/static|_next/image|favicon.ico).*)'],
 };

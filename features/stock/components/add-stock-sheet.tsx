@@ -8,7 +8,9 @@ import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
 import { Segmented } from '@/components/ui/segmented';
-import { SpecFields } from '@/features/masters/diamonds/components/spec-fields';
+import { CaratsRate } from '@/components/ui/carats-rate';
+import { SpecFields, type Picklists } from '@/features/masters/diamonds/components/spec-fields';
+import type { SieveShapes } from '@/lib/spec-rules';
 import { useLastUsed } from '@/lib/use-last-used';
 import { addStockAction, type ActionState } from '../actions';
 
@@ -16,10 +18,10 @@ type Party = { id: string; name: string; defaultTermsDays: number };
 type Mode = 'bill' | 'memo';
 
 export function AddStockSheet({
-  suppliers, agents, shapes, colours, clarities, defaultOpen = false,
+  suppliers, agents, picklists, sieveShapes, defaultOpen = false,
 }: {
   suppliers: Party[]; agents: string[];
-  shapes: string[]; colours: string[]; clarities: string[];
+  picklists: Picklists; sieveShapes: SieveShapes;
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -45,38 +47,32 @@ export function AddStockSheet({
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger render={<Button />}>Add diamonds</SheetTrigger>
+      <SheetTrigger render={<Button />}>Add stock</SheetTrigger>
       <SheetContent side="right">
         <SheetHeader>
-          <SheetTitle>Add diamonds to stock</SheetTitle>
+          <SheetTitle>Receive stock</SheetTitle>
           <SheetDescription>
             {mode === 'bill'
-              ? 'Bought outright — goes to purchase stock. A bill number posts a payable; leave it blank for a cash buy.'
-              : 'Held on approval — goes to memo stock. No payable until the supplier bills you.'}
+              ? 'You own this stock now. Add the supplier bill to create a payable, or leave it blank for a cash purchase.'
+              : 'You are holding this stock on supplier approval. It is available to show a client, but you do not own it yet.'}
           </SheetDescription>
         </SheetHeader>
 
         <Segmented
           value={mode} set={setMode}
-          options={[['bill', 'On bill / cash'], ['memo', 'On memo']]}
+          options={[['bill', 'Purchase / cash'], ['memo', 'Supplier approval']]}
         />
 
         <form key={round} action={formAction} className="flex flex-1 flex-col gap-4">
           <input type="hidden" name="mode" value={mode} />
 
-          <SpecFields id="as" shapes={shapes} colours={colours} clarities={clarities} autoFocus />
+          <SpecFields id="as" picklists={picklists} sieveShapes={sieveShapes} autoFocus />
 
-          <div className="grid grid-cols-3 gap-3">
-            <Field label="Carats" htmlFor="as-carats">
-              <Input id="as-carats" name="carats" type="number" step="0.001" min="0.001" required />
-            </Field>
-            <Field label="Rate (₹/ct)" htmlFor="as-rate">
-              <Input id="as-rate" name="rate" type="number" step="0.01" min="0" required />
-            </Field>
-            <Field label={mode === 'bill' ? 'Date' : 'Received on'} htmlFor="as-on">
-              <Input id="as-on" name="on" type="date" defaultValue={today} required />
-            </Field>
-          </div>
+          <CaratsRate id="as" />
+
+          <Field label={mode === 'bill' ? 'Date' : 'Received on'} htmlFor="as-on">
+            <Input id="as-on" name="on" type="date" defaultValue={today} required />
+          </Field>
 
           <Field label="Supplier" htmlFor="as-partyId">
             <select
@@ -102,7 +98,7 @@ export function AddStockSheet({
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <Field label="Memo no." htmlFor="as-memoNo">
-                <Input id="as-memoNo" name="memoNo" required placeholder="JGD-IN-2026-001" />
+                <Input id="as-memoNo" name="memoNo" placeholder="Blank = we number it" />
               </Field>
               <Field label="Terms (days)" htmlFor="as-terms">
                 <Input
@@ -136,7 +132,7 @@ export function AddStockSheet({
               Save &amp; add another
             </Button>
             <Button type="submit" name="then" value="close" disabled={isPending}>
-              {isPending ? 'Saving…' : mode === 'bill' ? 'Add to purchase stock' : 'Add to memo stock'}
+              {isPending ? 'Saving…' : mode === 'bill' ? 'Receive owned stock' : 'Receive on approval'}
             </Button>
           </SheetFooter>
         </form>

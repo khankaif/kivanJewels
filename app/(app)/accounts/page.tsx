@@ -5,25 +5,35 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getAging, getPartyBalances, getAccountTotals } from '@/features/accounts/queries';
+import { getBills } from '@/features/accounts/money';
+import { PaymentDialog } from '@/features/accounts/components/payment-dialog';
 import { inr } from '@/lib/format';
+import { PageHeader } from '@/components/layout/page-header';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AccountsPage() {
   const asOf = new Date().toISOString().slice(0, 10);
-  const [aging, balances, totals] = await Promise.all([
+  const [aging, balances, totals, receivables, payables] = await Promise.all([
     getAging(asOf), getPartyBalances(), getAccountTotals(),
+    getBills({ direction: 'sale', status: 'unpaid', limit: 5 }),
+    getBills({ direction: 'purchase', status: 'unpaid', limit: 5 }),
   ]);
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">One row per party, not per invoice. Aging as of {asOf}.</p>
+      <PageHeader
+        eyebrow="Cash control"
+        title="Accounts desk"
+        description={`See who needs chasing and who needs paying. Aging is calculated as of ${asOf}.`}
+        actions={<Link href="/accounts/bills?status=unpaid" className="inline-flex h-8 items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/85">Open unpaid bills</Link>}
+      />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Receivable</div>
-            <div className="mt-1 text-2xl font-bold tabular-nums text-positive">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Card className="shadow-xs">
+          <CardContent className="pt-4">
+            <div className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">To collect</div>
+            <div className="mt-1 text-2xl font-semibold tabular-nums text-positive">
               {inr(totals.receivable)}
             </div>
             <Link href="/accounts/bills?direction=sale&status=unpaid"
@@ -32,10 +42,10 @@ export default async function AccountsPage() {
             </Link>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Payable</div>
-            <div className="mt-1 text-2xl font-bold tabular-nums text-warning">
+        <Card className="shadow-xs">
+          <CardContent className="pt-4">
+            <div className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">To pay</div>
+            <div className="mt-1 text-2xl font-semibold tabular-nums text-warning">
               {inr(totals.payable)}
             </div>
             <Link href="/accounts/bills?direction=purchase&status=unpaid"
@@ -45,6 +55,20 @@ export default async function AccountsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <section>
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">Cash workbench</h2>
+            <p className="text-xs text-muted-foreground">The next collections and supplier payments to resolve.</p>
+          </div>
+          <Link href="/accounts/bills?status=unpaid" className="text-xs font-medium text-primary hover:underline">View every unpaid bill</Link>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-2">
+          <BillQueue title="Collect from clients" empty="Nothing to collect." rows={receivables.rows} />
+          <BillQueue title="Pay suppliers" empty="Nothing to pay." rows={payables.rows} />
+        </div>
+      </section>
 
       <Tabs defaultValue="aging">
         <TabsList>
@@ -135,5 +159,40 @@ export default async function AccountsPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function BillQueue({ title, empty, rows }: {
+  title: string; empty: string;
+  rows: Awaited<ReturnType<typeof getBills>>['rows'];
+}) {
+  return (
+    <Card className="shadow-xs">
+      <CardHeader className="border-b bg-muted/20">
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="divide-y pt-1">
+        {rows.map((bill) => (
+          <div key={`${bill.direction}-${bill.billKey}`} className="flex items-center justify-between gap-3 py-3">
+            <div className="min-w-0">
+              <Link href={`/parties/${bill.partyId}`} className="block truncate text-sm font-medium hover:underline">{bill.partyName}</Link>
+              <div className="text-xs text-muted-foreground">
+                {bill.billNo ?? 'Unnumbered'} · {bill.status === 'overdue' ? `${bill.daysOverdue}d overdue` : `due ${bill.dueOn ?? '—'}`}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className={bill.status === 'overdue' ? 'font-semibold tabular-nums text-negative' : 'font-semibold tabular-nums'}>{inr(bill.balance)}</span>
+              <PaymentDialog
+                partyId={bill.partyId} partyName={bill.partyName}
+                direction={bill.direction === 'sale' ? 'in' : 'out'} billNo={bill.billNo}
+                outstanding={bill.balance} size="sm"
+                label={bill.direction === 'sale' ? 'Receive' : 'Pay'}
+              />
+            </div>
+          </div>
+        ))}
+        {!rows.length && <div className="py-8 text-center text-sm text-muted-foreground">{empty}</div>}
+      </CardContent>
+    </Card>
   );
 }

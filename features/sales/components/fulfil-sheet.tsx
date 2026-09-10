@@ -8,6 +8,8 @@ import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+import { specLabel } from '@/lib/format';
+import { CaratsRate } from '@/components/ui/carats-rate';
 import { deliverAction, sourceAction, type ActionState } from '../actions';
 import type { RequirementLine, SpecLot } from '../queries';
 
@@ -34,13 +36,15 @@ function Toggle<T extends string>({ value, set, options }: {
 }
 
 export function FulfilSheet({
-  line, stock, suppliers, agents,
+  line, stock, suppliers, agents, defaultOpen = false,
 }: {
   line: RequirementLine;
   stock: { exact: SpecLot[]; others: SpecLot[] };
   suppliers: Party[]; agents: string[];
+  /** The pipeline board links straight into a line's drawer. */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [mode, setMode] = useState<'deliver' | 'source'>(line.inStock > 0.0005 ? 'deliver' : 'source');
   const [channel, setChannel] = useState<'memo' | 'bill'>('memo');
   const [showAll, setShowAll] = useState(false);
@@ -61,24 +65,23 @@ export function FulfilSheet({
   const today = new Date().toISOString().slice(0, 10);
   const due = new Date(new Date(today).getTime() + 7 * 864e5).toISOString().slice(0, 10);
   const lots = showAll ? [...stock.exact, ...stock.others] : stock.exact;
-  const specLabel = [line.sieveSize, line.mmSize && `${line.mmSize}mm`, line.shape, line.colour, line.clarity]
-    .filter(Boolean).join(' · ');
+  const label = specLabel(line);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger render={<Button size="sm" />}>Fulfil</SheetTrigger>
       <SheetContent side="right">
         <SheetHeader>
-          <SheetTitle>Fulfil — {specLabel || 'line'}</SheetTitle>
+          <SheetTitle>Fulfil order line</SheetTitle>
           <SheetDescription>
-            {line.outstanding.toFixed(3)} ct outstanding of {line.wanted.toFixed(3)}.
-            {line.inStock > 0.0005 && ` ${line.inStock.toFixed(3)} ct of this spec in stock.`}
+            {label} · {line.outstanding.toFixed(3)} ct still to fulfil.
+            {line.inStock > 0.0005 && ` ${line.inStock.toFixed(3)} ct is available now.`}
           </SheetDescription>
         </SheetHeader>
 
         <Toggle
           value={mode} set={setMode}
-          options={[['deliver', 'Deliver from stock'], ['source', 'Source from market']]}
+          options={[['deliver', 'Use available stock'], ['source', 'Source from supplier']]}
         />
 
         <form action={formAction} className="flex flex-1 flex-col gap-4">
@@ -101,14 +104,14 @@ export function FulfilSheet({
                 {stock.others.length > 0 && (
                   <label className="flex items-center gap-2 text-xs text-muted-foreground">
                     <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} className="size-3.5" />
-                    show all stock (substitution)
+                    Allow a substitution from another specification
                   </label>
                 )}
               </div>
 
               <Toggle
                 value={channel} set={setChannel}
-                options={[['memo', 'On memo (approval)'], ['bill', 'On bill (firm sale)']]}
+                options={[['memo', 'Send on approval'], ['bill', 'Firm sale / invoice']]}
               />
             </>
           ) : (
@@ -130,38 +133,28 @@ export function FulfilSheet({
 
               <Toggle
                 value={channel} set={setChannel}
-                options={[['memo', 'On memo'], ['bill', 'On bill']]}
+                options={[['memo', 'Supplier approval'], ['bill', 'Purchase bill']]}
               />
             </>
           )}
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="ff-carats">Carats</Label>
-              <Input
-                id="ff-carats" name="carats" type="number" step="0.001" min="0.001" required
-                defaultValue={line.outstanding > 0 ? line.outstanding.toFixed(3) : ''}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ff-rate">Rate (₹/ct)</Label>
-              <Input
-                id="ff-rate" name="rate" type="number" step="0.01" min="0" required
-                defaultValue={mode === 'deliver' && line.quotedRate ? line.quotedRate : ''}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ff-on">Date</Label>
-              <Input id="ff-on" name="on" type="date" defaultValue={today} required />
-            </div>
+          <CaratsRate
+            id="ff"
+            defaultCarats={line.outstanding > 0 ? line.outstanding.toFixed(3) : ''}
+            defaultRate={mode === 'deliver' && line.quotedRate ? line.quotedRate : ''}
+            rateLabel={mode === 'deliver' ? 'Rate (₹/ct)' : 'Cost (₹/ct)'}
+          />
+
+          <div className="space-y-2">
+            <Label htmlFor="ff-on">Date</Label>
+            <Input id="ff-on" name="on" type="date" defaultValue={today} required />
           </div>
 
           {channel === 'memo' ? (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="ff-memoNo">Memo no.</Label>
-                <Input id="ff-memoNo" name="memoNo" required
-                       placeholder={mode === 'deliver' ? 'JGD-OUT-…' : 'JGD-IN-…'} />
+                <Input id="ff-memoNo" name="memoNo" placeholder="Blank = we number it" />
               </div>
               {mode === 'deliver' ? (
                 <div className="space-y-2">
@@ -188,8 +181,7 @@ export function FulfilSheet({
               <Label htmlFor="ff-doc">{mode === 'deliver' ? 'Invoice no.' : 'Bill no.'}</Label>
               <Input
                 id="ff-doc" name={mode === 'deliver' ? 'invoiceNo' : 'billNo'}
-                required={mode === 'deliver'}
-                placeholder={mode === 'deliver' ? 'INV-2026-…' : 'Blank = cash'}
+                placeholder={mode === 'deliver' ? 'Blank = we number it' : 'Blank = cash'}
               />
             </div>
           )}
@@ -202,8 +194,8 @@ export function FulfilSheet({
             <Button type="submit" disabled={isPending}>
               {isPending ? 'Saving…'
                 : mode === 'deliver'
-                  ? channel === 'memo' ? 'Issue memo to customer' : 'Bill the customer'
-                  : channel === 'memo' ? 'Receive on memo' : 'Buy into stock'}
+                  ? channel === 'memo' ? 'Send on approval' : 'Create customer invoice'
+                  : channel === 'memo' ? 'Receive on supplier approval' : 'Buy into stock'}
             </Button>
           </SheetFooter>
         </form>

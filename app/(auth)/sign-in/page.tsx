@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CredentialsForm } from '@/features/auth/components/credentials-form';
 import { signInWithEmail } from '@/features/auth/actions';
@@ -10,15 +9,14 @@ export default function SignInPage() {
     <Card>
       <CardHeader>
         <CardTitle>Sign in</CardTitle>
-        <CardDescription>Aurum ERP — diamond trading &amp; jewellery</CardDescription>
+        <CardDescription>Kaivan Jewels — diamond trading &amp; jewellery</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <CredentialsForm mode="sign-in" action={signInWithEmail} />
+        <CredentialsForm action={signInWithEmail} />
+        {/* Accounts are created by an admin in Settings → Staff. Self sign-up
+            would let anyone who finds the URL into the whole book. */}
         <p className="text-sm text-muted-foreground">
-          No account?{' '}
-          <Link href="/sign-up" className="underline underline-offset-4">
-            Create one
-          </Link>
+          Staff accounts are issued by the office. Ask an admin if you need access or a password reset.
         </p>
       </CardContent>
     </Card>

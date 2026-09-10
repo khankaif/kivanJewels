@@ -8,9 +8,10 @@ import { FilterBar, type FieldDef } from '@/components/layout/filter-bar';
 import { getBills } from '@/features/accounts/money';
 import { getPartyOptions } from '@/features/parties/queries';
 import { getOwnedUnits } from '@/features/stock/queries';
-import { getDiamondPicklists } from '@/features/masters/diamonds/queries';
+import { getDiamondPicklists, getSieveShapes } from '@/features/masters/diamonds/queries';
 import { AddBillSheet } from '@/features/accounts/components/add-bill-sheet';
-import { inr } from '@/lib/format';
+import { PaymentDialog } from '@/features/accounts/components/payment-dialog';
+import { inr, specLabel } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,15 +32,16 @@ export default async function MoneyPage({
   const page = Math.max(1, Number(sp.page ?? 1) || 1);
   const perPage = 100;
 
-  const [parties, clients, suppliers, units, picklists] = await Promise.all([
+  const [parties, clients, suppliers, units, picklists, sieveShapes] = await Promise.all([
     getPartyOptions(), getPartyOptions('client'), getPartyOptions('supplier'),
-    getOwnedUnits({ limit: 300 }), getDiamondPicklists(),
+    getOwnedUnits({ limit: 300 }), getDiamondPicklists(), getSieveShapes(),
   ]);
   const bills = await getBills({
     partyId: sp.party, from: sp.from, to: sp.to, q: sp.q,
     limit: perPage, offset: (page - 1) * perPage,
     direction: sp.direction === 'purchase' ? 'purchase' : sp.direction === 'sale' ? 'sale' : undefined,
-    status: (['unpaid', 'paid', 'all'].includes(sp.status ?? '') ? sp.status : 'all') as 'all' | 'unpaid' | 'paid',
+    status: (['unpaid', 'paid', 'overdue', 'all'].includes(sp.status ?? '') ? sp.status : 'all') as
+      'all' | 'unpaid' | 'paid' | 'overdue',
     namedOnly: sp.named === '1',
   });
 
@@ -69,6 +71,7 @@ export default async function MoneyPage({
     { type: 'select', name: 'status', label: 'Status', value: sp.status, options: [
       { value: 'all', label: 'All' },
       { value: 'unpaid', label: 'Unpaid only' },
+      { value: 'overdue', label: 'Overdue only' },
       { value: 'paid', label: 'Settled only' },
     ] },
     partyField, ...dateFields,
@@ -85,10 +88,9 @@ export default async function MoneyPage({
           clients={clients} suppliers={suppliers}
           units={units.map((u) => ({
             lotId: u.lotId, lotNo: u.lotNo, balance: u.balance,
-            label: [u.sieveSize, u.mmSize && `${u.mmSize}mm`, u.shape, u.colour, u.clarity]
-              .filter(Boolean).join(' · ') || u.lotNo,
+            label: specLabel(u) === '—' ? u.lotNo : specLabel(u),
           }))}
-          shapes={picklists.shape} colours={picklists.colour} clarities={picklists.clarity}
+          picklists={picklists} sieveShapes={sieveShapes}
           defaultOpen={sp.new === '1'}
         />
       </div>
@@ -139,7 +141,9 @@ function BillTable({ rows }: { rows: NonNullable<Awaited<ReturnType<typeof getBi
           <TableHead className="text-right">Amount</TableHead>
           <TableHead className="text-right">Settled</TableHead>
           <TableHead className="text-right">Balance</TableHead>
-          <TableHead className="text-right">Age</TableHead>
+          <TableHead>Due</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead />
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -172,15 +176,38 @@ function BillTable({ rows }: { rows: NonNullable<Awaited<ReturnType<typeof getBi
             >
               {b.balance > 0.005 ? inr(b.balance) : 'settled'}
             </TableCell>
-            <TableCell className="text-right tabular-nums text-xs">
-              {b.balance > 0.005 && b.ageDays !== null ? `${b.ageDays}d` : '—'}
+            <TableCell className="tabular-nums text-xs">{b.dueOn ?? '—'}</TableCell>
+            <TableCell><BillStatus bill={b} /></TableCell>
+            <TableCell className="text-right">
+              {b.balance > 0.005 && (
+                <PaymentDialog
+                  partyId={b.partyId} partyName={b.partyName}
+                  direction={b.direction === 'sale' ? 'in' : 'out'}
+                  billNo={b.billNo} outstanding={b.balance}
+                  label="Record payment" size="sm"
+                />
+              )}
             </TableCell>
           </TableRow>
         ))}
-        {!rows.length && <Empty cols={9} what="No bills match these filters." />}
+        {!rows.length && <Empty cols={11} what="No bills match these filters." />}
       </TableBody>
     </Table>
   );
+}
+
+/** Derived in SQL from the payments already recorded -- never typed by hand. */
+function BillStatus({ bill }: { bill: { status: string; daysOverdue: number | null; balance: number } }) {
+  if (bill.status === 'paid') return <Badge variant="secondary">paid</Badge>;
+  if (bill.status === 'overdue') {
+    return (
+      <Badge variant="destructive">
+        overdue{bill.daysOverdue ? ` ${bill.daysOverdue}d` : ''}
+      </Badge>
+    );
+  }
+  if (bill.status === 'part') return <Badge variant="outline">part paid</Badge>;
+  return <Badge variant="outline">due</Badge>;
 }
 
 function Empty({ cols, what }: { cols: number; what: string }) {

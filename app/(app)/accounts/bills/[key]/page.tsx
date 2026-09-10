@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { getBill, getBillLines } from '@/features/accounts/money';
+import { getBill, getBillLines, getBillTrail } from '@/features/accounts/money';
 import { PaymentDialog } from '@/features/accounts/components/payment-dialog';
 import { inr, ct } from '@/lib/format';
 
@@ -22,8 +22,8 @@ export default async function BillPage({
   const direction = dirRaw === 'purchase' ? 'purchase' : 'sale';
   const billKey = decodeURIComponent(key);
 
-  const [bill, lines] = await Promise.all([
-    getBill(billKey, direction), getBillLines(billKey, direction),
+  const [bill, lines, trail] = await Promise.all([
+    getBill(billKey, direction), getBillLines(billKey, direction), getBillTrail(billKey, direction),
   ]);
   if (!bill) notFound();
 
@@ -40,15 +40,22 @@ export default async function BillPage({
         <h1 className="mt-2 flex items-center gap-3 font-mono text-2xl font-bold tracking-tight">
           {bill.billNo ?? (bill.isCash ? 'Cash sale' : 'Unnumbered')}
           <Badge variant={direction === 'sale' ? 'default' : 'outline'}>{direction}</Badge>
-          {bill.balance > 0.005
-            ? <Badge variant="destructive">{inr(bill.balance)} due</Badge>
-            : <Badge variant="secondary">settled</Badge>}
+          {bill.status === 'paid' && <Badge variant="secondary">settled</Badge>}
+          {bill.status === 'overdue' && (
+            <Badge variant="destructive">
+              {inr(bill.balance)} overdue{bill.daysOverdue ? ` by ${bill.daysOverdue}d` : ''}
+            </Badge>
+          )}
+          {(bill.status === 'due' || bill.status === 'part') && (
+            <Badge variant="outline">{inr(bill.balance)} {bill.status === 'part' ? 'left' : 'due'}</Badge>
+          )}
         </h1>
         <p className="text-sm text-muted-foreground">
           <Link href={`/parties/${bill.partyId}`} className="underline underline-offset-4">
             {bill.partyName}
           </Link>
           {' · '}{bill.billedOn ?? '—'}
+          {bill.dueOn && ` · due ${bill.dueOn}`}
           {bill.ageDays !== null && bill.balance > 0.005 && ` · ${bill.ageDays} days old`}
         </p>
       </div>
@@ -100,6 +107,50 @@ export default async function BillPage({
               ))}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Where these goods came from</CardTitle>
+          <CardDescription>
+            The chain behind this document: the parcel each line came out of, the memo it settled,
+            and the requirement it was raised against.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {trail.length ? trail.map((t) => (
+            <div key={t.ledgerId} className="rounded-lg border p-3 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-medium">{t.spec}</span>
+                <span className="tabular-nums">{inr(t.amount)}</span>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {t.lotNo && <span>lot <span className="font-mono">{t.lotNo}</span></span>}
+                {t.stoneType && <span>{t.stoneType}</span>}
+                {t.memoNo && (
+                  <span>
+                    from <span className="font-mono">{t.memoNo}</span>
+                    {t.memoIssuedOn && ` · ${t.memoDirection === 'out' ? 'issued' : 'received'} ${t.memoIssuedOn}`}
+                  </span>
+                )}
+                {t.requirementNo && (
+                  <span>
+                    for{' '}
+                    <Link href={`/sales/${encodeURIComponent(t.requirementNo)}`} className="underline underline-offset-4">
+                      {t.requirementNo}
+                    </Link>
+                    {t.requirementParty && ` · ${t.requirementParty}`}
+                  </span>
+                )}
+              </div>
+            </div>
+          )) : (
+            <p className="text-sm text-muted-foreground">
+              No chain recorded — this bill predates the linked ledger, or it is a charges-only
+              document with no goods behind it.
+            </p>
+          )}
         </CardContent>
       </Card>
 

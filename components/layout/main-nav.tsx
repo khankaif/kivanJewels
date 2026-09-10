@@ -25,7 +25,7 @@ export function MainNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex items-center gap-1">
+    <nav className="-mx-1 flex min-w-0 items-center gap-0.5 overflow-x-auto px-1 [scrollbar-width:none]">
       {NAV.map(({ href, label }) => {
         const prefixes = OWNS[href] ?? [href];
         const active = href === '/'
@@ -36,8 +36,10 @@ export function MainNav() {
             key={href}
             href={href}
             className={cn(
-              'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-              active ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground',
+              'whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors sm:px-3',
+              active
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >
             {label}

@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
-} from '@/components/ui/dialog';
+  Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
+} from '@/components/ui/sheet';
 import { savePartyAction, type PartyState } from '../actions';
 import type { Party } from '../queries';
 
@@ -23,18 +23,18 @@ export function PartyDialog({ party, defaultOpen = false }: { party?: Party; def
   const editing = !!party;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size={editing ? 'sm' : 'default'} variant={editing ? 'ghost' : 'default'} />}>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger render={<Button size={editing ? 'sm' : 'default'} variant={editing ? 'ghost' : 'default'} />}>
         {editing ? 'Edit' : 'Add party'}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{editing ? `Edit ${party.name}` : 'Add party'}</DialogTitle>
-          <DialogDescription>
+      </SheetTrigger>
+      <SheetContent side="right" className="sm:max-w-lg">
+        <SheetHeader>
+          <SheetTitle>{editing ? `Edit ${party.name}` : 'Add party'}</SheetTitle>
+          <SheetDescription>
             Credit terms drive the due date on inward memos, matching how your sheet sets
             Due Date = purchase date + terms.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         <form action={formAction} className="space-y-4">
           {editing && <input type="hidden" name="id" value={party.id} />}
@@ -126,13 +126,13 @@ export function PartyDialog({ party, defaultOpen = false }: { party?: Party; def
             <p role="alert" className="text-sm text-destructive">{state.error}</p>
           )}
 
-          <DialogFooter>
+          <SheetFooter>
             <Button type="submit" disabled={isPending}>
               {isPending ? 'Saving…' : editing ? 'Save changes' : 'Add party'}
             </Button>
-          </DialogFooter>
+          </SheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

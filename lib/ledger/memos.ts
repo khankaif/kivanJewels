@@ -24,12 +24,16 @@ import { unitLot, addToUnit } from './stock';
 // billings until nothing is outstanding.
 
 export type MemoDirection = 'in' | 'out';
-export type MemoLineInput = { lotId: string; carats: number; rate: number };
+/** `requirementLineId` per line: one memo can serve several lines of one sale. */
+export type MemoLineInput = {
+  lotId: string; carats: number; rate: number; requirementLineId?: string | null;
+};
 /** Inward lines describe goods arriving, so they carry the parcel's attributes. */
 export type InwardLineInput = {
-  carats: number; rate: number; stoneType: string;
+  carats: number; rate: number; stoneType: string; requirementLineId?: string | null;
   shape?: string | null; sieveSize?: string | null; mmSize?: string | null;
   clarity?: string | null; colour?: string | null;
+  lab?: string | null; certified?: string | null;
 };
 
 const addDays = (iso: string, days: number) => {
@@ -84,15 +88,16 @@ export async function receiveInwardMemo(
       i += 1;
       const [lot] = await run(
         `INSERT INTO lots (lot_no, party_id, stone_type, shape, sieve_size, mm_size,
-                           clarity, colour, cost_rate, source, opened_on)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'memo_in',$10) RETURNING id`,
+                           clarity, colour, lab, certified, cost_rate, source, opened_on)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'memo_in',$12) RETURNING id`,
         [`${a.memoNo}/${i}`, a.partyId, l.stoneType, l.shape ?? null, l.sieveSize ?? null,
-         l.mmSize ?? null, l.clarity ?? null, l.colour ?? null, l.rate, a.issuedOn],
+         l.mmSize ?? null, l.clarity ?? null, l.colour ?? null, l.lab ?? null,
+         l.certified ?? null, l.rate, a.issuedOn],
       );
       const [line] = await run(
         `INSERT INTO memo_lines (memo_id, lot_id, carats, rate, requirement_line_id)
          VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-        [memo.id, lot.id, l.carats, l.rate, a.requirementLineId ?? null],
+        [memo.id, lot.id, l.carats, l.rate, l.requirementLineId ?? a.requirementLineId ?? null],
       );
       await insertMovement(
         'memo_in_receipt',
@@ -134,7 +139,7 @@ export async function issueOutwardMemo(
       const [line] = await run(
         `INSERT INTO memo_lines (memo_id, lot_id, carats, rate, requirement_line_id)
          VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-        [memo.id, l.lotId, l.carats, l.rate, a.requirementLineId ?? null],
+        [memo.id, l.lotId, l.carats, l.rate, l.requirementLineId ?? a.requirementLineId ?? null],
       );
       await insertMovement(
         'memo_out_issue',
@@ -163,6 +168,12 @@ async function lineState(memoLineId: string, ctx: Ctx): Promise<LineState> {
     lineId: r.line_id, direction: r.direction, lotId: r.lot_id, partyId: r.party_id,
     rate: Number(r.rate), carats: Number(r.carats), outstanding: Number(r.outstanding),
   };
+}
+
+/** Serialise a settlement per memo line before reading its computed balance. */
+async function lockMemoLine(memoLineId: string, c: PoolClientLike) {
+  const rows = await q(c)('SELECT id FROM memo_lines WHERE id = $1 FOR UPDATE', [memoLineId]);
+  if (!rows.length) throw new SettlementError(`memo line ${memoLineId} not found`);
 }
 
 /** Carats on this line neither returned nor billed yet. Works both directions. */
@@ -207,6 +218,7 @@ export async function returnFromMemo(
   ctx?: Ctx,
 ): Promise<void> {
   await inCtx(ctx, async (c) => {
+    await lockMemoLine(a.memoLineId, c);
     const st = await lineState(a.memoLineId, c);
     assertWithin(st, a.carats, 'return');
     await insertMovement(
@@ -235,13 +247,14 @@ export async function returnFromMemo(
 export async function billMemoLine(
   a: {
     memoLineId: string; carats: number; on: string; invoiceNo: string;
-    rate?: number;
+    rate?: number; dueOn?: string | null;
   },
   ctx?: Ctx,
 ): Promise<void> {
   if (!a.invoiceNo.trim()) throw new SettlementError('an invoice number is required');
   await inCtx(ctx, async (c) => {
     const run = q(c);
+    await lockMemoLine(a.memoLineId, c);
     const st = await lineState(a.memoLineId, c);
     assertWithin(st, a.carats, 'billing');
 
@@ -255,17 +268,25 @@ export async function billMemoLine(
       [a.memoLineId, a.carats, amount, rate, a.invoiceNo, a.on],
     );
 
+    // bill_no, not just a ref: this IS the invoice, so it has to be the same
+    // kind of document as any other bill -- findable in the register, ageable,
+    // and payable. Without it the row grouped as "unnumbered" and no payment
+    // could ever be matched to it.
+    const dueOn = a.dueOn ?? addDays(a.on, await partyTerms(st.partyId, c));
+
     if (st.direction === 'out') {
       await run(
-        `INSERT INTO ledger (party_id, kind, amount, dated_on, ref_type, ref_id)
-         VALUES ($1,'sale_invoice',$2,$3,'memo_line',$4)`,
-        [st.partyId, amount, a.on, a.invoiceNo],
+        `INSERT INTO ledger (party_id, kind, amount, dated_on, bill_no, due_on,
+                             ref_type, ref_id, memo_line_id)
+         VALUES ($1,'sale_invoice',$2,$3,$4,$5,'memo_line',$4,$6)`,
+        [st.partyId, amount, a.on, a.invoiceNo, dueOn, a.memoLineId],
       );
     } else {
       await run(
-        `INSERT INTO ledger (party_id, kind, amount, dated_on, ref_type, ref_id)
-         VALUES ($1,'purchase_invoice',$2,$3,'memo_line',$4)`,
-        [st.partyId, -amount, a.on, a.invoiceNo],
+        `INSERT INTO ledger (party_id, kind, amount, dated_on, bill_no, due_on,
+                             ref_type, ref_id, memo_line_id)
+         VALUES ($1,'purchase_invoice',$2,$3,$4,$5,'memo_line',$4,$6)`,
+        [st.partyId, -amount, a.on, a.invoiceNo, dueOn, a.memoLineId],
       );
       // Consignment goods become owned stock once the vendor has invoiced them,
       // and owned stock lives in the spec's unit -- not in the memo parcel,
@@ -275,7 +296,7 @@ export async function billMemoLine(
       const held = Math.min(a.carats, await lotBalance(st.lotId, c));
       if (held > EPS) {
         const [spec] = await run(
-          `SELECT stone_type, shape, sieve_size, mm_size, clarity, colour
+          `SELECT stone_type, shape, sieve_size, mm_size, clarity, colour, lab, certified
            FROM lots WHERE id = $1`,
           [st.lotId],
         );
@@ -283,9 +304,12 @@ export async function billMemoLine(
           lotId: st.lotId, carats: held, rate, on: a.on,
           refType: 'bill', ref: a.invoiceNo, notes: `bought on ${a.invoiceNo}`,
         }, c);
+        // Certification is identity (023): billing an IGI parcel into the
+        // uncertified unit would average two different goods into one price.
         const unitId = await unitLot({
           stoneType: spec.stone_type, shape: spec.shape, sieveSize: spec.sieve_size,
           mmSize: spec.mm_size, clarity: spec.clarity, colour: spec.colour,
+          lab: spec.lab, certified: spec.certified,
         }, c);
         await addToUnit({
           lotId: unitId, kind: 'adjust_in', carats: held, rate, on: a.on,

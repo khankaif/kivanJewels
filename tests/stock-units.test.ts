@@ -124,8 +124,41 @@ test('back-to-back: goods sold onward before purchase leave nothing to own', asy
     await billMemoLine({ memoLineId: line.id, carats: 6, on: '2024-05-08', invoiceNo: `ZZ-P-${uniq()}` }, c);
 
     const { rows } = await c.query(
-      `SELECT id FROM lots WHERE source = 'unit' AND unit_key = lot_unit_key($1,$2,$3,$4,$5)`,
-      [s.shape, s.sieveSize, s.mmSize, null, null]);
+      `SELECT id FROM lots WHERE source = 'unit'
+         AND unit_key = lot_unit_key($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [s.stoneType, s.shape, s.sieveSize, s.mmSize, null, null, null, null]);
     assert.equal(rows.length, 0, 'nothing was left to move into stock');
+  });
+});
+
+test('lab grown and natural of one spec are different units, never averaged', async () => {
+  await inRollback(async (c) => {
+    const s = spec();
+    const lab = await recordPurchase({ spec: s, carats: 2, rate: 4500, on: '2024-05-01' }, c);
+    const nat = await recordPurchase(
+      { spec: { ...s, stoneType: 'Natural' }, carats: 2, rate: 90000, on: '2024-05-02' }, c);
+
+    assert.notEqual(nat, lab, 'a natural stone must not land in the lab-grown unit');
+    assert.equal(Number((await lotOf(c, lab)).cost_rate), 4500);
+    assert.equal(Number((await lotOf(c, nat)).cost_rate), 90000);
+  });
+});
+
+test('certification is identity: certified, uncertified and each lab stand apart', async () => {
+  await inRollback(async (c) => {
+    const s = spec();
+    const plain = await recordPurchase(
+      { spec: { ...s, certified: 'Non-certified' }, carats: 1, rate: 4000, on: '2024-05-01' }, c);
+    const igi = await recordPurchase(
+      { spec: { ...s, certified: 'Certified', lab: 'IGI' }, carats: 1, rate: 6000, on: '2024-05-02' }, c);
+    const hrd = await recordPurchase(
+      { spec: { ...s, certified: 'Certified', lab: 'HRD' }, carats: 1, rate: 6500, on: '2024-05-03' }, c);
+
+    assert.equal(new Set([plain, igi, hrd]).size, 3);
+    // Same certificate, same unit -- casing is normalized like every other field.
+    const again = await recordPurchase(
+      { spec: { ...s, certified: 'certified', lab: 'igi' }, carats: 1, rate: 6200, on: '2024-05-04' }, c);
+    assert.equal(again, igi);
+    assert.equal(Number((await lotOf(c, igi)).cost_rate), 6100, '(6000 + 6200) / 2');
   });
 });

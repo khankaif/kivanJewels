@@ -6,6 +6,7 @@ import { SectionTabs } from '@/components/layout/section-tabs';
 export const MASTERS_TABS = [
   { href: '/parties', label: 'Parties' },
   { href: '/masters/diamonds', label: 'Diamonds' },
+  { href: '/settings/staff', label: 'Staff & access' },
 ] as const;
 
 export function MastersNav() {

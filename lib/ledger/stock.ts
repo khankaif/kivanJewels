@@ -18,15 +18,19 @@ export type Spec = {
   stoneType: string;
   shape?: string | null; sieveSize?: string | null; mmSize?: string | null;
   clarity?: string | null; colour?: string | null;
+  // Identity too: a certified parcel is not the same goods as an uncertified
+  // one of the same spec, and IGI is not HRD. See db/migrations/023.
+  lab?: string | null; certified?: string | null;
 };
 
 /** The one owned lot for a spec, created on first purchase. */
 export async function unitLot(spec: Spec, c: PoolClientLike): Promise<string> {
   const run = q(c);
-  const key = [spec.shape ?? null, spec.sieveSize ?? null, spec.mmSize ?? null,
-               spec.colour ?? null, spec.clarity ?? null];
+  const key = [spec.stoneType, spec.shape ?? null, spec.sieveSize ?? null, spec.mmSize ?? null,
+               spec.colour ?? null, spec.clarity ?? null, spec.lab ?? null, spec.certified ?? null];
   const find = () =>
-    run(`SELECT id FROM lots WHERE source = 'unit' AND unit_key = lot_unit_key($1,$2,$3,$4,$5)`, key);
+    run(`SELECT id FROM lots WHERE source = 'unit'
+          AND unit_key = lot_unit_key($1,$2,$3,$4,$5,$6,$7,$8)`, key);
 
   const [found] = await find();
   if (found) return found.id as string;
@@ -36,12 +40,12 @@ export async function unitLot(spec: Spec, c: PoolClientLike): Promise<string> {
   // the winner's unit, not fail the purchase.
   const [made] = await run(
     `INSERT INTO lots (lot_no, stone_type, shape, sieve_size, mm_size, clarity, colour,
-                       cost_rate, source, opened_on)
-     VALUES ('U-' || nextval('lot_unit_seq'), $1,$2,$3,$4,$5,$6, 0, 'unit', CURRENT_DATE)
+                       lab, certified, cost_rate, source, opened_on)
+     VALUES ('U-' || nextval('lot_unit_seq'), $1,$2,$3,$4,$5,$6,$7,$8, 0, 'unit', CURRENT_DATE)
      ON CONFLICT (unit_key) WHERE source = 'unit' DO NOTHING
      RETURNING id`,
     [spec.stoneType, spec.shape ?? null, spec.sieveSize ?? null, spec.mmSize ?? null,
-     spec.clarity ?? null, spec.colour ?? null],
+     spec.clarity ?? null, spec.colour ?? null, spec.lab ?? null, spec.certified ?? null],
   );
   if (made) return made.id as string;
   return (await find())[0].id as string;
@@ -80,7 +84,7 @@ export async function addToUnit(
 export async function recordPurchase(
   a: {
     spec: Spec; carats: number; rate: number; on: string;
-    partyId?: string | null; billNo?: string | null; notes?: string;
+    partyId?: string | null; billNo?: string | null; dueOn?: string | null; notes?: string;
   },
   ctx?: Ctx,
 ): Promise<string> {
@@ -98,9 +102,11 @@ export async function recordPurchase(
 
     if (a.billNo) {
       await q(c)(
-        `INSERT INTO ledger (party_id, kind, amount, dated_on, bill_no, ref_type, ref_id, notes)
-         VALUES ($1,'purchase_invoice',$2,$3,$4,'purchase',$5,$6)`,
-        [a.partyId, -round2(a.carats * a.rate), a.on, a.billNo, a.billNo, a.notes ?? null],
+        `INSERT INTO ledger (party_id, kind, amount, dated_on, bill_no, ref_type, ref_id, notes,
+                             due_on, lot_id)
+         VALUES ($1,'purchase_invoice',$2,$3,$4,'purchase',$5,$6,$7,$8)`,
+        [a.partyId, -round2(a.carats * a.rate), a.on, a.billNo, a.billNo, a.notes ?? null,
+         a.dueOn ?? null, lotId],
       );
     }
     return lotId;

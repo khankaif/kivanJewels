@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
-} from '@/components/ui/dialog';
+  Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
+} from '@/components/ui/sheet';
 import { recordPaymentAction, type PaymentState } from '../actions';
 
 export function PaymentDialog({
@@ -29,22 +29,22 @@ export function PaymentDialog({
   const received = direction === 'in';
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size={size} variant={received ? 'default' : 'outline'} />}>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger render={<Button size={size} variant={received ? 'default' : 'outline'} />}>
         {label ?? (received ? 'Record receipt' : 'Record payment')}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{received ? 'Money received' : 'Money paid'}</DialogTitle>
-          <DialogDescription>
+      </SheetTrigger>
+      <SheetContent side="right" className="sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>{received ? 'Money received' : 'Money paid'}</SheetTitle>
+          <SheetDescription>
             {partyName}
             {billNo
               ? ` · against bill ${billNo}${
                   outstanding !== undefined ? ` (₹${outstanding.toLocaleString('en-IN')} outstanding)` : ''
                 }`
               : ' · on account, not tied to one bill'}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         <form action={formAction} className="space-y-4">
           <input type="hidden" name="partyId" value={partyId} />
@@ -95,13 +95,13 @@ export function PaymentDialog({
             <p role="alert" className="text-sm text-destructive">{state.error}</p>
           )}
 
-          <DialogFooter>
+          <SheetFooter>
             <Button type="submit" disabled={isPending}>
               {isPending ? 'Saving…' : received ? 'Record receipt' : 'Record payment'}
             </Button>
-          </DialogFooter>
+          </SheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

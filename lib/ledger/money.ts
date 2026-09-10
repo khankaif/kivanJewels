@@ -6,7 +6,7 @@ import { SettlementError, type Ctx, q, inCtx, round2, insertMovement } from './c
 export async function recordDirectSale(
   a: {
     lotId: string; carats: number; rate: number; on: string;
-    invoiceNo: string; partyId: string;
+    invoiceNo: string; partyId: string; dueOn?: string | null;
     requirementLineId?: string | null; notes?: string;
   },
   ctx?: Ctx,
@@ -25,9 +25,11 @@ export async function recordDirectSale(
       refType, ref: refId, notes: a.notes ?? `sold on ${a.invoiceNo}`,
     }, c);
     const [row] = await q(c)(
-      `INSERT INTO ledger (party_id, kind, amount, dated_on, bill_no, ref_type, ref_id, notes)
-       VALUES ($1,'sale_invoice',$2,$3,$4,$5,$6,$7) RETURNING id`,
-      [a.partyId, amount, a.on, a.invoiceNo, refType, refId, a.notes ?? null],
+      `INSERT INTO ledger (party_id, kind, amount, dated_on, bill_no, ref_type, ref_id, notes,
+                           due_on, lot_id, requirement_line_id)
+       VALUES ($1,'sale_invoice',$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
+      [a.partyId, amount, a.on, a.invoiceNo, refType, refId, a.notes ?? null, a.dueOn ?? null,
+       a.lotId, a.requirementLineId ?? null],
     );
     return row.id as string;
   });
@@ -44,7 +46,7 @@ export async function recordDirectSale(
 export async function recordBill(
   a: {
     partyId: string; direction: 'sale' | 'purchase'; amount: number; on: string;
-    billNo: string; notes?: string | null;
+    billNo: string; dueOn?: string | null; notes?: string | null;
   },
   ctx?: Ctx,
 ): Promise<string> {
@@ -54,14 +56,14 @@ export async function recordBill(
 
   return inCtx(ctx, async (c) => {
     const [row] = await q(c)(
-      `INSERT INTO ledger (party_id, kind, amount, dated_on, bill_no, ref_type, ref_id, notes)
-       VALUES ($1,$2,$3,$4,$5,'bill',$5,$6) RETURNING id`,
+      `INSERT INTO ledger (party_id, kind, amount, dated_on, bill_no, ref_type, ref_id, notes, due_on)
+       VALUES ($1,$2,$3,$4,$5,'bill',$5,$6,$7) RETURNING id`,
       [a.partyId,
        a.direction === 'sale' ? 'sale_invoice' : 'purchase_invoice',
        // Positive = they owe us, negative = we owe them; the ledger_sign
        // constraint rejects anything else.
        a.direction === 'sale' ? amount : -amount,
-       a.on, a.billNo.trim(), a.notes ?? null],
+       a.on, a.billNo.trim(), a.notes ?? null, a.dueOn ?? null],
     );
     return row.id as string;
   });
@@ -91,6 +93,12 @@ export async function recordPayment(
 
   return inCtx(ctx, async (c) => {
     const run = q(c);
+
+    // A bill balance is derived from ledger rows. Locking the party before we
+    // read that derived value makes two simultaneous receipts/payments queue
+    // behind each other instead of both accepting the same remaining balance.
+    const party = await run('SELECT id FROM parties WHERE id = $1 FOR UPDATE', [a.partyId]);
+    if (!party.length) throw new SettlementError('party not found');
 
     // Guard the common fat-finger: paying more than a bill owes. An unallocated
     // on-account payment is always allowed, because advances are real.

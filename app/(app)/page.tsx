@@ -3,6 +3,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { getDashboard, getWorklist } from '@/features/dashboard/queries';
 import { inr, ct, pct } from '@/lib/format';
+import { PageHeader } from '@/components/layout/page-header';
+import { ArrowRight, CircleDollarSign, Gem, HandCoins, PackagePlus, ShoppingBag } from 'lucide-react';
 
 const URGENCY: Record<string, { badge: 'destructive' | 'default' | 'secondary'; ring: string }> = {
   critical: { badge: 'destructive', ring: 'border-negative/40' },
@@ -40,56 +42,115 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Today</h1>
-        <p className="text-sm text-muted-foreground">
-          What needs acting on first, then the numbers. Every figure is an aggregate over the
-          movement and money ledgers — nothing is stored.
-        </p>
-      </div>
+    <div className="space-y-7">
+      <PageHeader
+        eyebrow="Daily desk"
+        title="Today’s work"
+        description="Start with what needs a decision. Your stock and money positions update from the live ledgers."
+        actions={<QuickActions />}
+      />
 
-      <section className="space-y-3">
+      <section className="grid gap-3 lg:grid-cols-[1.4fr_0.9fr]">
+        <div className="rounded-xl border border-border/80 bg-card p-4 shadow-xs sm:p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold">Needs your attention</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">Ordered by risk, not by when it was entered.</p>
+            </div>
+            <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+              {work.length} open
+            </span>
+          </div>
         {work.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
+            <div className="rounded-lg border border-dashed bg-muted/30 py-10 text-center text-muted-foreground">
               Nothing outstanding. No open memos, no bills past terms.
-            </CardContent>
-          </Card>
+            </div>
         ) : (
-          work.map((w) => {
+          <div className="space-y-2">
+            {work.map((w) => {
             const u = URGENCY[w.urgency];
             return (
-              <Link key={w.key} href={w.href} className="block">
-                <Card className={`transition-colors hover:bg-accent/40 ${u.ring}`}>
-                  <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
-                    <div className="flex items-center gap-3">
-                      <Badge variant={u.badge}>{w.count}</Badge>
+              <Link key={w.key} href={w.href} className="group block">
+                <div className={`flex flex-wrap items-center justify-between gap-4 rounded-lg border bg-background px-3.5 py-3 transition-all hover:-translate-y-px hover:border-primary/30 hover:bg-accent/35 ${u.ring}`}>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Badge variant={u.badge} className="min-w-6 justify-center">{w.count}</Badge>
                       <div>
                         <div className="font-medium">{w.label}</div>
                         <div className="text-xs text-muted-foreground">{w.detail}</div>
                       </div>
                     </div>
-                    <div className="text-right font-bold tabular-nums">{inr(w.value)}</div>
-                  </CardContent>
-                </Card>
+                    <div className="flex items-center gap-3 text-right">
+                      <div className="font-semibold tabular-nums">{inr(w.value)}</div>
+                      <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                    </div>
+                </div>
               </Link>
             );
-          })
+            })}
+          </div>
         )}
+        </div>
+        <PositionSummary d={d} />
       </section>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold">Business position</h2>
+            <p className="text-xs text-muted-foreground">A compact read of the book, not another task list.</p>
+          </div>
+        </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((c) => (
-          <Card key={c.label}>
-            <CardContent className="pt-6">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">{c.label}</div>
-              <div className={`mt-1 text-2xl font-bold tabular-nums ${c.tone ?? ''}`}>{c.value}</div>
+          <Card key={c.label} className="transition-shadow hover:shadow-sm">
+            <CardContent className="pt-4">
+              <div className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{c.label}</div>
+              <div className={`mt-1 text-2xl font-semibold tabular-nums ${c.tone ?? ''}`}>{c.value}</div>
               {c.sub && <div className="mt-0.5 text-xs text-muted-foreground">{c.sub}</div>}
             </CardContent>
           </Card>
         ))}
       </div>
+      </section>
 
+    </div>
+  );
+}
+
+function QuickActions() {
+  return (
+    <div className="flex flex-wrap justify-end gap-2">
+      <Link href="/stock?new=1" className="inline-flex h-8 items-center gap-1.5 rounded-lg border bg-background px-2.5 text-sm font-medium transition-colors hover:bg-muted">
+        <PackagePlus className="size-3.5" /> Add stock
+      </Link>
+      <Link href="/sales?new=1" className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85">
+        <ShoppingBag className="size-3.5" /> New sale
+      </Link>
+    </div>
+  );
+}
+
+function PositionSummary({ d }: { d: Awaited<ReturnType<typeof getDashboard>> }) {
+  return (
+    <div className="rounded-xl bg-foreground p-5 text-background shadow-sm">
+      <div className="flex items-center gap-2 text-background/70">
+        <CircleDollarSign className="size-4" />
+        <span className="text-xs font-medium uppercase tracking-[0.1em]">Cash position</span>
+      </div>
+      <div className="mt-5 grid grid-cols-2 gap-5">
+        <div>
+          <div className="flex items-center gap-1.5 text-xs text-background/60"><HandCoins className="size-3.5" /> To collect</div>
+          <div className="mt-1 text-xl font-semibold tabular-nums">{inr(d.receivable)}</div>
+        </div>
+        <div>
+          <div className="flex items-center gap-1.5 text-xs text-background/60"><Gem className="size-3.5" /> To pay</div>
+          <div className="mt-1 text-xl font-semibold tabular-nums">{inr(d.payable)}</div>
+        </div>
+      </div>
+      <div className="mt-5 border-t border-background/15 pt-4 text-xs leading-5 text-background/65">
+        Open client approvals: <span className="font-semibold text-background">{d.openMemos}</span>
+        {d.overdueMemos > 0 && <> · <span className="font-semibold text-background">{d.overdueMemos} overdue</span></>}
+      </div>
     </div>
   );
 }

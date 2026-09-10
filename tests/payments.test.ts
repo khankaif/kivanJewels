@@ -10,8 +10,10 @@ async function partyWithBill(c: any, gross: number, direction: 'sale' | 'purchas
   const { rows: [p] } = await c.query(
     `INSERT INTO parties (name) VALUES ($1) RETURNING id`, [`ZZ Pay ${uniq()}`]);
   await c.query(
+    // ref_type 'bill' is what a charges-only document carries; the goods rule
+    // (029) refuses an invoice that claims goods without pointing at any.
     `INSERT INTO ledger (party_id, kind, amount, dated_on, bill_no, ref_type, ref_id)
-     VALUES ($1,$2,$3,'2024-06-01',$4,'test',$4)`,
+     VALUES ($1,$2,$3,'2024-06-01',$4,'bill',$4)`,
     [p.id, direction === 'sale' ? 'sale_invoice' : 'purchase_invoice',
      direction === 'sale' ? gross : -gross, billNo]);
   return { partyId: p.id as string, billNo };

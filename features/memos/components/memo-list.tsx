@@ -23,18 +23,18 @@ export function MemoList({ memos, direction }: { memos: Memo[]; direction: 'in' 
   return (
     <div className="space-y-4">
       {memos.map((m) => (
-        <Card key={m.memoId} className={m.overdue ? 'border-negative/40' : undefined}>
-          <CardHeader>
+        <Card key={m.memoId} className={m.overdue ? 'border-negative/40 shadow-xs' : 'shadow-xs'}>
+          <CardHeader className="border-b bg-muted/20">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <CardTitle className="flex items-center gap-2 font-mono text-base">
                   {m.memoNo}
                   {m.status === 'closed' ? (
-                    <Badge variant="secondary">settled</Badge>
+                    <Badge variant="secondary">complete</Badge>
                   ) : m.overdue ? (
                     <Badge variant="destructive">overdue</Badge>
                   ) : (
-                    <Badge>open</Badge>
+                    <Badge>needs action</Badge>
                   )}
                 </CardTitle>
                 <CardDescription>
@@ -44,7 +44,7 @@ export function MemoList({ memos, direction }: { memos: Memo[]; direction: 'in' 
                 </CardDescription>
               </div>
               <div className="text-right text-sm">
-                <div className="font-bold tabular-nums">{inr(m.value)}</div>
+                <div className="font-semibold tabular-nums">{inr(m.value)}</div>
                 <div className="tabular-nums text-muted-foreground">
                   {ct(m.outstanding)} outstanding of {ct(m.carats)}
                 </div>
@@ -63,7 +63,7 @@ export function MemoList({ memos, direction }: { memos: Memo[]; direction: 'in' 
                   <TableHead className="text-right">Billed</TableHead>
                   <TableHead className="text-right">Outstanding</TableHead>
                   <TableHead className="text-right">Rate</TableHead>
-                  <TableHead className="text-right">Settle</TableHead>
+                  <TableHead className="text-right">Next action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

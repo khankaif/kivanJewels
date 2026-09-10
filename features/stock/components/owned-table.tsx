@@ -5,11 +5,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import type { StockUnit } from '../queries';
-import { inr, ct } from '@/lib/format';
+import { inr, ct, specLabel } from '@/lib/format';
 
 /** Sieve and MM are the name of the goods; everything else is description. */
-const spec = (s: { sieveSize: string | null; mmSize: string | null }) =>
-  [s.sieveSize, s.mmSize && `${s.mmSize}mm`].filter(Boolean).join(' · ') || '—';
+
 
 export function OwnedTable({ units }: { units: StockUnit[] }) {
   return (
@@ -25,6 +24,7 @@ export function OwnedTable({ units }: { units: StockUnit[] }) {
               <TableHead>Shape</TableHead>
               <TableHead>Colour / Clarity</TableHead>
               <TableHead>Type</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead className="text-right">In vault</TableHead>
               <TableHead className="text-right">With clients</TableHead>
               <TableHead className="text-right">Avg rate</TableHead>
@@ -37,7 +37,7 @@ export function OwnedTable({ units }: { units: StockUnit[] }) {
                 <TableCell>
                   <Link href={`/stock/${encodeURIComponent(u.lotNo)}`}
                         className="font-medium underline underline-offset-4">
-                    {spec(u)}
+                    {specLabel(u)}
                   </Link>
                 </TableCell>
                 <TableCell className="text-sm">{u.shape ?? '—'}</TableCell>
@@ -49,6 +49,12 @@ export function OwnedTable({ units }: { units: StockUnit[] }) {
                     {u.stoneType}
                   </Badge>
                 </TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-1">
+                    {u.balance > 0.0005 && <Badge variant="secondary">In vault</Badge>}
+                    {u.exposure > 0.0005 && <Badge variant="outline">With client</Badge>}
+                  </div>
+                </TableCell>
                 <TableCell className="text-right tabular-nums">{ct(u.balance)}</TableCell>
                 <TableCell className="text-right tabular-nums">
                   {u.exposure > 0 ? <span className="text-warning">{ct(u.exposure)}</span> : '—'}
@@ -59,7 +65,7 @@ export function OwnedTable({ units }: { units: StockUnit[] }) {
             ))}
             {!units.length && (
               <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                   No stock matches.
                 </TableCell>
               </TableRow>

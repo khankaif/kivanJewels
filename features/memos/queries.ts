@@ -14,11 +14,29 @@ export type Memo = {
   carats: number; value: number; outstanding: number; lines: MemoLine[];
 };
 
+export type MemoFilters = {
+  partyId?: string; q?: string;
+  /** 'open' hides settled memos; 'overdue' keeps only the ones past their date. */
+  status?: 'all' | 'open' | 'overdue';
+};
+
 /** Dates arrive as text from memo_line_status: a calendar date carries no time zone. */
-export async function getMemos(direction: 'in' | 'out'): Promise<Memo[]> {
+export async function getMemos(
+  direction: 'in' | 'out', f: MemoFilters = {},
+): Promise<Memo[]> {
+  const partyId = f.partyId || null;
+  const q = f.q ? `%${f.q}%` : null;
+  const status = f.status ?? 'all';
   const rows = await sql`
     SELECT * FROM memo_line_status
     WHERE direction = ${direction}
+      AND (${partyId}::uuid IS NULL OR party_id = ${partyId}::uuid)
+      AND (${q}::text IS NULL
+           OR memo_no ILIKE ${q} OR party_name ILIKE ${q} OR lot_no ILIKE ${q}
+           OR sieve_size ILIKE ${q} OR mm_size ILIKE ${q} OR shape ILIKE ${q})
+      AND (${status} = 'all'
+           OR (${status} = 'open'    AND memo_status = 'open')
+           OR (${status} = 'overdue' AND overdue))
     ORDER BY (memo_status = 'open') DESC, issued_on DESC, memo_no, lot_no`;
 
   const byMemo = new Map<string, Memo>();

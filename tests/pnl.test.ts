@@ -30,8 +30,9 @@ test('a sale with no recorded cost is uncosted, not pure profit', async () => {
       [lot.id],
     );
     await c.query(
-      `INSERT INTO ledger (party_id, kind, amount, dated_on) VALUES ($1,'sale_invoice',5000,'2024-04-02')`,
-      [party.id],
+      `INSERT INTO ledger (party_id, kind, amount, dated_on, lot_id)
+       VALUES ($1,'sale_invoice',5000,'2024-04-02',$2)`,
+      [party.id, lot.id],
     );
 
     const after = await getPnl(c);
@@ -67,8 +68,9 @@ test('a sale from a purchased lot books both the revenue and its cost', async ()
     // Revenue is the invoice, not the movement: a sale with no bill behind it
     // would read as costed revenue that was never billed.
     await c.query(
-      `INSERT INTO ledger (party_id, kind, amount, dated_on) VALUES ($1,'sale_invoice',5000,'2024-04-02')`,
-      [party.id],
+      `INSERT INTO ledger (party_id, kind, amount, dated_on, lot_id)
+       VALUES ($1,'sale_invoice',5000,'2024-04-02',$2)`,
+      [party.id, lot.id],
     );
 
     const after = await getPnl(c);

@@ -8,8 +8,8 @@ const sans = Inter({ variable: '--font-inter', subsets: ['latin'], display: 'swa
 const mono = JetBrains_Mono({ variable: '--font-jetbrains', subsets: ['latin'], display: 'swap' });
 
 export const metadata: Metadata = {
-  title: 'Aurum ERP',
-  description: 'Diamond trading, consignment memos and accounts',
+  title: 'Kaivan Jewels',
+  description: 'Kaivan Jewels — diamond trading, memos and accounts',
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {

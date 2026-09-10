@@ -1,16 +1,19 @@
 import { sql } from '@/db/client';
+import { specLabel } from '@/lib/format';
 
 export type Bill = {
   billKey: string; billNo: string | null; isCash: boolean;
   direction: 'sale' | 'purchase';
   partyId: string; partyName: string;
-  billedOn: string | null; lastPaidOn: string | null;
-  lines: number; gross: number; paid: number; balance: number; ageDays: number | null;
+  billedOn: string | null; lastPaidOn: string | null; dueOn: string | null;
+  lines: number; gross: number; paid: number; balance: number;
+  ageDays: number | null; daysOverdue: number | null;
+  status: 'paid' | 'part' | 'due' | 'overdue';
 };
 
 export type BillFilters = {
   direction?: 'sale' | 'purchase';
-  status?: 'all' | 'unpaid' | 'paid';
+  status?: 'all' | 'unpaid' | 'paid' | 'overdue';
   partyId?: string;
   from?: string;
   to?: string;
@@ -46,8 +49,9 @@ export async function getBills(f: BillFilters = {}): Promise<{ rows: Bill[]; tot
       AND (${w.q}::text     IS NULL OR bill_no ILIKE ${w.q} OR party_name ILIKE ${w.q})
       AND (NOT ${w.named}::boolean OR bill_no IS NOT NULL)
       AND (${w.status} = 'all'
-           OR (${w.status} = 'unpaid' AND balance > 0.005)
-           OR (${w.status} = 'paid'   AND balance <= 0.005))
+           OR (${w.status} = 'unpaid'  AND balance > 0.005)
+           OR (${w.status} = 'paid'    AND balance <= 0.005)
+           OR (${w.status} = 'overdue' AND status = 'overdue'))
     ORDER BY billed_on DESC NULLS LAST, gross DESC
     LIMIT ${limit} OFFSET ${offset}`;
 
@@ -64,8 +68,9 @@ export async function getBills(f: BillFilters = {}): Promise<{ rows: Bill[]; tot
       AND (${w.q}::text     IS NULL OR bill_no ILIKE ${w.q} OR party_name ILIKE ${w.q})
       AND (NOT ${w.named}::boolean OR bill_no IS NOT NULL)
       AND (${w.status} = 'all'
-           OR (${w.status} = 'unpaid' AND balance > 0.005)
-           OR (${w.status} = 'paid'   AND balance <= 0.005))`;
+           OR (${w.status} = 'unpaid'  AND balance > 0.005)
+           OR (${w.status} = 'paid'    AND balance <= 0.005)
+           OR (${w.status} = 'overdue' AND status = 'overdue'))`;
 
   return {
     rows: (rows as any[]).map(mapBill),
@@ -77,9 +82,11 @@ export async function getBills(f: BillFilters = {}): Promise<{ rows: Bill[]; tot
 const mapBill = (r: any): Bill => ({
   billKey: r.bill_key, billNo: r.bill_no, isCash: !!r.is_cash, direction: r.direction,
   partyId: r.party_id, partyName: r.party_name,
-  billedOn: r.billed_on, lastPaidOn: r.last_paid_on,
+  billedOn: r.billed_on, lastPaidOn: r.last_paid_on, dueOn: r.due_on,
   lines: r.lines, gross: Number(r.gross), paid: Number(r.paid),
   balance: Number(r.balance), ageDays: r.age_days === null ? null : Number(r.age_days),
+  daysOverdue: r.days_overdue === null ? null : Number(r.days_overdue),
+  status: r.status,
 });
 
 export async function getBill(billKey: string, direction: 'sale' | 'purchase'): Promise<Bill | null> {
@@ -134,3 +141,36 @@ export async function getBillLines(billKey: string, direction: 'sale' | 'purchas
     rate: r.rate === null ? null : Number(r.rate),
   }));
 }
+
+export type TrailRow = {
+  ledgerId: string; kind: string; datedOn: string; amount: number; notes: string | null;
+  memoNo: string | null; memoDirection: 'in' | 'out' | null; memoIssuedOn: string | null;
+  requirementNo: string | null; requirementParty: string | null;
+  lotNo: string | null; stoneType: string | null; spec: string;
+};
+
+/**
+ * What is behind a bill: the parcel each line came out of, the memo it settled,
+ * and the requirement it was raised against.
+ *
+ * This is the funnel read backwards. It only answers for rows written since the
+ * links existed -- the imported historical book has no memo or requirement
+ * behind it, and says so rather than inventing one.
+ */
+export async function getBillTrail(billKey: string, direction: 'sale' | 'purchase'): Promise<TrailRow[]> {
+  const rows = await sql`
+    SELECT * FROM bill_trail
+    WHERE direction = ${direction}
+      AND COALESCE(bill_no, COALESCE(kind, '') || ':' || ledger_id::text) = ${billKey}
+      AND kind IN ('sale_invoice', 'purchase_invoice')
+    ORDER BY dated_on, memo_no NULLS LAST`;
+
+  return (rows as any[]).map((r) => ({
+    ledgerId: r.ledger_id, kind: r.kind, datedOn: r.dated_on, amount: Math.abs(Number(r.amount)),
+    notes: r.notes,
+    memoNo: r.memo_no, memoDirection: r.memo_direction, memoIssuedOn: r.memo_issued_on,
+    requirementNo: r.requirement_no, requirementParty: r.requirement_party,
+    lotNo: r.lot_no, stoneType: r.stone_type, spec: specLabel(r),
+  }));
+}
+

@@ -4,10 +4,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import type { MemoStock } from '../queries';
-import { inr, ct } from '@/lib/format';
+import { inr, ct, specLabel } from '@/lib/format';
 
-const spec = (s: { sieveSize: string | null; mmSize: string | null }) =>
-  [s.sieveSize, s.mmSize && `${s.mmSize}mm`].filter(Boolean).join(' · ') || '—';
+
 
 /** What is physically here but still the supplier's, summed by supplier and spec. */
 export function MemoTable({ rows }: { rows: MemoStock[] }) {
@@ -25,6 +24,7 @@ export function MemoTable({ rows }: { rows: MemoStock[] }) {
               <TableHead>Colour / Clarity</TableHead>
               <TableHead>Memo</TableHead>
               <TableHead>Due</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead className="text-right">To settle</TableHead>
               <TableHead className="text-right">Still here</TableHead>
               <TableHead className="text-right">Rate</TableHead>
@@ -38,9 +38,14 @@ export function MemoTable({ rows }: { rows: MemoStock[] }) {
                     {m.partyName}
                   </Link>
                 </TableCell>
-                <TableCell>{spec(m)}{m.shape ? ` · ${m.shape}` : ''}</TableCell>
+                <TableCell>{specLabel(m)}</TableCell>
                 <TableCell className="text-sm">
                   {[m.colour, m.clarity].filter(Boolean).join(' · ') || '—'}
+                </TableCell>
+                <TableCell>
+                  <span className={m.overdue ? 'font-medium text-negative' : 'text-muted-foreground'}>
+                    {m.overdue ? 'Overdue' : m.inVault > 0.0005 ? 'In vault' : 'With client'}
+                  </span>
                 </TableCell>
                 <TableCell className="font-mono text-xs">{m.memoNos.join(', ')}</TableCell>
                 <TableCell className="text-sm">
@@ -60,7 +65,7 @@ export function MemoTable({ rows }: { rows: MemoStock[] }) {
             ))}
             {!rows.length && (
               <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                   Nothing held on a supplier memo.
                 </TableCell>
               </TableRow>

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth/server';
+import { docNoOr } from '@/lib/doc-numbers';
 import {
   returnFromMemo, billMemoLine, OverdrawError, SettlementError,
 } from '@/lib/ledger/movements';
@@ -43,7 +44,8 @@ export async function settleLineAction(_prev: ActionState, form: FormData): Prom
   const action = String(form.get('action') ?? '');
   const carats = Number(form.get('carats'));
   const on = String(form.get('on') ?? '');
-  const invoiceNo = String(form.get('invoiceNo') ?? '').trim();
+  const direction = String(form.get('direction') ?? '');
+  let invoiceNo = String(form.get('invoiceNo') ?? '').trim();
   const rateRaw = String(form.get('rate') ?? '').trim();
 
   if (!Number.isFinite(carats) || carats <= 0) return { error: 'Carats must be greater than zero.' };
@@ -52,7 +54,10 @@ export async function settleLineAction(_prev: ActionState, form: FormData): Prom
     if (action === 'return') {
       await returnFromMemo({ memoLineId, carats, on });
     } else if (action === 'bill') {
-      if (!invoiceNo) return { error: 'Invoice number is required to bill.' };
+      // Billing an outward memo issues OUR invoice; billing an inward one
+      // records the supplier's bill, which only they can number.
+      if (!invoiceNo && direction === 'in') return { error: "Enter the supplier's bill number." };
+      invoiceNo = await docNoOr(invoiceNo, 'invoice');
       await billMemoLine({
         memoLineId, carats, on, invoiceNo,
         rate: rateRaw ? Number(rateRaw) : undefined,

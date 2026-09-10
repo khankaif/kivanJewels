@@ -5,6 +5,8 @@ import { auth } from '@/lib/auth/server';
 import {
   recordPurchase, receiveInwardMemo, SettlementError, OverdrawError,
 } from '@/lib/ledger/movements';
+import { specFromForm } from '@/features/masters/diamonds/spec';
+import { docNoOr } from '@/lib/doc-numbers';
 
 export type ActionState = { error: string } | { ok: string } | null;
 
@@ -36,18 +38,11 @@ export async function addStockAction(_prev: ActionState, form: FormData): Promis
   if (!Number.isFinite(carats) || carats <= 0) return { error: 'Carats must be greater than zero.' };
   if (!Number.isFinite(rate) || rate < 0) return { error: 'Enter a valid rate.' };
   if (!on) return { error: 'Enter a date.' };
-  if (!str('sieveSize') && !str('mmSize')) {
-    return { error: 'Enter a sieve or an MM size — that is what identifies the stock.' };
-  }
 
-  const spec = {
-    stoneType: str('stoneType') || 'Lab Grown',
-    shape: str('shape') || null,
-    sieveSize: str('sieveSize') || null,
-    mmSize: str('mmSize') || null,
-    colour: str('colour') || null,
-    clarity: str('clarity') || null,
-  };
+  // Which fields a shape needs is a masters rule; see lib/spec-rules.ts.
+  const checked = await specFromForm(form);
+  if (!checked.ok) return { error: checked.error };
+  const spec = checked.spec;
 
   try {
     if (mode === 'bill') {
@@ -64,8 +59,9 @@ export async function addStockAction(_prev: ActionState, form: FormData): Promis
       };
     }
 
-    const memoNo = str('memoNo');
-    if (!memoNo) return { error: 'Enter the memo number.' };
+    // Blank is normal: most inward parcels arrive before their paperwork, so
+    // the app issues its own number and the supplier's can be added later.
+    const memoNo = await docNoOr(str('memoNo'), 'memo_in');
     if (!partyId) return { error: 'Select the supplier.' };
     const termsRaw = str('termsDays');
     await receiveInwardMemo({

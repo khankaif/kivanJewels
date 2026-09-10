@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
-} from '@/components/ui/dialog';
+  Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
+} from '@/components/ui/sheet';
 import { settleLineAction, type ActionState } from '../actions';
 
 export function SettleLineDialog({
@@ -29,8 +29,8 @@ export function SettleLineDialog({
   const today = new Date().toISOString().slice(0, 10);
 
   const title = isBill
-    ? inward ? 'Supplier bills you' : 'Bill the client'
-    : inward ? 'Return to supplier' : 'Client returns goods';
+    ? inward ? 'Record supplier bill' : 'Create customer invoice'
+    : inward ? 'Return to supplier' : 'Receive client return';
   const explain = isBill
     ? inward
       ? 'Creates a payable and promotes the goods from consignment to owned stock. No carats move — they are already in your vault.'
@@ -40,22 +40,23 @@ export function SettleLineDialog({
       : 'Carats re-enter your vault.';
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" variant={isBill ? 'default' : 'outline'} />}>
-        {isBill ? 'Bill' : 'Return'}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger render={<Button size="sm" variant={isBill ? 'default' : 'outline'} />}>
+        {isBill ? (inward ? 'Record bill' : 'Invoice') : 'Return'}
+      </SheetTrigger>
+      <SheetContent side="right" className="sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription>
             Lot {lotNo} · {outstanding.toFixed(3)} ct outstanding. {explain} You can do this
             repeatedly until the line is settled.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         <form action={formAction} className="space-y-4">
           <input type="hidden" name="memoLineId" value={lineId} />
           <input type="hidden" name="action" value={action} />
+          <input type="hidden" name="direction" value={direction} />
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
@@ -73,8 +74,11 @@ export function SettleLineDialog({
 
           {isBill && (
             <div className="space-y-2">
-              <Label htmlFor={`i-${lineId}`}>Invoice no.</Label>
-              <Input id={`i-${lineId}`} name="invoiceNo" required placeholder="INV-2026-001" />
+              <Label htmlFor={`i-${lineId}`}>{inward ? 'Supplier bill no.' : 'Customer invoice no.'}</Label>
+              <Input
+                id={`i-${lineId}`} name="invoiceNo" required={inward}
+                placeholder={inward ? "As printed on their bill" : 'Blank = we number it'}
+              />
             </div>
           )}
 
@@ -96,13 +100,13 @@ export function SettleLineDialog({
             <p role="alert" className="text-sm text-destructive">{state.error}</p>
           )}
 
-          <DialogFooter>
+          <SheetFooter>
             <Button type="submit" disabled={isPending}>
-              {isPending ? 'Saving…' : isBill ? 'Bill' : 'Return'}
+              {isPending ? 'Saving…' : isBill ? (inward ? 'Record supplier bill' : 'Create invoice') : 'Confirm return'}
             </Button>
-          </DialogFooter>
+          </SheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
