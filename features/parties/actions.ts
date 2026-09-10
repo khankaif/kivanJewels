@@ -63,6 +63,7 @@ export async function savePartyAction(_prev: PartyState, form: FormData): Promis
   }
 
   revalidatePath('/parties');
-  revalidatePath('/memos');
+  revalidatePath('/stock');
+  revalidatePath('/sales');
   return { ok: id ? `${name} updated.` : `${name} added.` };
 }

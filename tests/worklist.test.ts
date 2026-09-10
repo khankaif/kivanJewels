@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { inRollback } from './helpers';
 import { receiveInwardMemo, issueOutwardMemo } from '@/lib/ledger/movements';
-import { getWorklist } from '@/features/dashboard/queries';
+import { getWorklist, WORKLIST_HREF } from '@/features/dashboard/queries';
 
 const uniq = () => `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
@@ -58,6 +59,14 @@ test('worklist orders critical memo items above money items', async () => {
 test('every worklist item links somewhere real and has a non-zero count', async () => {
   for (const i of await getWorklist()) {
     assert.ok(i.count > 0, `${i.key} should not appear with a zero count`);
-    assert.match(i.href, /^\/(memos|sales|accounts\/bills)/, `${i.key} must link to an actionable view`);
+    assert.match(i.href, /^\/(stock|sales|accounts\/bills)/, `${i.key} must link to an actionable view`);
+  }
+});
+
+test('every worklist link points at a route that exists', () => {
+  for (const [key, href] of Object.entries(WORKLIST_HREF)) {
+    const path = href.split('?')[0].replace(/^\/|\/$/g, '');
+    const file = path ? `app/(app)/${path}/page.tsx` : 'app/(app)/page.tsx';
+    assert.ok(existsSync(file), `${key} -> ${href} (${file}) missing`);
   }
 });

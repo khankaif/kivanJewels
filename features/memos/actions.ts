@@ -28,7 +28,7 @@ function toMessage(e: unknown): string {
 }
 
 const revalidateAll = () => {
-  for (const p of ['/', '/memos', '/stock', '/accounts', '/parties']) revalidatePath(p);
+  for (const p of ['/', '/stock', '/sales', '/accounts', '/parties']) revalidatePath(p);
 };
 
 

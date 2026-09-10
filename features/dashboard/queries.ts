@@ -31,6 +31,21 @@ export async function getDashboard() {
   };
 }
 
+/**
+ * Where each worklist item sends you. Kept as data, not inline literals, so a
+ * deleted route breaks a test instead of a click: the worklist only emits an
+ * item when its count is non-zero, which a test database usually cannot stage.
+ */
+export const WORKLIST_HREF = {
+  'memo-out-overdue': '/sales?tab=memo',
+  'memo-in-overdue': '/stock?tab=memo',
+  'memo-out-open': '/sales?tab=memo',
+  'memo-in-open': '/stock?tab=memo',
+  'sales-open': '/sales',
+  'pur-late': '/accounts/bills?direction=purchase&status=unpaid',
+  'sale-stale': '/accounts/bills?direction=sale&status=unpaid',
+} as const;
+
 export type WorkItem = {
   key: string; label: string; detail: string; count: number; value: number;
   href: string; urgency: 'critical' | 'warning' | 'info';
@@ -92,32 +107,32 @@ export async function getWorklist(): Promise<WorkItem[]> {
     { key: 'memo-out-overdue', count: memo.out_overdue, value: Number(memo.out_overdue_val),
       label: 'Memos overdue with clients',
       detail: 'Goods are with a client past the return date. Bill them or get them back.',
-      href: '/memos', urgency: 'critical' },
+      href: WORKLIST_HREF['memo-out-overdue'], urgency: 'critical' },
     { key: 'memo-in-overdue', count: memo.in_overdue, value: Number(memo.in_overdue_val),
       label: 'Supplier memos past due',
       detail: 'You are holding consignment goods past the agreed date. Return or take the bill.',
-      href: '/memos', urgency: 'critical' },
+      href: WORKLIST_HREF['memo-in-overdue'], urgency: 'critical' },
     { key: 'memo-out-open', count: memo.out_open, value: Number(memo.out_open_val),
       label: 'Memos out with clients',
       detail: 'Stock outside your vault, not yet billed.',
-      href: '/memos', urgency: 'warning' },
+      href: WORKLIST_HREF['memo-out-open'], urgency: 'warning' },
     { key: 'memo-in-open', count: memo.in_open, value: Number(memo.in_open_val),
       label: 'Goods held on supplier memo',
       detail: 'In your vault but not yours yet — no payable until billed.',
-      href: '/memos', urgency: 'info' },
+      href: WORKLIST_HREF['memo-in-open'], urgency: 'info' },
     { key: 'sales-open', count: sales.reqs, value: Number(sales.value),
       label: 'Customer requirements to fulfil',
       detail: `${sales.lines_ready} line${sales.lines_ready === 1 ? '' : 's'} deliverable from stock now, `
         + `${sales.lines_short} need sourcing.`,
-      href: '/sales', urgency: 'warning' },
+      href: WORKLIST_HREF['sales-open'], urgency: 'warning' },
     { key: 'pur-late', count: money.pur_late, value: Number(money.pur_late_val),
       label: 'Supplier bills past terms',
       detail: 'Past each supplier’s own credit days.',
-      href: '/accounts/bills?direction=purchase&status=unpaid', urgency: 'warning' },
+      href: WORKLIST_HREF['pur-late'], urgency: 'warning' },
     { key: 'sale-stale', count: money.sale_stale, value: Number(money.sale_stale_val),
       label: 'Client bills unpaid over 60 days',
       detail: 'Worth chasing.',
-      href: '/accounts/bills?direction=sale&status=unpaid', urgency: 'warning' },
+      href: WORKLIST_HREF['sale-stale'], urgency: 'warning' },
   ];
   return items.filter((i) => i.count > 0);
 }

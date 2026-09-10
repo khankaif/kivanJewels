@@ -8,7 +8,7 @@ import {
 
 export type ActionState = { error: string } | { ok: string } | null;
 
-const PATHS = ['/', '/stock', '/memos', '/accounts/bills', '/accounts', '/parties'];
+const PATHS = ['/', '/stock', '/accounts/bills', '/accounts', '/parties'];
 
 /**
  * Brings diamonds into stock. Two ways in, one form:
