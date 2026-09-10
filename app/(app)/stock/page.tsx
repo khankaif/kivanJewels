@@ -7,9 +7,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { getOwnedUnits, getMemoStock, getStockTotals } from '@/features/stock/queries';
-import { PurchaseDialog } from '@/features/stock/components/purchase-dialog';
+import { AddStockSheet } from '@/features/stock/components/add-stock-sheet';
 import { getPartyOptions } from '@/features/parties/queries';
 import { getDiamondPicklists } from '@/features/masters/diamonds/queries';
+import { getAgents } from '@/features/memos/queries';
 import { inr, ct } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -24,9 +25,9 @@ export default async function StockPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
-  const [units, memo, totals, suppliers, picklists] = await Promise.all([
+  const [units, memo, totals, suppliers, picklists, agents] = await Promise.all([
     getOwnedUnits({ search: q }), getMemoStock({ search: q }), getStockTotals(),
-    getPartyOptions('supplier'), getDiamondPicklists(),
+    getPartyOptions('supplier'), getDiamondPicklists(), getAgents(),
   ]);
 
   return (
@@ -39,8 +40,8 @@ export default async function StockPage({
             supplier memo is still theirs, so it stays listed by supplier.
           </p>
         </div>
-        <PurchaseDialog
-          suppliers={suppliers} shapes={picklists.shape}
+        <AddStockSheet
+          suppliers={suppliers} agents={agents} shapes={picklists.shape}
           colours={picklists.colour} clarities={picklists.clarity}
         />
       </div>

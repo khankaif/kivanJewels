@@ -2,60 +2,90 @@
 
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth/server';
-import { recordPurchase, SettlementError, OverdrawError } from '@/lib/ledger/movements';
+import {
+  recordPurchase, receiveInwardMemo, SettlementError, OverdrawError,
+} from '@/lib/ledger/movements';
 
 export type ActionState = { error: string } | { ok: string } | null;
 
+const PATHS = ['/', '/stock', '/movements', '/memos', '/bills', '/accounts', '/parties'];
+
 /**
- * Buys stock into the vault.
+ * Brings diamonds into stock. Two ways in, one form:
  *
- * Two ways goods become yours: bought on a supplier's bill (a payable), or
- * bought outright over the counter (no payable). Either way the carats land in
- * the ONE unit for that shape/sieve/mm, so buying 2.20mm again grows the unit
- * you already have instead of adding a second row to hunt through.
+ *  - `mode=bill`: goods you own from the moment they arrive. A bill number
+ *    posts a payable alongside; without one it is a cash buy, stock only.
+ *    Either way the carats land in the owned unit for their full spec.
+ *  - `mode=memo`: goods held on approval (jangad in). No payable until the
+ *    supplier bills. The parcel stays a parcel -- it goes back to that
+ *    supplier if not kept.
  */
-export async function recordPurchaseAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+export async function addStockAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   const { data: session } = await auth.getSession();
   if (!session?.user) throw new Error('Not authenticated');
 
   const str = (k: string) => String(form.get(k) ?? '').trim();
+  const mode = str('mode');
   const carats = Number(form.get('carats'));
   const rate = Number(form.get('rate'));
-  const billNo = str('billNo') || null;
+  const on = str('on');
   const partyId = str('partyId') || null;
+  const notes = str('notes') || undefined;
 
+  if (mode !== 'bill' && mode !== 'memo') return { error: 'Pick how the goods arrived.' };
   if (!Number.isFinite(carats) || carats <= 0) return { error: 'Carats must be greater than zero.' };
   if (!Number.isFinite(rate) || rate < 0) return { error: 'Enter a valid rate.' };
-  if (billNo && !partyId) return { error: 'A bill needs a supplier. Pick one, or clear the bill number.' };
+  if (!on) return { error: 'Enter a date.' };
   if (!str('sieveSize') && !str('mmSize')) {
     return { error: 'Enter a sieve or an MM size — that is what identifies the stock.' };
   }
 
+  const spec = {
+    stoneType: str('stoneType') || 'Lab Grown',
+    shape: str('shape') || null,
+    sieveSize: str('sieveSize') || null,
+    mmSize: str('mmSize') || null,
+    colour: str('colour') || null,
+    clarity: str('clarity') || null,
+  };
+
   try {
-    await recordPurchase({
-      spec: {
-        stoneType: str('stoneType') || 'Lab Grown',
-        shape: str('shape') || null,
-        sieveSize: str('sieveSize') || null,
-        mmSize: str('mmSize') || null,
-        colour: str('colour') || null,
-        clarity: str('clarity') || null,
-      },
-      carats, rate, on: str('on'), partyId, billNo,
-      notes: str('notes') || undefined,
+    if (mode === 'bill') {
+      const billNo = str('billNo') || null;
+      if (billNo && !partyId) {
+        return { error: 'A bill needs a supplier. Pick one, or clear the bill number.' };
+      }
+      await recordPurchase({ spec, carats, rate, on, partyId, billNo, notes });
+      revalidate();
+      return {
+        ok: billNo
+          ? `${carats} ct into purchase stock, ₹${(carats * rate).toLocaleString('en-IN')} payable on ${billNo}.`
+          : `${carats} ct into purchase stock.`,
+      };
+    }
+
+    const memoNo = str('memoNo');
+    if (!memoNo) return { error: 'Enter the memo number.' };
+    if (!partyId) return { error: 'Select the supplier.' };
+    const termsRaw = str('termsDays');
+    await receiveInwardMemo({
+      memoNo, partyId, issuedOn: on,
+      termsDays: termsRaw ? Number(termsRaw) : null,
+      agent: str('agent') || null,
+      notes,
+      lines: [{ carats, rate, ...spec }],
     });
+    revalidate();
+    return { ok: `${carats} ct into memo stock on ${memoNo} — not yet purchased.` };
   } catch (e) {
     if (e instanceof SettlementError || e instanceof OverdrawError) return { error: e.message };
     if (e instanceof Error && /duplicate key/.test(e.message)) {
-      return { error: 'That bill number is already recorded.' };
+      return { error: mode === 'bill' ? 'That bill number is already recorded.' : 'That memo number is already used.' };
     }
     throw e;
   }
+}
 
-  for (const p of ['/', '/stock', '/movements', '/bills', '/accounts', '/parties']) revalidatePath(p);
-  return {
-    ok: billNo
-      ? `${carats} ct added to stock, and ₹${(carats * rate).toLocaleString('en-IN')} payable on ${billNo}.`
-      : `${carats} ct added to stock.`,
-  };
+function revalidate() {
+  for (const p of PATHS) revalidatePath(p);
 }

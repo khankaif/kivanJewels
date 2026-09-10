@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth/server';
 import {
-  receiveInwardMemo, issueOutwardMemo, returnFromMemo, billMemoLine,
+  issueOutwardMemo, returnFromMemo, billMemoLine,
   OverdrawError, SettlementError,
 } from '@/lib/ledger/movements';
 
@@ -31,43 +31,6 @@ function toMessage(e: unknown): string {
 const revalidateAll = () => {
   for (const p of ['/', '/memos', '/stock', '/accounts', '/parties']) revalidatePath(p);
 };
-
-/** Goods arriving from a supplier on approval. Creates no payable. */
-export async function receiveMemoAction(_prev: ActionState, form: FormData): Promise<ActionState> {
-  await requireUser();
-  const memoNo = String(form.get('memoNo') ?? '').trim();
-  const partyId = String(form.get('partyId') ?? '');
-  const carats = Number(form.get('carats'));
-  const rate = Number(form.get('rate'));
-  const issuedOn = String(form.get('issuedOn') ?? '');
-  const termsRaw = String(form.get('termsDays') ?? '').trim();
-
-  if (!memoNo) return { error: 'Memo number is required.' };
-  if (!partyId) return { error: 'Select a supplier.' };
-  if (!Number.isFinite(carats) || carats <= 0) return { error: 'Carats must be greater than zero.' };
-  if (!Number.isFinite(rate) || rate < 0) return { error: 'Enter a valid rate.' };
-
-  try {
-    await receiveInwardMemo({
-      memoNo, partyId, issuedOn,
-      termsDays: termsRaw ? Number(termsRaw) : null,
-      agent: String(form.get('agent') ?? '').trim() || null,
-      lines: [{
-        carats, rate,
-        stoneType: String(form.get('stoneType') ?? '').trim() || 'Lab Grown',
-        shape: String(form.get('shape') ?? '').trim() || null,
-        sieveSize: String(form.get('sieveSize') ?? '').trim() || null,
-        mmSize: String(form.get('mmSize') ?? '').trim() || null,
-        colour: String(form.get('colour') ?? '').trim() || null,
-        clarity: String(form.get('clarity') ?? '').trim() || null,
-      }],
-    });
-  } catch (e) {
-    return { error: toMessage(e) };
-  }
-  revalidateAll();
-  return { ok: `Inward memo ${memoNo} received — ${carats} ct now in the vault, not yet purchased.` };
-}
 
 /** Goods going out to a client on approval. Carats leave the vault. */
 export async function issueMemoAction(_prev: ActionState, form: FormData): Promise<ActionState> {

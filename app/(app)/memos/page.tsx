@@ -1,21 +1,19 @@
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getMemos, getMemoSummary, getAgents } from '@/features/memos/queries';
 import { getIssuableLots } from '@/features/stock/queries';
 import { getPartyOptions } from '@/features/parties/queries';
-import { getDiamondPicklists } from '@/features/masters/diamonds/queries';
 import { MemoList } from '@/features/memos/components/memo-list';
 import { IssueMemoDialog } from '@/features/memos/components/issue-memo-dialog';
-import { ReceiveMemoDialog } from '@/features/memos/components/receive-memo-dialog';
 import { inr, ct } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
 export default async function MemosPage() {
-  const [inward, outward, summary, lots, suppliers, clients, agents, picklists] = await Promise.all([
+  const [inward, outward, summary, lots, clients, agents] = await Promise.all([
     getMemos('in'), getMemos('out'), getMemoSummary(),
-    getIssuableLots(), getPartyOptions('supplier'), getPartyOptions('client'), getAgents(),
-    getDiamondPicklists(),
+    getIssuableLots(), getPartyOptions('client'), getAgents(),
   ]);
 
   return (
@@ -25,15 +23,10 @@ export default async function MemosPage() {
           <h1 className="text-2xl font-bold tracking-tight">Memos</h1>
           <p className="text-sm text-muted-foreground">
             Goods on approval, in both directions. Nothing is bought or sold until it is billed.
+            Receive goods on memo from <Link href="/stock" className="underline underline-offset-4">Stock</Link>.
           </p>
         </div>
-        <div className="flex gap-2">
-          <ReceiveMemoDialog
-            suppliers={suppliers} agents={agents} shapes={picklists.shape}
-            colours={picklists.colour} clarities={picklists.clarity}
-          />
-          <IssueMemoDialog lots={lots} parties={clients} agents={agents} />
-        </div>
+        <IssueMemoDialog lots={lots} parties={clients} agents={agents} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
