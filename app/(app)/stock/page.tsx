@@ -1,34 +1,57 @@
-import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
+import { SectionTabs } from '@/components/layout/section-tabs';
+import { resolveTab } from '@/lib/tabs';
 import { getOwnedUnits, getMemoStock, getStockTotals } from '@/features/stock/queries';
+import { getMovements } from '@/features/stock/register';
+import { OwnedTable } from '@/features/stock/components/owned-table';
+import { MemoTable } from '@/features/stock/components/memo-table';
+import { MovementsTable } from '@/features/stock/components/movements-table';
 import { AddStockSheet } from '@/features/stock/components/add-stock-sheet';
+import { MemoList } from '@/features/memos/components/memo-list';
+import { getMemos, getAgents } from '@/features/memos/queries';
 import { getPartyOptions } from '@/features/parties/queries';
 import { getDiamondPicklists } from '@/features/masters/diamonds/queries';
-import { getAgents } from '@/features/memos/queries';
 import { inr, ct } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
-/** Sieve and MM are the name of the goods; everything else is description. */
-const spec = (s: { sieveSize: string | null; mmSize: string | null }) =>
-  [s.sieveSize, s.mmSize && `${s.mmSize}mm`].filter(Boolean).join(' · ') || '—';
+const TABS = ['owned', 'memo', 'movements'] as const;
+const LABELS = { owned: 'My stock', memo: 'On memo', movements: 'Movements' } as const;
+const MOVEMENTS_PAGE = 200;
+
+type Params = Record<string, string | undefined>;
+
+/** The movement register's own filters, lifted from the page it used to be. */
+async function loadMovements(sp: Params) {
+  const page = Math.max(1, Number(sp.page ?? 1) || 1);
+  const { rows, total, inCarats, outCarats } = await getMovements({
+    kind: sp.kind, q: sp.q, from: sp.from, to: sp.to,
+    direction: sp.direction === 'in' ? 'in' : sp.direction === 'out' ? 'out' : undefined,
+    limit: MOVEMENTS_PAGE, offset: (page - 1) * MOVEMENTS_PAGE,
+  });
+  return {
+    rows, total, inCarats, outCarats, sp,
+    page, pages: Math.max(1, Math.ceil(total / MOVEMENTS_PAGE)),
+  };
+}
 
 export default async function StockPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<Params>;
 }) {
-  const { q } = await searchParams;
-  const [units, memo, totals, suppliers, picklists, agents] = await Promise.all([
-    getOwnedUnits({ search: q }), getMemoStock({ search: q }), getStockTotals(),
-    getPartyOptions('supplier'), getDiamondPicklists(), getAgents(),
+  const sp = await searchParams;
+  const tab = resolveTab(sp.tab, TABS);
+
+  const [totals, suppliers, picklists, agents] = await Promise.all([
+    getStockTotals(), getPartyOptions('supplier'), getDiamondPicklists(), getAgents(),
   ]);
+
+  // A tab link keeps the current search but always resets paging.
+  const href = (t: string) =>
+    `/stock?${new URLSearchParams(
+      Object.entries({ ...sp, tab: t, page: undefined }).filter(([, v]) => v) as [string, string][])}`;
 
   return (
     <div className="space-y-6">
@@ -37,7 +60,7 @@ export default async function StockPage({
           <h1 className="text-2xl font-bold tracking-tight">Stock</h1>
           <p className="text-sm text-muted-foreground">
             What you own is one row per shape, sieve, MM, colour and clarity. What you hold on a
-            supplier memo is still theirs, so it stays listed by supplier.
+            supplier memo is still theirs, so it stays listed by supplier — settle it on that tab.
           </p>
         </div>
         <AddStockSheet
@@ -53,136 +76,30 @@ export default async function StockPage({
         <Stat label="Out with clients" value={ct(totals.exposure)} sub="on approval" />
       </div>
 
-      <form>
-        <Input
-          name="q" defaultValue={q ?? ''} className="max-w-sm"
-          placeholder="Search sieve, MM, shape, supplier…"
-        />
-      </form>
+      <SectionTabs items={TABS.map((t) => ({ href: href(t), label: LABELS[t], active: t === tab }))} />
 
-      <Tabs defaultValue="owned">
-        <TabsList>
-          <TabsTrigger value="owned">My stock ({units.length})</TabsTrigger>
-          <TabsTrigger value="memo">On memo ({memo.length})</TabsTrigger>
-        </TabsList>
+      {tab !== 'movements' && (
+        <form>
+          {/* Without this the search would throw you back to the first tab. */}
+          <input type="hidden" name="tab" value={tab} />
+          <Input
+            name="q" defaultValue={sp.q ?? ''} className="max-w-sm"
+            placeholder="Search sieve, MM, shape, supplier…"
+          />
+        </form>
+      )}
 
-        <TabsContent value="owned">
-          <Card>
-            <CardHeader>
-              <CardTitle>Owned units</CardTitle>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Sieve / MM</TableHead>
-                    <TableHead>Shape</TableHead>
-                    <TableHead>Colour / Clarity</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">In vault</TableHead>
-                    <TableHead className="text-right">With clients</TableHead>
-                    <TableHead className="text-right">Avg rate</TableHead>
-                    <TableHead className="text-right">Value</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {units.map((u) => (
-                    <TableRow key={u.lotId}>
-                      <TableCell>
-                        <Link href={`/stock/${encodeURIComponent(u.lotNo)}`}
-                              className="font-medium underline underline-offset-4">
-                          {spec(u)}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-sm">{u.shape ?? '—'}</TableCell>
-                      <TableCell className="text-sm">
-                        {[u.colour, u.clarity].filter(Boolean).join(' · ') || '—'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={u.stoneType.toLowerCase().includes('lab') ? 'secondary' : 'outline'}>
-                          {u.stoneType}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{ct(u.balance)}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {u.exposure > 0 ? <span className="text-warning">{ct(u.exposure)}</span> : '—'}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{inr(u.costRate)}</TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">{inr(u.value)}</TableCell>
-                    </TableRow>
-                  ))}
-                  {!units.length && <Empty cols={8} what="No stock matches." />}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
+      {tab === 'owned' && <OwnedTable units={await getOwnedUnits({ search: sp.q })} />}
 
-        <TabsContent value="memo">
-          <Card>
-            <CardHeader>
-              <CardTitle>Held from suppliers</CardTitle>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead>Sieve / MM</TableHead>
-                    <TableHead>Colour / Clarity</TableHead>
-                    <TableHead>Memo</TableHead>
-                    <TableHead>Due</TableHead>
-                    <TableHead className="text-right">To settle</TableHead>
-                    <TableHead className="text-right">Still here</TableHead>
-                    <TableHead className="text-right">Rate</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {memo.map((m) => (
-                    <TableRow key={`${m.partyId}-${m.unitKey}`}>
-                      <TableCell className="font-medium">
-                        <Link href={`/parties/${m.partyId}`} className="underline underline-offset-4">
-                          {m.partyName}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{spec(m)}{m.shape ? ` · ${m.shape}` : ''}</TableCell>
-                      <TableCell className="text-sm">
-                        {[m.colour, m.clarity].filter(Boolean).join(' · ') || '—'}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{m.memoNos.join(', ')}</TableCell>
-                      <TableCell className="text-sm">
-                        {m.overdue
-                          ? <span className="text-negative">{m.dueOn} · overdue</span>
-                          : m.dueOn ?? '—'}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
-                        {ct(m.outstanding)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {/* The gap is goods that went straight out to a client. */}
-                        {ct(m.inVault)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{inr(m.rate)}</TableCell>
-                    </TableRow>
-                  ))}
-                  {!memo.length && (
-                    <Empty cols={8} what="Nothing held on a supplier memo. Settle them from Memos." />
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {tab === 'memo' && (
+        <div className="space-y-6">
+          <MemoTable rows={await getMemoStock({ search: sp.q })} />
+          <MemoList memos={await getMemos('in')} direction="in" />
+        </div>
+      )}
+
+      {tab === 'movements' && <MovementsTable {...await loadMovements(sp)} />}
     </div>
-  );
-}
-
-function Empty({ cols, what }: { cols: number; what: string }) {
-  return (
-    <TableRow>
-      <TableCell colSpan={cols} className="py-10 text-center text-muted-foreground">{what}</TableCell>
-    </TableRow>
   );
 }
 

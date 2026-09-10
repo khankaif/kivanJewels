@@ -12,10 +12,17 @@ export type FieldDef =
  * shareable, and the CSV export reuses the same query string.
  */
 export function FilterBar({
-  fields, exportHref, action,
-}: { fields: FieldDef[]; exportHref?: string; action?: string }) {
+  fields, exportHref, action, hidden,
+}: {
+  fields: FieldDef[]; exportHref?: string; action?: string;
+  /** Params the form must carry through, like the tab it lives on. */
+  hidden?: Record<string, string>;
+}) {
   return (
     <form action={action} className="flex flex-wrap items-end gap-3">
+      {Object.entries(hidden ?? {}).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
       {fields.map((f) => (
         <div key={f.name} className="space-y-1">
           {f.type !== 'checkbox' && (

@@ -11,7 +11,7 @@
     "import": "tsx -r dotenv/config scripts/import.ts dotenv_config_path=.env.local",
     "test": "tsx -r dotenv/config --test tests/*.test.ts dotenv_config_path=.env.local",
     "typecheck": "tsc --noEmit",
-    "test:pure": "tsx --test tests/dates.test.ts tests/normalize.test.ts tests/routes.test.ts",
+    "test:pure": "tsx --test tests/dates.test.ts tests/normalize.test.ts tests/routes.test.ts tests/tabs.test.ts",
     "reconcile": "tsx -r dotenv/config scripts/reconcile.ts dotenv_config_path=.env.local",
     "backfill-bills": "tsx -r dotenv/config scripts/backfill-bills.ts dotenv_config_path=.env.local"
   },

@@ -26,7 +26,7 @@ export default async function LotPage({ params }: { params: Promise<{ lotNo: str
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/movements" className="text-sm text-muted-foreground underline underline-offset-4">
+        <Link href="/stock?tab=movements" className="text-sm text-muted-foreground underline underline-offset-4">
           ← All movements
         </Link>
         <h1 className="mt-2 flex items-center gap-3 font-mono text-2xl font-bold tracking-tight">
