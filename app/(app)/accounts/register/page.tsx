@@ -58,12 +58,9 @@ export default async function LedgerPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Money register</h1>
-        <p className="text-sm text-muted-foreground">
-          Every rupee that moved, newest first. Append-only: corrections are new rows, never edits.
-        </p>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Every rupee that moved, newest first. Append-only: corrections are new rows, never edits.
+      </p>
 
       <Card>
         <CardContent className="space-y-4 pt-6">

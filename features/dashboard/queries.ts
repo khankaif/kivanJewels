@@ -113,11 +113,11 @@ export async function getWorklist(): Promise<WorkItem[]> {
     { key: 'pur-late', count: money.pur_late, value: Number(money.pur_late_val),
       label: 'Supplier bills past terms',
       detail: 'Past each supplier’s own credit days.',
-      href: '/bills?direction=purchase&status=unpaid', urgency: 'warning' },
+      href: '/accounts/bills?direction=purchase&status=unpaid', urgency: 'warning' },
     { key: 'sale-stale', count: money.sale_stale, value: Number(money.sale_stale_val),
       label: 'Client bills unpaid over 60 days',
       detail: 'Worth chasing.',
-      href: '/bills?direction=sale&status=unpaid', urgency: 'warning' },
+      href: '/accounts/bills?direction=sale&status=unpaid', urgency: 'warning' },
   ];
   return items.filter((i) => i.count > 0);
 }

@@ -150,7 +150,7 @@ export default async function PartyPage({ params }: { params: Promise<{ id: stri
                     <TableRow key={`${b.direction}:${b.billKey}`}>
                       <TableCell>
                         <Link
-                          href={`/bills/${encodeURIComponent(b.billKey)}?direction=${b.direction}`}
+                          href={`/accounts/bills/${encodeURIComponent(b.billKey)}?direction=${b.direction}`}
                           className="font-mono text-xs underline underline-offset-4"
                         >
                           {b.billNo ?? 'Unnumbered'}

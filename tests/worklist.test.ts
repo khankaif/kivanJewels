@@ -58,6 +58,6 @@ test('worklist orders critical memo items above money items', async () => {
 test('every worklist item links somewhere real and has a non-zero count', async () => {
   for (const i of await getWorklist()) {
     assert.ok(i.count > 0, `${i.key} should not appear with a zero count`);
-    assert.match(i.href, /^\/(memos|bills)/, `${i.key} must link to an actionable view`);
+    assert.match(i.href, /^\/(memos|sales|accounts\/bills)/, `${i.key} must link to an actionable view`);
   }
 });

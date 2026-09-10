@@ -21,15 +21,16 @@ export const NAV: Entry[] = [
   { label: 'Sales', items: [
     { href: '/sales', label: 'Requirements' },
     { href: '/memos?dir=out', label: 'Outward memos' },
-    { href: '/bills?direction=sale', label: 'Sale bills' },
+    { href: '/accounts/bills?direction=sale', label: 'Sale bills' },
   ] },
   { label: 'Purchases', items: [
     { href: '/memos?dir=in', label: 'Inward memos' },
-    { href: '/bills?direction=purchase', label: 'Purchase bills' },
+    { href: '/accounts/bills?direction=purchase', label: 'Purchase bills' },
   ] },
   { label: 'Accounts', items: [
     { href: '/accounts', label: 'Balances & aging' },
-    { href: '/ledger', label: 'Money register' },
+    { href: '/accounts/bills', label: 'Bills' },
+    { href: '/accounts/register', label: 'Money register' },
   ] },
   { label: 'Masters', items: [
     { href: '/parties', label: 'Parties' },
@@ -58,7 +59,11 @@ export function MainNav() {
             </Link>
           );
         }
-        const active = entry.items.some((i) => pathname === base(i.href) || pathname.startsWith(base(i.href) + '/'));
+        // Only routes this group owns drive the active state — cross-links
+        // (a `?` deep-link into another section) light up their real home, not this one.
+        const active = entry.items
+          .filter((i) => !i.href.includes('?'))
+          .some((i) => pathname === base(i.href) || pathname.startsWith(base(i.href) + '/'));
         return (
           <DropdownMenu key={entry.label}>
             <DropdownMenuTrigger

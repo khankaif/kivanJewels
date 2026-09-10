@@ -37,7 +37,7 @@ export async function recordPaymentAction(_prev: PaymentState, form: FormData): 
     throw e;
   }
 
-  for (const p of ['/', '/accounts', '/bills', '/ledger', '/parties']) revalidatePath(p);
+  for (const p of ['/', '/accounts', '/accounts/bills', '/accounts/register', '/parties']) revalidatePath(p);
   revalidatePath(`/parties/${partyId}`);
   return {
     ok: `${direction === 'in' ? 'Received' : 'Paid'} ₹${amount.toLocaleString('en-IN')}` +

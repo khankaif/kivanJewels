@@ -34,7 +34,7 @@ export default async function BillPage({
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/bills" className="text-sm text-muted-foreground underline underline-offset-4">
+        <Link href="/accounts/bills" className="text-sm text-muted-foreground underline underline-offset-4">
           ← All bills
         </Link>
         <h1 className="mt-2 flex items-center gap-3 font-mono text-2xl font-bold tracking-tight">

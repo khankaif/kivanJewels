@@ -17,12 +17,7 @@ export default async function AccountsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Accounts</h1>
-        <p className="text-sm text-muted-foreground">
-          One row per party, not per invoice. Aging as of {asOf}.
-        </p>
-      </div>
+      <p className="text-sm text-muted-foreground">One row per party, not per invoice. Aging as of {asOf}.</p>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
@@ -31,7 +26,7 @@ export default async function AccountsPage() {
             <div className="mt-1 text-2xl font-bold tabular-nums text-positive">
               {inr(totals.receivable)}
             </div>
-            <Link href="/bills?direction=sale&status=unpaid"
+            <Link href="/accounts/bills?direction=sale&status=unpaid"
                   className="text-xs text-muted-foreground underline underline-offset-4">
               see unpaid sale bills
             </Link>
@@ -43,7 +38,7 @@ export default async function AccountsPage() {
             <div className="mt-1 text-2xl font-bold tabular-nums text-warning">
               {inr(totals.payable)}
             </div>
-            <Link href="/bills?direction=purchase&status=unpaid"
+            <Link href="/accounts/bills?direction=purchase&status=unpaid"
                   className="text-xs text-muted-foreground underline underline-offset-4">
               see unpaid purchase bills
             </Link>

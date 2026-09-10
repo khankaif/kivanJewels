@@ -40,12 +40,9 @@ export default async function BillsPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Bills</h1>
-        <p className="text-sm text-muted-foreground">
-          Every invoice as a document: what you billed, to whom, when, and what is still unpaid.
-        </p>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Every invoice as a document: what you billed, to whom, when, and what is still unpaid.
+      </p>
 
       <Card>
         <CardContent className="space-y-4 pt-6">
@@ -100,7 +97,7 @@ export default async function BillsPage({
                   <TableRow key={`${b.direction}:${b.billKey}`}>
                     <TableCell>
                       <Link
-                        href={`/bills/${encodeURIComponent(b.billKey)}?direction=${b.direction}`}
+                        href={`/accounts/bills/${encodeURIComponent(b.billKey)}?direction=${b.direction}`}
                         className="font-mono text-xs underline underline-offset-4"
                       >
                         {b.billNo ?? (b.isCash ? 'Cash' : 'Unnumbered')}

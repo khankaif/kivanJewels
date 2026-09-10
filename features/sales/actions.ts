@@ -15,7 +15,7 @@ async function requireUser() {
   if (!session?.user) throw new Error('Not authenticated');
 }
 
-const PATHS = ['/', '/sales', '/stock', '/movements', '/memos', '/bills', '/accounts', '/parties'];
+const PATHS = ['/', '/sales', '/stock', '/movements', '/memos', '/accounts/bills', '/accounts', '/parties'];
 const revalidate = () => PATHS.forEach((p) => revalidatePath(p));
 
 function toMessage(e: unknown): string | null {
