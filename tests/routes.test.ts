@@ -29,7 +29,3 @@ test('section tabs point at routes that exist', () => {
     assert.ok(existsSync(routeFile(t.href)), `${t.href} -> ${routeFile(t.href)} missing`);
   }
 });
-
-test('accounts exposes the money register as its own tab', () => {
-  assert.ok(ACCOUNTS_TABS.some((t) => t.href.includes('grain=entries')));
-});

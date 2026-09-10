@@ -1,21 +1,15 @@
 'use client';
 
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { SectionTabs } from '@/components/layout/section-tabs';
 
 export const ACCOUNTS_TABS = [
   { href: '/accounts', label: 'Balances & aging' },
   { href: '/accounts/bills', label: 'Bills' },
-  { href: '/accounts/bills?grain=entries', label: 'Every entry' },
 ] as const;
 
 export function AccountsNav() {
   const pathname = usePathname();
-  const entries = useSearchParams().get('grain') === 'entries';
-  // Bills and the money register are the same route at two grains, so the
-  // active tab is decided by the grain, not by the path alone.
-  const onBills = pathname === '/accounts/bills' || pathname.startsWith('/accounts/bills/');
-
   return (
     <SectionTabs
       items={ACCOUNTS_TABS.map((t) => ({
@@ -23,7 +17,7 @@ export function AccountsNav() {
         label: t.label,
         active: t.href === '/accounts'
           ? pathname === '/accounts'
-          : onBills && t.href.includes('grain=entries') === entries,
+          : pathname === t.href || pathname.startsWith(t.href + '/'),
       }))}
     />
   );
