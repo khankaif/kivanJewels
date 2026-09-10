@@ -6,8 +6,7 @@ import { cn } from '@/lib/utils';
 
 const TABS = [
   { href: '/accounts', label: 'Balances & aging' },
-  { href: '/accounts/bills', label: 'Bills' },
-  { href: '/accounts/register', label: 'Money register' },
+  { href: '/accounts/bills', label: 'Bills & entries' },
 ];
 
 export function AccountsNav() {

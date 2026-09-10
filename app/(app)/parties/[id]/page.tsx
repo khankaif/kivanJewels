@@ -7,7 +7,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { getParty, getPartyStatement, getPartyActivity } from '@/features/parties/queries';
-import { getBills } from '@/features/accounts/bills';
+import { getBills } from '@/features/accounts/money';
 import { PaymentDialog } from '@/features/accounts/components/payment-dialog';
 import { inr, ct } from '@/lib/format';
 

@@ -29,8 +29,8 @@ export const NAV: Entry[] = [
   ] },
   { label: 'Accounts', items: [
     { href: '/accounts', label: 'Balances & aging' },
-    { href: '/accounts/bills', label: 'Bills' },
-    { href: '/accounts/register', label: 'Money register' },
+    { href: '/accounts/bills', label: 'Bills & entries' },
+    { href: '/accounts/bills?grain=entries', label: 'Money register' },
   ] },
   { label: 'Masters', items: [
     { href: '/parties', label: 'Parties' },

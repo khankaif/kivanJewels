@@ -134,3 +134,63 @@ export async function getBillLines(billKey: string, direction: 'sale' | 'purchas
     rate: r.rate === null ? null : Number(r.rate),
   }));
 }
+
+// ---------------------------------------------------------------- entry grain
+//
+// The same `ledger` rows the bills view groups into documents, ungrouped.
+// A bill is the document; an entry is the line that made it. One table, two
+// grains — which is why they share a page.
+
+export type LedgerEntry = {
+  id: string; datedOn: string; kind: string; amount: number;
+  billNo: string | null; refId: string | null; notes: string | null;
+  partyId: string; partyName: string;
+};
+
+export type EntryFilters = {
+  kind?: string; partyId?: string; from?: string; to?: string; q?: string;
+  limit?: number; offset?: number;
+};
+
+export async function getLedgerEntries(f: EntryFilters = {}): Promise<{
+  rows: LedgerEntry[]; total: number; totals: { debit: number; credit: number };
+}> {
+  const kind = f.kind || null;
+  const party = f.partyId || null;
+  const from = f.from || null;
+  const to = f.to || null;
+  const q = f.q ? `%${f.q}%` : null;
+  const limit = f.limit ?? 200;
+  const offset = f.offset ?? 0;
+
+  const rows = await sql`
+    SELECT * FROM ledger_entries
+    WHERE (${kind}::text  IS NULL OR kind = ${kind})
+      AND (${party}::uuid IS NULL OR party_id = ${party}::uuid)
+      AND (${from}::text  IS NULL OR dated_on >= ${from})
+      AND (${to}::text    IS NULL OR dated_on <= ${to})
+      AND (${q}::text     IS NULL OR bill_no ILIKE ${q} OR party_name ILIKE ${q} OR ref_id ILIKE ${q})
+    ORDER BY dated_on DESC, id
+    LIMIT ${limit} OFFSET ${offset}`;
+
+  const [agg] = await sql`
+    SELECT count(*)::int AS n,
+           COALESCE(SUM(amount) FILTER (WHERE amount > 0),0)  AS debit,
+           COALESCE(-SUM(amount) FILTER (WHERE amount < 0),0) AS credit
+    FROM ledger_entries
+    WHERE (${kind}::text  IS NULL OR kind = ${kind})
+      AND (${party}::uuid IS NULL OR party_id = ${party}::uuid)
+      AND (${from}::text  IS NULL OR dated_on >= ${from})
+      AND (${to}::text    IS NULL OR dated_on <= ${to})
+      AND (${q}::text     IS NULL OR bill_no ILIKE ${q} OR party_name ILIKE ${q} OR ref_id ILIKE ${q})`;
+
+  return {
+    rows: (rows as any[]).map((r) => ({
+      id: r.id, datedOn: r.dated_on, kind: r.kind, amount: Number(r.amount),
+      billNo: r.bill_no, refId: r.ref_id, notes: r.notes,
+      partyId: r.party_id, partyName: r.party_name,
+    })),
+    total: agg.n as number,
+    totals: { debit: Number(agg.debit), credit: Number(agg.credit) },
+  };
+}
