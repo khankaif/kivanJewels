@@ -1,41 +1,25 @@
 import { sql } from '@/db/client';
 import { getStockTotals } from '@/features/stock/queries';
-import { getAccountTotals, getSegments } from '@/features/accounts/queries';
+import { getAccountTotals, getPnl } from '@/features/accounts/queries';
 
 export async function getDashboard() {
-  const [stock, money, segments, memo] = await Promise.all([
+  const [stock, money, pnl, memo] = await Promise.all([
     getStockTotals(),
     getAccountTotals(),
-    getSegments(),
+    getPnl(),
     sql`SELECT count(*) FILTER (WHERE status='open')::int AS open,
                count(*) FILTER (WHERE status='open' AND due_on < CURRENT_DATE)::int AS overdue
         FROM memos WHERE direction='out'`,
   ]);
-  const revenue = segments.reduce((s, x) => s + x.revenue, 0);
-  const cost = segments.reduce((s, x) => s + x.cost, 0);
-  const uncosted = segments.reduce((s, x) => s + x.uncosted, 0);
-  const profit = segments.reduce((s, x) => s + x.profit, 0);
   return {
     ...stock,
     ...money,
-    segments,
-    revenue,
-    cost,
-    uncosted,
-    profit,
-    // The sheet's "Profit %" is profit over cost. Match it, so the headline
-    // number is the one already trusted.
-    markup: cost > 0 ? (profit / cost) * 100 : 0,
+    ...pnl,
     openMemos: memo[0].open as number,
     overdueMemos: memo[0].overdue as number,
   };
 }
 
-/**
- * Where each worklist item sends you. Kept as data, not inline literals, so a
- * deleted route breaks a test instead of a click: the worklist only emits an
- * item when its count is non-zero, which a test database usually cannot stage.
- */
 export const WORKLIST_HREF = {
   'memo-out-overdue': '/sales?tab=memo',
   'memo-in-overdue': '/stock?tab=memo',

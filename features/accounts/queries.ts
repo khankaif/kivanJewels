@@ -1,4 +1,4 @@
-import { sql } from '@/db/client';
+import { sql, type PoolClientLike } from '@/db/client';
 
 export type PartyBalance = {
   partyId: string; partyName: string; receivable: number; payable: number; net: number;
@@ -36,75 +36,48 @@ export async function getAccountTotals() {
   return { receivable: Number(r.receivable), payable: Number(r.payable) };
 }
 
-export type Segment = {
-  label: string; revenue: number; cost: number; uncosted: number;
-  profit: number; markup: number; margin: number;
-};
-
 /**
- * P&L split by business, following the convention the source workbook uses.
+ * The whole book's P&L.
  *
- * Two rules taken from the sheet rather than invented here:
+ * `cost` counts only lots that have actually SOLD, so unsold inventory stays on
+ * the balance sheet rather than in cost of sales.
  *
- * 1. Sales with NO cost basis are excluded from profit. Nine rows (the sheet's
- *    first nine, opening stock sold for Rs 4,39,390.63) have a sale but no
- *    purchase, and the sheet deliberately leaves Profit Loss blank rather than
- *    booking them as 100% profit. They are reported separately as `uncosted`
- *    so the money stays visible instead of quietly inflating margin.
+ * A sale from a lot with no `purchase` movement has no cost to set against it
+ * -- opening stock sold before the book starts, and the imported jewellery
+ * sales. It is reported as `uncosted` and left out of profit: booking it as
+ * 100% profit is the one thing the source workbook refused to do, and this
+ * follows that.
  *
- * 2. `markup` is profit over COST -- the sheet's "Profit %" column, 10.92%.
- *    `margin` (profit over revenue) is also returned because it is the more
- *    common convention elsewhere; the UI labels which is which.
- *
- * COGS is the cost of lots actually SOLD, so unsold inventory stays on the
- * balance sheet rather than in cost of sales.
- *
- * Caveat on the jewellery line: its cost comes from "Product Costing", which
- * bundles Rs 2,63,937 of diamonds. Where those were sourced internally they are
- * also counted in the diamond segment, so combined profit is understated by up
- * to that amount. The workbook records the same stones on two sheets with no
- * key linking them.
+ * `markup` is profit over cost, matching the sheet's "Profit %" column.
  */
-export async function getSegments(): Promise<Segment[]> {
-  const [r] = await sql`
-    WITH sold AS (
-      SELECT m.lot_id, ABS(m.amount) AS sale_amount,
-             EXISTS (SELECT 1 FROM movements x
-                     WHERE x.lot_id = m.lot_id AND x.kind = 'purchase') AS costed
-      FROM movements m WHERE m.kind = 'sale'
-    )
-    SELECT
-      -- Everything that is NOT jewellery, rather than a whitelist of the
-      -- ref_types that existed when this was written: a new sale path
-      -- (a direct sale off a requirement, say) must not silently drop out
-      -- of revenue because nobody remembered to add it here.
-      (SELECT COALESCE(SUM(amount),0) FROM ledger
-        WHERE kind='sale_invoice' AND ref_type IS DISTINCT FROM 'jewellery')       AS dia_rev,
-      (SELECT COALESCE(SUM(sale_amount),0) FROM sold WHERE costed)                 AS dia_costed_rev,
-      (SELECT COALESCE(SUM(p.amount),0) FROM movements p
-        WHERE p.kind='purchase'
-          AND EXISTS (SELECT 1 FROM movements s
-                      WHERE s.lot_id = p.lot_id AND s.kind='sale'))                AS dia_cost,
-      (SELECT COALESCE(SUM(amount),0) FROM ledger
-        WHERE kind='sale_invoice' AND ref_type='jewellery')                        AS jew_rev,
-      (SELECT COALESCE(SUM(product_cost),0) FROM jewellery_orders)                 AS jew_cost`;
+const PNL_SQL = `
+  WITH sold AS (
+    SELECT m.lot_id, ABS(m.amount) AS sale_amount,
+           EXISTS (SELECT 1 FROM movements x
+                   WHERE x.lot_id = m.lot_id AND x.kind = 'purchase') AS costed
+    FROM movements m WHERE m.kind = 'sale'
+  )
+  SELECT
+    (SELECT COALESCE(SUM(amount),0) FROM ledger WHERE kind='sale_invoice')       AS revenue,
+    (SELECT COALESCE(SUM(sale_amount),0) FROM sold WHERE costed)                 AS costed_revenue,
+    (SELECT COALESCE(SUM(p.amount),0) FROM movements p
+      WHERE p.kind='purchase'
+        AND EXISTS (SELECT 1 FROM movements s
+                    WHERE s.lot_id = p.lot_id AND s.kind='sale'))                AS cost`;
 
-  const diaRev = Number(r.dia_rev);
-  const diaCostedRev = Number(r.dia_costed_rev);
-  const diaCost = Number(r.dia_cost);
-  const jewRev = Number(r.jew_rev);
-  const jewCost = Number(r.jew_cost);
+/** Pass a transaction client to read uncommitted rows; tests need that. */
+export async function getPnl(c?: PoolClientLike) {
+  const rows = c ? (await c.query(PNL_SQL)).rows : await sql.query(PNL_SQL);
+  const r = rows[0];
 
-  const mk = (label: string, revenue: number, costedRev: number, cost: number): Segment => {
-    const profit = costedRev - cost;
-    return {
-      label, revenue, cost, uncosted: revenue - costedRev, profit,
-      markup: cost > 0 ? (profit / cost) * 100 : 0,
-      margin: costedRev > 0 ? (profit / costedRev) * 100 : 0,
-    };
+  const revenue = Number(r.revenue);
+  const costedRevenue = Number(r.costed_revenue);
+  const cost = Number(r.cost);
+  const profit = costedRevenue - cost;
+  return {
+    revenue, costedRevenue, cost,
+    uncosted: revenue - costedRevenue,
+    profit,
+    markup: cost > 0 ? (profit / cost) * 100 : 0,
   };
-  return [
-    mk('Diamond trading', diaRev, diaCostedRev, diaCost),
-    mk('Jewellery', jewRev, jewRev, jewCost),
-  ];
 }

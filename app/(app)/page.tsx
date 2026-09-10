@@ -19,7 +19,11 @@ export default async function DashboardPage() {
     { label: 'Revenue', value: inr(d.revenue) },
     {
       label: 'Gross profit', value: inr(d.profit),
-      sub: `${pct(d.markup)} on cost`, tone: d.profit >= 0 ? 'text-positive' : 'text-negative',
+      // Sales with no recorded cost are excluded rather than booked as pure
+      // profit; saying so here is what the deleted panel's caveat was for.
+      sub: `${pct(d.markup)} on cost`
+        + (d.uncosted > 0 ? ` · excludes ${inr(d.uncosted)} uncosted` : ''),
+      tone: d.profit >= 0 ? 'text-positive' : 'text-negative',
     },
     { label: 'Receivable', value: inr(d.receivable), tone: 'text-positive' },
     { label: 'Payable', value: inr(d.payable), tone: 'text-warning' },
@@ -86,43 +90,6 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      <Card>
-        <CardContent className="pt-6">
-          <div className="mb-3 text-xs uppercase tracking-wide text-muted-foreground">
-            Profit by business
-          </div>
-          <div className="space-y-2">
-            {d.segments.map((s) => (
-              <div key={s.label} className="flex items-baseline justify-between gap-4 text-sm">
-                <span className="font-medium">{s.label}</span>
-                <span className="text-muted-foreground tabular-nums">
-                  {inr(s.revenue - s.uncosted)} − {inr(s.cost)} =
-                </span>
-                <span
-                  className={`w-44 text-right font-bold tabular-nums ${
-                    s.profit >= 0 ? 'text-positive' : 'text-negative'
-                  }`}
-                >
-                  {inr(s.profit)} ({pct(s.markup)} on cost)
-                </span>
-              </div>
-            ))}
-          </div>
-          {d.uncosted > 0 && (
-            <p className="mt-3 text-xs text-muted-foreground">
-              Excludes <strong>{inr(d.uncosted)}</strong> of sales with no recorded cost (opening
-              stock sold before the book starts). Your sheet leaves Profit Loss blank on those rows
-              rather than booking them as pure profit, and this follows that.
-            </p>
-          )}
-          <p className="mt-2 text-xs text-muted-foreground">
-            Profit % is on cost, matching the sheet&apos;s Profit % column. Cost of sales counts only
-            lots that have sold; unsold inventory stays on the balance sheet. Jewellery cost bundles
-            ₹2,63,937 of diamonds that may also appear in the diamond segment — the workbook records
-            those stones on two sheets with no key linking them.
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 }

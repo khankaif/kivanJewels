@@ -36,7 +36,6 @@ export type ImportReport = {
   lots: number;
   movements: number;
   ledgerRows: number;
-  jewelleryOrders: number;
   skipped: string[];
   plugs: string[];
 };
@@ -70,7 +69,7 @@ export async function importAll(reset = false): Promise<ImportReport> {
   }
   if (reset) {
     await sql`TRUNCATE ledger, memo_line_billings, movements, memo_lines, memos,
-                       lots, jewellery_orders, parties RESTART IDENTITY CASCADE`;
+                       lots, parties RESTART IDENTITY CASCADE`;
   }
 
   // ---- 1. parties -------------------------------------------------------
@@ -225,7 +224,6 @@ export async function importAll(reset = false): Promise<ImportReport> {
   const lotIdByNo = new Map<string, string>();
   let movementCount = 0;
   let ledgerCount = 0;
-  let jewelleryCount = 0;
 
   await withTx(async (tx: PoolClientLike) => {
     const col = <K extends keyof LotIn>(k: K) => lots.map((l) => l[k]);
@@ -265,7 +263,10 @@ export async function importAll(reset = false): Promise<ImportReport> {
       ledgerCount = ledger.length;
     }
 
-    // jewellery orders + their client receivables
+    // Jewellery receivables. The order headers themselves are not stored --
+    // jewellery is not one of the four flows, and migration 019 dropped the
+    // table. What is owed on those sales is still real money, so it lands in
+    // the ledger tagged ref_type='jewellery'.
     for (const r of jm) {
       // Two source rows are annotations, not orders: Cust Order No holds the
       // literal text "Adjusted Against Diamonds" with no customer, product or
@@ -283,23 +284,6 @@ export async function importAll(reset = false): Promise<ImportReport> {
         skipped.push(`${r._id}: no order number in source -> synthesised ${orderNo}`);
       }
       const on = parseLooseDate(r['Date']);
-      await tx.query(
-        `INSERT INTO jewellery_orders (order_no, ordered_on, party_id, product_type, metal_type,
-           metal_colour, gross_wt, net_wt, metal_rate, metal_amount, labour_amount,
-           other_charges, client_total, product_cost, remarks)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-         ON CONFLICT (order_no) DO NOTHING`,
-        [orderNo, on, idFor(r['Cust Name']), clean(r['Product type']),
-         clean(r['Metal Type'])?.replace(/\s+/g, '') ?? null, clean(r['Metal Colour']),
-         num(r['Gross Wt']) || null, num(r['Net Wt']) || null, num(r['Metal Rate']) || null,
-         round2(num(r['Metal Amt'])) || null, round2(num(r['Lab Charges'])) || null,
-         round2(num(r['Hm & Engr']) + num(r['Cad Charges'])) || null,
-         num(r['Client Total']) || null,
-         // Source "Product Costing"; falls back to Metal Total when absent.
-         num(r['Product Costing']) || num(r['Metal Total']) || null,
-         clean(r['Remarks'])],
-      );
-      jewelleryCount++;
 
       const clientId = idFor(r['Cust Name']);
       const total = num(r['Client Total']);
@@ -324,7 +308,7 @@ export async function importAll(reset = false): Promise<ImportReport> {
 
   return {
     parties: resolved.size, lots: lots.length, movements: movementCount,
-    ledgerRows: ledgerCount, jewelleryOrders: jewelleryCount, skipped, plugs,
+    ledgerRows: ledgerCount, skipped, plugs,
   };
 }
 
