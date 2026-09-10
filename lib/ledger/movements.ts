@@ -223,6 +223,7 @@ export async function receiveInwardMemo(
   a: {
     memoNo: string; partyId: string; issuedOn: string; dueOn?: string | null;
     termsDays?: number | null; agent?: string | null; notes?: string;
+    requirementLineId?: string | null;
     lines: InwardLineInput[];
   },
   ctx?: Ctx,
@@ -256,9 +257,9 @@ export async function receiveInwardMemo(
          l.mmSize ?? null, l.clarity ?? null, l.colour ?? null, l.rate, a.issuedOn],
       );
       const [line] = await run(
-        `INSERT INTO memo_lines (memo_id, lot_id, carats, rate)
-         VALUES ($1,$2,$3,$4) RETURNING id`,
-        [memo.id, lot.id, l.carats, l.rate],
+        `INSERT INTO memo_lines (memo_id, lot_id, carats, rate, requirement_line_id)
+         VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+        [memo.id, lot.id, l.carats, l.rate, a.requirementLineId ?? null],
       );
       await insertMovement(
         'memo_in_receipt',
@@ -281,7 +282,8 @@ export async function receiveInwardMemo(
 export async function issueOutwardMemo(
   a: {
     memoNo: string; partyId: string; issuedOn: string; dueOn: string | null;
-    agent?: string | null; notes?: string; lines: MemoLineInput[];
+    agent?: string | null; notes?: string;
+    requirementLineId?: string | null; lines: MemoLineInput[];
   },
   ctx?: Ctx,
 ): Promise<string> {
@@ -297,9 +299,9 @@ export async function issueOutwardMemo(
     );
     for (const l of a.lines) {
       const [line] = await run(
-        `INSERT INTO memo_lines (memo_id, lot_id, carats, rate)
-         VALUES ($1,$2,$3,$4) RETURNING id`,
-        [memo.id, l.lotId, l.carats, l.rate],
+        `INSERT INTO memo_lines (memo_id, lot_id, carats, rate, requirement_line_id)
+         VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+        [memo.id, l.lotId, l.carats, l.rate, a.requirementLineId ?? null],
       );
       await insertMovement(
         'memo_out_issue',
@@ -459,6 +461,46 @@ export async function billMemoLine(
       }
     }
     await closeIfSettled(c, a.memoLineId);
+  });
+}
+
+/**
+ * Sells stock straight off a lot on a bill -- no memo step.
+ *
+ * Carats leave the vault (the overdraw guard enforces the balance) and a
+ * receivable is posted. Firm: there is no sale-return movement kind, so if the
+ * customer might send goods back, issue an outward memo instead.
+ *
+ * `requirementLineId` tags both the movement and the ledger row so the sale
+ * counts against a customer requirement.
+ */
+export async function recordDirectSale(
+  a: {
+    lotId: string; carats: number; rate: number; on: string;
+    invoiceNo: string; partyId: string;
+    requirementLineId?: string | null; notes?: string;
+  },
+  ctx?: Ctx,
+): Promise<string> {
+  if (!a.invoiceNo.trim()) throw new SettlementError('an invoice number is required');
+  if (!(a.carats > 0)) throw new SettlementError('carats must be greater than zero');
+  if (!(a.rate >= 0)) throw new SettlementError('rate must not be negative');
+
+  const amount = round2(a.carats * a.rate);
+  const refType = a.requirementLineId ? 'requirement_line' : 'sale';
+  const refId = a.requirementLineId ?? a.invoiceNo;
+
+  return inCtx(ctx, async (c) => {
+    await insertMovement('sale', {
+      lotId: a.lotId, carats: a.carats, rate: a.rate, on: a.on,
+      refType, ref: refId, notes: a.notes ?? `sold on ${a.invoiceNo}`,
+    }, c);
+    const [row] = await q(c)(
+      `INSERT INTO ledger (party_id, kind, amount, dated_on, bill_no, ref_type, ref_id, notes)
+       VALUES ($1,'sale_invoice',$2,$3,$4,$5,$6,$7) RETURNING id`,
+      [a.partyId, amount, a.on, a.invoiceNo, refType, refId, a.notes ?? null],
+    );
+    return row.id as string;
   });
 }
 

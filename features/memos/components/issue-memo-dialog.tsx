@@ -25,7 +25,7 @@ export function IssueMemoDialog({
     null,
   );
   const today = new Date().toISOString().slice(0, 10);
-  const due = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+  const due = new Date(new Date(today).getTime() + 7 * 864e5).toISOString().slice(0, 10);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
