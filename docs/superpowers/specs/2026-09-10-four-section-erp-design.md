@@ -45,10 +45,21 @@ search or filter submit.
 | Stock      | `/stock`    | My stock · On memo · Movements                    |
 | Sales      | `/sales`    | Requirements · Out on memo                        |
 | Accounts   | `/accounts` | Balances & aging · Bills · Every entry            |
-| Masters    | `/masters`  | Parties · Diamonds                                |
+| Masters    | `/parties`  | Parties · Diamonds                                |
 
 Detail routes are unchanged: `/stock/[lotNo]`, `/sales/[requirementNo]`,
 `/parties/[id]`, `/accounts/bills/[key]`.
+
+Two sections keep sub-routes rather than a `?tab=` param, because they
+already have them and moving them would break links for no gain:
+
+- **Accounts** already renders `AccountsNav` above `/accounts` and
+  `/accounts/bills`. It gains a third link, "Every entry", pointing at
+  `/accounts/bills?grain=entries` — the grain switch that page already has.
+- **Masters** keeps `/parties` and `/masters/diamonds`. A `MastersNav`
+  built from the same component renders above both, and the top-level
+  Masters link points at `/parties`. `/parties/[id]` is referenced from six
+  places; it does not move.
 
 ### Where memos go
 
@@ -122,10 +133,12 @@ action for search. No new tables.
 Each hit links to its detail route.
 
 **Actions**, listed when the query is empty and filtered as it is typed:
-Add diamonds · New requirement · Record payment · New party.
+Add diamonds · New requirement · New party.
 
-Selecting an action navigates to the owning page with the sheet open, via a
-search param the page already has to read for its tab.
+Selecting an action navigates to the owning page with `?new=1`; the page
+passes `defaultOpen` to its sheet. Recording a payment is deliberately not
+an action: a payment needs a party first, so the path is to search the
+party and pay from their page.
 
 ## 4. Entry ergonomics
 
