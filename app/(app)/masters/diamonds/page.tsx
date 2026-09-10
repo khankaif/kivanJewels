@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDiamondAttributes, ATTRIBUTE_TYPES } from '@/features/masters/diamonds/queries';
 import { AttributeList } from '@/features/masters/diamonds/components/attribute-list';
+import { MastersNav } from '@/features/masters/components/masters-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,12 +11,14 @@ export default async function DiamondMasterPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Diamond master</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Masters</h1>
         <p className="text-sm text-muted-foreground">
           The values a purchase or memo can pick from. Sieve and MM aren&apos;t here — those are
           measurements, not a fixed list, and get normalized automatically on stock.
         </p>
       </div>
+
+      <MastersNav />
 
       <Card>
         <CardHeader>

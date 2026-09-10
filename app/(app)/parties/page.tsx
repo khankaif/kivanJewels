@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/table';
 import { getParties } from '@/features/parties/queries';
 import { PartyDialog } from '@/features/parties/components/party-dialog';
+import { MastersNav } from '@/features/masters/components/masters-nav';
 import { inr } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -23,13 +24,15 @@ export default async function PartiesPage({
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Parties</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Masters</h1>
           <p className="text-sm text-muted-foreground">
             Suppliers and clients. Credit terms set the due date on inward memos.
           </p>
         </div>
         <PartyDialog />
       </div>
+
+      <MastersNav />
 
       <Card>
         <CardHeader className="gap-3">

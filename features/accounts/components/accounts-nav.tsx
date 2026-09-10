@@ -1,36 +1,30 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { SectionTabs } from '@/components/layout/section-tabs';
 
-const TABS = [
+export const ACCOUNTS_TABS = [
   { href: '/accounts', label: 'Balances & aging' },
-  { href: '/accounts/bills', label: 'Bills & entries' },
-];
+  { href: '/accounts/bills', label: 'Bills' },
+  { href: '/accounts/bills?grain=entries', label: 'Every entry' },
+] as const;
 
 export function AccountsNav() {
   const pathname = usePathname();
+  const entries = useSearchParams().get('grain') === 'entries';
+  // Bills and the money register are the same route at two grains, so the
+  // active tab is decided by the grain, not by the path alone.
+  const onBills = pathname === '/accounts/bills' || pathname.startsWith('/accounts/bills/');
+
   return (
-    <div className="flex gap-1 border-b">
-      {TABS.map((t) => {
-        const active = t.href === '/accounts'
+    <SectionTabs
+      items={ACCOUNTS_TABS.map((t) => ({
+        href: t.href,
+        label: t.label,
+        active: t.href === '/accounts'
           ? pathname === '/accounts'
-          : pathname === t.href || pathname.startsWith(t.href + '/');
-        return (
-          <Link
-            key={t.href} href={t.href}
-            className={cn(
-              '-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-              active
-                ? 'border-foreground text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {t.label}
-          </Link>
-        );
-      })}
-    </div>
+          : onBills && t.href.includes('grain=entries') === entries,
+      }))}
+    />
   );
 }
