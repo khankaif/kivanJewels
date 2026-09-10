@@ -60,6 +60,21 @@ export async function getWorklist(): Promise<WorkItem[]> {
       COALESCE(SUM(outstanding*rate) FILTER (WHERE NOT overdue AND direction='in'),0)  AS in_open_val
     FROM memo_line_status WHERE memo_status = 'open'`;
 
+  const [sales] = await sql`
+    SELECT
+      count(DISTINCT requirement_id)::int                                  AS reqs,
+      COALESCE(SUM(outstanding * COALESCE(quoted_rate, 0)), 0)             AS value,
+      count(*) FILTER (WHERE ready)::int                                   AS lines_ready,
+      count(*) FILTER (WHERE NOT ready)::int                               AS lines_short
+    FROM (
+      SELECT rls.requirement_id, rls.outstanding, rls.quoted_rate,
+        (SELECT COALESCE(SUM(b.balance), 0) FROM lot_balances b JOIN lots l ON l.id = b.lot_id
+         WHERE l.unit_key = rls.unit_key AND b.balance > 0.0005) >= rls.outstanding AS ready
+      FROM requirement_line_status rls
+      WHERE rls.requirement_status = 'open' AND rls.line_status = 'open'
+        AND rls.outstanding > 0.0005
+    ) x`;
+
   const [money] = await sql`
     SELECT
       (SELECT count(*)::int FROM bills b JOIN parties p ON p.id = b.party_id
@@ -90,6 +105,11 @@ export async function getWorklist(): Promise<WorkItem[]> {
       label: 'Goods held on supplier memo',
       detail: 'In your vault but not yours yet — no payable until billed.',
       href: '/memos', urgency: 'info' },
+    { key: 'sales-open', count: sales.reqs, value: Number(sales.value),
+      label: 'Customer requirements to fulfil',
+      detail: `${sales.lines_ready} line${sales.lines_ready === 1 ? '' : 's'} deliverable from stock now, `
+        + `${sales.lines_short} need sourcing.`,
+      href: '/sales', urgency: 'warning' },
     { key: 'pur-late', count: money.pur_late, value: Number(money.pur_late_val),
       label: 'Supplier bills past terms',
       detail: 'Past each supplier’s own credit days.',

@@ -1,32 +1,33 @@
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { getMemos, getMemoSummary, getAgents } from '@/features/memos/queries';
-import { getIssuableLots } from '@/features/stock/queries';
-import { getPartyOptions } from '@/features/parties/queries';
+import { getMemos, getMemoSummary } from '@/features/memos/queries';
 import { MemoList } from '@/features/memos/components/memo-list';
-import { IssueMemoDialog } from '@/features/memos/components/issue-memo-dialog';
 import { inr, ct } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
-export default async function MemosPage() {
-  const [inward, outward, summary, lots, clients, agents] = await Promise.all([
+export default async function MemosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ dir?: string }>;
+}) {
+  const { dir } = await searchParams;
+  const start = dir === 'in' ? 'in' : 'out';
+  const [inward, outward, summary] = await Promise.all([
     getMemos('in'), getMemos('out'), getMemoSummary(),
-    getIssuableLots(), getPartyOptions('client'), getAgents(),
   ]);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Memos</h1>
-          <p className="text-sm text-muted-foreground">
-            Goods on approval, in both directions. Nothing is bought or sold until it is billed.
-            Receive goods on memo from <Link href="/stock" className="underline underline-offset-4">Stock</Link>.
-          </p>
-        </div>
-        <IssueMemoDialog lots={lots} parties={clients} agents={agents} />
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Memos</h1>
+        <p className="text-sm text-muted-foreground">
+          The open jangad register, both directions — track and settle. Nothing is bought or sold
+          until it is billed. Receive goods from{' '}
+          <Link href="/stock" className="underline underline-offset-4">Stock</Link>; send goods
+          by fulfilling a <Link href="/sales" className="underline underline-offset-4">Sales</Link> requirement.
+        </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -60,7 +61,7 @@ export default async function MemosPage() {
         </Card>
       </div>
 
-      <Tabs defaultValue="out">
+      <Tabs defaultValue={start}>
         <TabsList>
           <TabsTrigger value="out">Outward — to clients ({outward.length})</TabsTrigger>
           <TabsTrigger value="in">Inward — from suppliers ({inward.length})</TabsTrigger>

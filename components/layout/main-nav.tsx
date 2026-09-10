@@ -2,39 +2,81 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ChevronDownIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
-export const NAV_ITEMS = [
+type Leaf = { href: string; label: string };
+type Entry = Leaf | { label: string; items: Leaf[] };
+
+/** Workflow order: bring stock in, sell it, chase the money, keep the masters. */
+export const NAV: Entry[] = [
   { href: '/', label: 'Dashboard' },
-  { href: '/stock', label: 'Stock' },
-  { href: '/sales', label: 'Sales' },
-  { href: '/movements', label: 'Movements' },
-  { href: '/memos', label: 'Memos' },
-  { href: '/bills', label: 'Bills' },
-  { href: '/ledger', label: 'Register' },
-  { href: '/accounts', label: 'Accounts' },
-  { href: '/parties', label: 'Parties' },
-  { href: '/masters/diamonds', label: 'Diamond master' },
-] as const;
+  { label: 'Stock', items: [
+    { href: '/stock', label: 'Stock' },
+    { href: '/movements', label: 'Movement history' },
+  ] },
+  { label: 'Sales', items: [
+    { href: '/sales', label: 'Requirements' },
+    { href: '/memos?dir=out', label: 'Outward memos' },
+    { href: '/bills?direction=sale', label: 'Sale bills' },
+  ] },
+  { label: 'Purchases', items: [
+    { href: '/memos?dir=in', label: 'Inward memos' },
+    { href: '/bills?direction=purchase', label: 'Purchase bills' },
+  ] },
+  { label: 'Accounts', items: [
+    { href: '/accounts', label: 'Balances & aging' },
+    { href: '/ledger', label: 'Money register' },
+  ] },
+  { label: 'Masters', items: [
+    { href: '/parties', label: 'Parties' },
+    { href: '/masters/diamonds', label: 'Diamond master' },
+  ] },
+];
+
+const base = (href: string) => href.split('?')[0];
 
 export function MainNav() {
   const pathname = usePathname();
+  const link = 'rounded-md px-3 py-1.5 text-sm font-medium transition-colors';
+  const on = 'bg-accent text-accent-foreground';
+  const off = 'text-muted-foreground hover:text-foreground';
+
   return (
     <nav className="flex items-center gap-1">
-      {NAV_ITEMS.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          className={cn(
-            'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-            pathname === item.href
-              ? 'bg-accent text-accent-foreground'
-              : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {item.label}
-        </Link>
-      ))}
+      {NAV.map((entry) => {
+        if ('href' in entry) {
+          return (
+            <Link
+              key={entry.href} href={entry.href}
+              className={cn(link, pathname === entry.href ? on : off)}
+            >
+              {entry.label}
+            </Link>
+          );
+        }
+        const active = entry.items.some((i) => pathname === base(i.href) || pathname.startsWith(base(i.href) + '/'));
+        return (
+          <DropdownMenu key={entry.label}>
+            <DropdownMenuTrigger
+              className={cn(link, 'flex items-center gap-1', active ? on : off)}
+            >
+              {entry.label}
+              <ChevronDownIcon className="size-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-auto min-w-44">
+              {entry.items.map((i) => (
+                <DropdownMenuItem key={i.href} render={<Link href={i.href} />}>
+                  {i.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      })}
     </nav>
   );
 }

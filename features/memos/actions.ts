@@ -3,8 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth/server';
 import {
-  issueOutwardMemo, returnFromMemo, billMemoLine,
-  OverdrawError, SettlementError,
+  returnFromMemo, billMemoLine, OverdrawError, SettlementError,
 } from '@/lib/ledger/movements';
 
 export type ActionState = { error: string } | { ok: string } | null;
@@ -32,35 +31,6 @@ const revalidateAll = () => {
   for (const p of ['/', '/memos', '/stock', '/accounts', '/parties']) revalidatePath(p);
 };
 
-/** Goods going out to a client on approval. Carats leave the vault. */
-export async function issueMemoAction(_prev: ActionState, form: FormData): Promise<ActionState> {
-  await requireUser();
-  const memoNo = String(form.get('memoNo') ?? '').trim();
-  const partyId = String(form.get('partyId') ?? '');
-  const lotId = String(form.get('lotId') ?? '');
-  const carats = Number(form.get('carats'));
-  const rate = Number(form.get('rate'));
-  const issuedOn = String(form.get('issuedOn') ?? '');
-  const dueOn = String(form.get('dueOn') ?? '') || null;
-
-  if (!memoNo) return { error: 'Memo number is required.' };
-  if (!partyId) return { error: 'Select a client.' };
-  if (!lotId) return { error: 'Select a lot.' };
-  if (!Number.isFinite(carats) || carats <= 0) return { error: 'Carats must be greater than zero.' };
-  if (!Number.isFinite(rate) || rate < 0) return { error: 'Enter a valid rate.' };
-
-  try {
-    await issueOutwardMemo({
-      memoNo, partyId, issuedOn, dueOn,
-      agent: String(form.get('agent') ?? '').trim() || null,
-      lines: [{ lotId, carats, rate }],
-    });
-  } catch (e) {
-    return { error: toMessage(e) };
-  }
-  revalidateAll();
-  return { ok: `Memo ${memoNo} issued.` };
-}
 
 /**
  * Settles part or all of a memo line. Works in both directions:

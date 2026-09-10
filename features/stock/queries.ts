@@ -91,19 +91,6 @@ export async function getMemoStock(opts: { search?: string } = {}): Promise<Memo
   }));
 }
 
-/** Lots with carats actually available to issue on a memo, owned or held. */
-export async function getIssuableLots() {
-  const rows = await sql`
-    SELECT lot_id, lot_no, stone_type, shape, sieve_size, mm_size, source,
-           balance, COALESCE(cost_rate,0) AS cost_rate
-    FROM lot_balances WHERE balance > 0.0005
-    ORDER BY balance DESC LIMIT 500`;
-  return rows.map((r: any) => ({
-    lotId: r.lot_id, lotNo: r.lot_no, stoneType: r.stone_type, shape: r.shape,
-    sieveSize: r.sieve_size, mmSize: r.mm_size, onMemo: r.source === 'memo_in',
-    balance: Number(r.balance), costRate: Number(r.cost_rate),
-  }));
-}
 
 export async function getStockTotals() {
   const [r] = await sql`
