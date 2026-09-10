@@ -7,6 +7,9 @@ import {
 import { FilterBar, type FieldDef } from '@/components/layout/filter-bar';
 import { getBills } from '@/features/accounts/money';
 import { getPartyOptions } from '@/features/parties/queries';
+import { getOwnedUnits } from '@/features/stock/queries';
+import { getDiamondPicklists } from '@/features/masters/diamonds/queries';
+import { AddBillSheet } from '@/features/accounts/components/add-bill-sheet';
 import { inr } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +31,10 @@ export default async function MoneyPage({
   const page = Math.max(1, Number(sp.page ?? 1) || 1);
   const perPage = 100;
 
-  const parties = await getPartyOptions();
+  const [parties, clients, suppliers, units, picklists] = await Promise.all([
+    getPartyOptions(), getPartyOptions('client'), getPartyOptions('supplier'),
+    getOwnedUnits({ limit: 300 }), getDiamondPicklists(),
+  ]);
   const bills = await getBills({
     partyId: sp.party, from: sp.from, to: sp.to, q: sp.q,
     limit: perPage, offset: (page - 1) * perPage,
@@ -71,9 +77,21 @@ export default async function MoneyPage({
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">
-        Every invoice as a document: what you billed, to whom, when, and what is still unpaid.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Every invoice as a document: what you billed, to whom, when, and what is still unpaid.
+        </p>
+        <AddBillSheet
+          clients={clients} suppliers={suppliers}
+          units={units.map((u) => ({
+            lotId: u.lotId, lotNo: u.lotNo, balance: u.balance,
+            label: [u.sieveSize, u.mmSize && `${u.mmSize}mm`, u.shape, u.colour, u.clarity]
+              .filter(Boolean).join(' · ') || u.lotNo,
+          }))}
+          shapes={picklists.shape} colours={picklists.colour} clarities={picklists.clarity}
+          defaultOpen={sp.new === '1'}
+        />
+      </div>
 
       <Card>
         <CardContent className="space-y-4 pt-6">

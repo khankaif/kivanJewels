@@ -16,4 +16,4 @@ export {
   type MemoDirection, type MemoLineInput, type InwardLineInput,
   receiveInwardMemo, issueOutwardMemo, memoLineOutstanding, returnFromMemo, billMemoLine,
 } from './memos';
-export { type PaymentMode, recordDirectSale, recordPayment } from './money';
+export { type PaymentMode, recordBill, recordDirectSale, recordPayment } from './money';

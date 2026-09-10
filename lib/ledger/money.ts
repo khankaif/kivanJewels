@@ -33,6 +33,40 @@ export async function recordDirectSale(
   });
 }
 
+/**
+ * A bill with no goods behind it: brokerage, freight, certification, labour --
+ * and catch-up bills entered for the balance alone.
+ *
+ * No movement is written, deliberately. A bill for stock goes through
+ * `recordPurchase` or `recordDirectSale` so the carats and the money move
+ * together; this one is for the money that has no carats.
+ */
+export async function recordBill(
+  a: {
+    partyId: string; direction: 'sale' | 'purchase'; amount: number; on: string;
+    billNo: string; notes?: string | null;
+  },
+  ctx?: Ctx,
+): Promise<string> {
+  if (!a.billNo.trim()) throw new SettlementError('a bill number is required');
+  if (!(a.amount > 0)) throw new SettlementError('bill amount must be greater than zero');
+  const amount = round2(a.amount);
+
+  return inCtx(ctx, async (c) => {
+    const [row] = await q(c)(
+      `INSERT INTO ledger (party_id, kind, amount, dated_on, bill_no, ref_type, ref_id, notes)
+       VALUES ($1,$2,$3,$4,$5,'bill',$5,$6) RETURNING id`,
+      [a.partyId,
+       a.direction === 'sale' ? 'sale_invoice' : 'purchase_invoice',
+       // Positive = they owe us, negative = we owe them; the ledger_sign
+       // constraint rejects anything else.
+       a.direction === 'sale' ? amount : -amount,
+       a.on, a.billNo.trim(), a.notes ?? null],
+    );
+    return row.id as string;
+  });
+}
+
 export type PaymentMode = 'bank' | 'cash' | 'upi' | 'cheque' | 'adjustment' | 'other';
 
 /**

@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
-import { cn } from '@/lib/utils';
+import { Segmented } from '@/components/ui/segmented';
+import { SpecFields } from '@/features/masters/diamonds/components/spec-fields';
 import { useLastUsed } from '@/lib/use-last-used';
 import { addStockAction, type ActionState } from '../actions';
 
@@ -55,60 +56,15 @@ export function AddStockSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
-          {(['bill', 'memo'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMode(m)}
-              className={cn(
-                'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                mode === m ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {m === 'bill' ? 'On bill / cash' : 'On memo'}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          value={mode} set={setMode}
+          options={[['bill', 'On bill / cash'], ['memo', 'On memo']]}
+        />
 
         <form key={round} action={formAction} className="flex flex-1 flex-col gap-4">
           <input type="hidden" name="mode" value={mode} />
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Type" htmlFor="as-type">
-              <Input id="as-type" name="stoneType" defaultValue="Lab Grown" autoFocus />
-            </Field>
-            <Field label="Shape" htmlFor="as-shape">
-              <Input id="as-shape" name="shape" list="as-shape-list" placeholder="Round" />
-              <datalist id="as-shape-list">
-                {shapes.map((s) => <option key={s} value={s} />)}
-              </datalist>
-            </Field>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Sieve" htmlFor="as-sieve">
-              <Input id="as-sieve" name="sieveSize" placeholder="8.5-9" />
-            </Field>
-            <Field label="MM" htmlFor="as-mm">
-              <Input id="as-mm" name="mmSize" placeholder="2.20" />
-            </Field>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Colour" htmlFor="as-colour">
-              <Input id="as-colour" name="colour" list="as-colour-list" placeholder="EF" />
-              <datalist id="as-colour-list">
-                {colours.map((c) => <option key={c} value={c} />)}
-              </datalist>
-            </Field>
-            <Field label="Clarity" htmlFor="as-clarity">
-              <Input id="as-clarity" name="clarity" list="as-clarity-list" placeholder="VVS-VS" />
-              <datalist id="as-clarity-list">
-                {clarities.map((c) => <option key={c} value={c} />)}
-              </datalist>
-            </Field>
-          </div>
+          <SpecFields id="as" shapes={shapes} colours={colours} clarities={clarities} autoFocus />
 
           <div className="grid grid-cols-3 gap-3">
             <Field label="Carats" htmlFor="as-carats">

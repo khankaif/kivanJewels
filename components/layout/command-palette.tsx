@@ -12,6 +12,7 @@ import type { Hit } from '@/features/search/queries';
 const ACTIONS: Hit[] = [
   { kind: 'stock', label: 'Add diamonds', sub: 'on bill or on memo', href: '/stock?new=1' },
   { kind: 'requirement', label: 'New requirement', sub: 'a customer asked for something', href: '/sales?new=1' },
+  { kind: 'bill', label: 'Add bill', sub: 'sale, purchase, or charges only', href: '/accounts/bills?new=1' },
   { kind: 'party', label: 'New party', sub: 'supplier or client', href: '/parties?new=1' },
 ];
 
