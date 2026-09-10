@@ -66,6 +66,7 @@ export default async function StockPage({
         <AddStockSheet
           suppliers={suppliers} agents={agents} shapes={picklists.shape}
           colours={picklists.colour} clarities={picklists.clarity}
+          defaultOpen={sp.new === '1'}
         />
       </div>
 

@@ -15,9 +15,9 @@ export const dynamic = 'force-dynamic';
 export default async function PartiesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; all?: string }>;
+  searchParams: Promise<{ q?: string; all?: string; new?: string }>;
 }) {
-  const { q, all } = await searchParams;
+  const { q, all, new: openNew } = await searchParams;
   const parties = await getParties({ search: q, includeInactive: all === '1' });
 
   return (
@@ -29,7 +29,7 @@ export default async function PartiesPage({
             Suppliers and clients. Credit terms set the due date on inward memos.
           </p>
         </div>
-        <PartyDialog />
+        <PartyDialog defaultOpen={openNew === '1'} />
       </div>
 
       <MastersNav />

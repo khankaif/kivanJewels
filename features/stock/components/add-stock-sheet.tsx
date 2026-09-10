@@ -8,24 +8,34 @@ import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+import { useLastUsed } from '@/lib/use-last-used';
 import { addStockAction, type ActionState } from '../actions';
 
 type Party = { id: string; name: string; defaultTermsDays: number };
 type Mode = 'bill' | 'memo';
 
 export function AddStockSheet({
-  suppliers, agents, shapes, colours, clarities,
+  suppliers, agents, shapes, colours, clarities, defaultOpen = false,
 }: {
   suppliers: Party[]; agents: string[];
   shapes: string[]; colours: string[]; clarities: string[];
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [mode, setMode] = useState<Mode>('bill');
   const [terms, setTerms] = useState(7);
+  const [supplier, setSupplier] = useLastUsed('stock.supplier');
+  // Bumped after a "save & add another" so the form clears its own fields
+  // while supplier, date and mode stay put -- the next parcel from the same
+  // supplier usually differs only in size and carats.
+  const [round, setRound] = useState(0);
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(
     async (prev, fd) => {
       const res = await addStockAction(prev, fd);
-      if (res && 'ok' in res) setOpen(false);
+      if (res && 'ok' in res) {
+        if (fd.get('then') === 'again') setRound((r) => r + 1);
+        else setOpen(false);
+      }
       return res;
     },
     null,
@@ -61,12 +71,12 @@ export function AddStockSheet({
           ))}
         </div>
 
-        <form action={formAction} className="flex flex-1 flex-col gap-4">
+        <form key={round} action={formAction} className="flex flex-1 flex-col gap-4">
           <input type="hidden" name="mode" value={mode} />
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Type" htmlFor="as-type">
-              <Input id="as-type" name="stoneType" defaultValue="Lab Grown" />
+              <Input id="as-type" name="stoneType" defaultValue="Lab Grown" autoFocus />
             </Field>
             <Field label="Shape" htmlFor="as-shape">
               <Input id="as-shape" name="shape" list="as-shape-list" placeholder="Round" />
@@ -117,7 +127,9 @@ export function AddStockSheet({
               id="as-partyId" name="partyId"
               required={mode === 'memo'}
               className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+              value={supplier}
               onChange={(e) => {
+                setSupplier(e.target.value);
                 const p = suppliers.find((s) => s.id === e.target.value);
                 if (p) setTerms(p.defaultTermsDays);
               }}
@@ -159,8 +171,15 @@ export function AddStockSheet({
             <p role="alert" className="text-sm text-destructive">{state.error}</p>
           )}
 
+          {state && 'ok' in state && (
+            <p role="status" className="text-sm text-positive">{state.ok}</p>
+          )}
+
           <SheetFooter>
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" name="then" value="again" variant="outline" disabled={isPending}>
+              Save &amp; add another
+            </Button>
+            <Button type="submit" name="then" value="close" disabled={isPending}>
               {isPending ? 'Saving…' : mode === 'bill' ? 'Add to purchase stock' : 'Add to memo stock'}
             </Button>
           </SheetFooter>

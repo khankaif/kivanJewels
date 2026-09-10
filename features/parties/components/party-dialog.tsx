@@ -10,8 +10,8 @@ import {
 import { savePartyAction, type PartyState } from '../actions';
 import type { Party } from '../queries';
 
-export function PartyDialog({ party }: { party?: Party }) {
-  const [open, setOpen] = useState(false);
+export function PartyDialog({ party, defaultOpen = false }: { party?: Party; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [state, formAction, isPending] = useActionState<PartyState, FormData>(
     async (prev, fd) => {
       const res = await savePartyAction(prev, fd);
@@ -42,7 +42,8 @@ export function PartyDialog({ party }: { party?: Party }) {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
-              <Input id="name" name="name" required defaultValue={party?.name} placeholder="Naice Gems LLP" />
+              <Input id="name" name="name" required autoFocus defaultValue={party?.name}
+                     placeholder="Naice Gems LLP" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="businessName">Business name</Label>

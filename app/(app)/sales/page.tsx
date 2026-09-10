@@ -54,6 +54,7 @@ export default async function SalesPage({
         <RequirementForm
           customers={customers} agents={agents}
           shapes={picklists.shape} colours={picklists.colour} clarities={picklists.clarity}
+          defaultOpen={sp.new === '1'}
         />
       </div>
 

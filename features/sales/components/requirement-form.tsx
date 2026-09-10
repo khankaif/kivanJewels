@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
+import { useLastUsed } from '@/lib/use-last-used';
 import { createRequirementAction, type ActionState } from '../actions';
 
 type Party = { id: string; name: string };
@@ -21,12 +22,14 @@ const blank = (): Line => ({
 });
 
 export function RequirementForm({
-  customers, agents, shapes, colours, clarities,
+  customers, agents, shapes, colours, clarities, defaultOpen = false,
 }: {
   customers: Party[]; agents: string[];
   shapes: string[]; colours: string[]; clarities: string[];
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
+  const [customer, setCustomer] = useLastUsed('sales.customer');
   const [lines, setLines] = useState<Line[]>([blank()]);
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(
     async (prev, fd) => {
@@ -68,8 +71,9 @@ export function RequirementForm({
             <div className="space-y-2">
               <Label htmlFor="rq-party">Customer</Label>
               <select
-                id="rq-party" name="partyId" required
+                id="rq-party" name="partyId" required autoFocus
                 className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+                value={customer} onChange={(e) => setCustomer(e.target.value)}
               >
                 <option value="">Select…</option>
                 {customers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
