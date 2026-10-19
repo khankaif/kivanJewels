@@ -40,3 +40,8 @@ export function resolveParties(raws: Iterable<unknown>): Map<string, string> {
   }
   return new Map([...longest].map(([k, raw]) => [k, titleCase(raw)]));
 }
+
+/** "ÉCLORA — The Circle of Eternal Light" -> "eclora-the-circle-of-eternal-light". */
+export const slugify = (s: string) =>
+  s.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');

@@ -53,7 +53,7 @@ export default async function DiamondMasterPage() {
           <CardTitle>Attribute values</CardTitle>
           <CardDescription>
             Removing a value only stops it being offered next time — it doesn&apos;t touch existing
-            stock. New lists you add are managed here; the five preset ones are wired to form fields
+            stock. New lists you add are managed here; the preset ones are wired to form fields
             and can&apos;t be deleted.
           </CardDescription>
         </CardHeader>

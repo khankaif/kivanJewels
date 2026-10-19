@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalPartyName, partyKey, resolveParties } from '../lib/normalize';
+import { canonicalPartyName, partyKey, resolveParties, slugify } from '../lib/normalize';
 
 test('collapses the seven real collision groups to one name each', () => {
   const groups = [
@@ -54,4 +54,10 @@ test('collapses the real workbook party set from 116 to 109', async () => {
   }, {} as Record<string, string[]>);
   const groups = Object.values(collapsed).filter((g) => g.length > 1);
   assert.equal(groups.length, 7, `expected 7 collision groups, got ${JSON.stringify(groups)}`);
+});
+
+test('slugify strips accents and punctuation into a URL-safe slug', () => {
+  assert.equal(slugify('ÉCLORA — The Circle of Eternal Light'), 'eclora-the-circle-of-eternal-light');
+  assert.equal(slugify('  18K / Rose-Gold  '), '18k-rose-gold');
+  assert.equal(slugify('— —'), '');
 });

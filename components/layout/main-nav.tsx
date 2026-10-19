@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 
 /**
- * Five sections, flat. Sub-views are tabs inside a section, not nav entries:
+ * Six sections, flat. Sub-views are tabs inside a section, not nav entries:
  * a menu that lists what a page already lists is a second place to be wrong.
  */
 export const NAV = [
@@ -13,6 +13,7 @@ export const NAV = [
   { href: '/stock', label: 'Stock' },
   { href: '/sales', label: 'Sales' },
   { href: '/accounts', label: 'Accounts' },
+  { href: '/catalog', label: 'Catalog' },
   { href: '/parties', label: 'Masters' },
 ] as const;
 

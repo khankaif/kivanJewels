@@ -22,3 +22,11 @@ export const specLabel = (s: {
   return [s.sieveSize, s.mmSize && `${s.mmSize}mm`, s.shape, s.colour, s.clarity, cert]
     .filter(Boolean).join(' · ') || '—';
 };
+
+/** A shelf price: whole rupees, as a price tag reads, not a ledger amount. */
+export const mrp = (v: unknown) =>
+  '₹' + Number(v ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+/** A weight as printed on a piece card: no trailing zeros. */
+export const weight = (v: unknown, unit: string) =>
+  `${Number(v ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 3 })} ${unit}`;

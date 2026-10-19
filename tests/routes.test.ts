@@ -17,10 +17,10 @@ test('every nav link points at a route that exists', () => {
   }
 });
 
-test('navigation is five flat sections', () => {
+test('navigation is six flat sections', () => {
   assert.deepEqual(
     NAV.map((n) => n.label),
-    ['Today', 'Stock', 'Sales', 'Accounts', 'Masters'],
+    ['Today', 'Stock', 'Sales', 'Accounts', 'Catalog', 'Masters'],
   );
 });
 
