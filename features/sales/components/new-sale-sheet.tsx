@@ -2,14 +2,16 @@
 
 import { useActionState, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
-import { Segmented } from '@/components/ui/segmented';
-import { Amount } from '@/components/ui/carats-rate';
+import { Segmented } from '@/components/forms/segmented';
+import { Amount } from '@/components/forms/carats-rate';
 import {
   SpecFields, blankSpec, type Picklists, type SpecValue,
 } from '@/features/masters/diamonds/components/spec-fields';
@@ -122,7 +124,8 @@ export function NewSaleSheet({
           <section className="space-y-3 rounded-xl border bg-muted/25 p-3.5">
             <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">1 · Customer</p>
             <div className="grid grid-cols-2 gap-3">
-            <Field label="Customer" htmlFor="ns-party">
+            <Field>
+              <FieldLabel htmlFor="ns-party">Customer</FieldLabel>
               <NativeSelect
                 id="ns-party" name="partyId" required autoFocus
                 className="w-full"
@@ -132,7 +135,8 @@ export function NewSaleSheet({
                 {customers.map((p) => <NativeSelectOption key={p.id} value={p.id}>{p.name}</NativeSelectOption>)}
               </NativeSelect>
             </Field>
-            <Field label="Raised on" htmlFor="ns-date">
+            <Field>
+              <FieldLabel htmlFor="ns-date">Raised on</FieldLabel>
               <Input
                 id="ns-date" name="raisedOn" type="date" required
                 value={raisedOn} onChange={(e) => setRaisedOn(e.target.value)}
@@ -141,11 +145,13 @@ export function NewSaleSheet({
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-            <Field label="Placed by" htmlFor="ns-agent">
+            <Field>
+              <FieldLabel htmlFor="ns-agent">Placed by</FieldLabel>
               <Input id="ns-agent" name="agent" list="ns-agents" placeholder="Rushabh" />
               <datalist id="ns-agents">{agents.map((a) => <option key={a} value={a} />)}</datalist>
             </Field>
-            <Field label="Note" htmlFor="ns-notes">
+            <Field>
+              <FieldLabel htmlFor="ns-notes">Note</FieldLabel>
               <Input id="ns-notes" name="notes" placeholder="Optional" />
             </Field>
             </div>
@@ -204,16 +210,15 @@ export function NewSaleSheet({
                 options={[['memo', 'On approval'], ['bill', 'Firm sale / invoice']]}
               />
               <div className="grid grid-cols-2 gap-3">
-                <Field
-                  label={channel === 'memo' ? 'Memo no.' : 'Invoice no.'}
-                  htmlFor="ns-doc"
-                >
+                <Field>
+                  <FieldLabel htmlFor="ns-doc">{channel === 'memo' ? 'Memo no.' : 'Invoice no.'}</FieldLabel>
                   <Input
                     id="ns-doc" name={channel === 'memo' ? 'memoNo' : 'invoiceNo'}
                     placeholder="Blank = we number it"
                   />
                 </Field>
-                <Field label={channel === 'memo' ? 'Due back' : 'Payment due'} htmlFor="ns-dueOn">
+                <Field>
+                  <FieldLabel htmlFor="ns-dueOn">{channel === 'memo' ? 'Due back' : 'Payment due'}</FieldLabel>
                   <Input id="ns-dueOn" name="dueOn" type="date" defaultValue={addDays(raisedOn, 7)} />
                 </Field>
               </div>
@@ -233,7 +238,8 @@ export function NewSaleSheet({
           {sourceNow && (
             <div className="space-y-3 rounded-lg border p-3">
               <input type="hidden" name="sourceChannel" value={sourceChannel} />
-              <Field label="Supplier" htmlFor="ns-supplier">
+              <Field>
+                <FieldLabel htmlFor="ns-supplier">Supplier</FieldLabel>
                 <NativeSelect
                   id="ns-supplier" name="supplierId" required
                   className="w-full"
@@ -253,10 +259,12 @@ export function NewSaleSheet({
               <div className="grid grid-cols-2 gap-3">
                 {sourceChannel === 'memo' ? (
                   <>
-                    <Field label="Memo no." htmlFor="ns-srcDoc">
+                    <Field>
+                      <FieldLabel htmlFor="ns-srcDoc">Memo no.</FieldLabel>
                       <Input id="ns-srcDoc" name="sourceMemoNo" placeholder="Blank = we number it" />
                     </Field>
-                    <Field label="Terms (days)" htmlFor="ns-terms">
+                    <Field>
+                      <FieldLabel htmlFor="ns-terms">Terms (days)</FieldLabel>
                       <Input
                         id="ns-terms" name="termsDays" type="number" min="0" max="365"
                         value={terms} onChange={(e) => setTerms(Number(e.target.value))}
@@ -264,7 +272,8 @@ export function NewSaleSheet({
                     </Field>
                   </>
                 ) : (
-                  <Field label="Bill no." htmlFor="ns-srcDoc">
+                  <Field>
+                    <FieldLabel htmlFor="ns-srcDoc">Bill no.</FieldLabel>
                     <Input id="ns-srcDoc" name="billNo" placeholder="Blank = cash" />
                   </Field>
                 )}
@@ -279,7 +288,7 @@ export function NewSaleSheet({
           </section>
 
           {state && 'error' in state && (
-            <p role="alert" className="text-sm text-destructive">{state.error}</p>
+            <FieldError>{state.error}</FieldError>
           )}
 
           <SheetFooter className="sticky bottom-0 -mx-5 border-t bg-popover px-5 py-3">
@@ -336,115 +345,113 @@ function LineCard({
   const short = fromStock && picked ? want - picked.balance : 0;
 
   return (
-    <div className="space-y-3 rounded-xl border bg-card p-3.5 shadow-xs">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span className="font-semibold uppercase tracking-[0.1em]">Stone {index + 1}</span>
-        {onRemove && (
-          <Button type="button" variant="ghost" size="xs" onClick={onRemove} className="hover:text-destructive">Remove</Button>
-        )}
-      </div>
-
-      <Segmented
-        value={line.from}
-        set={(v) => onChange({ from: v, lotId: '', inStock: null })}
-        options={[['stock', 'From stock'], ['source', 'To source']]}
-      />
-
-      {fromStock ? (
-        <>
-          <Field label="Which parcel" htmlFor={`ns-${index}-lot`}>
-            <NativeSelect
-              id={`ns-${index}-lot`} required
-              className="w-full"
-              value={line.lotId}
-              onChange={(e) => {
-                const u = units.find((x) => x.lotId === e.target.value);
-                onChange({
-                  lotId: e.target.value,
-                  // Selling the whole parcel is the common case; overwrite only
-                  // while the operator has not typed carats of their own.
-                  carats: carats || (u ? u.balance.toFixed(3) : ''),
-                });
-              }}
-            >
-              <NativeSelectOption value="">Select stock…</NativeSelectOption>
-              {units.map((u) => (
-                <NativeSelectOption key={u.lotId} value={u.lotId}>
-                  {u.label} — {u.balance.toFixed(3)} ct{u.onMemo ? ` (on memo${u.partyName ? `, ${u.partyName}` : ''})` : ''}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </Field>
-          {picked && (
-            <p className="text-xs text-muted-foreground">
-              {ct(picked.balance)} in this parcel
-              {picked.costRate > 0 && ` · cost ${inr(picked.costRate)}/ct`}
-              {picked.onMemo && ' · still the supplier\u2019s goods until billed'}
-            </p>
+    <Card size="sm">
+      <CardContent className="space-y-3">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span className="font-semibold uppercase tracking-[0.1em]">Stone {index + 1}</span>
+          {onRemove && (
+            <Button type="button" variant="ghost" size="xs" onClick={onRemove} className="hover:text-destructive">Remove</Button>
           )}
-        </>
-      ) : (
-        <SpecFields
-          id={`ns-${index}`} picklists={picklists} sieveShapes={sieveShapes}
-          value={spec} onChange={(v) => onChange({ spec: v })}
+        </div>
+
+        <Segmented
+          value={line.from}
+          set={(v) => onChange({ from: v, lotId: '', inStock: null })}
+          options={[['stock', 'From stock'], ['source', 'To source']]}
         />
-      )}
 
-      <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-3">
-        <Field label="Carats" htmlFor={`ns-${index}-carats`}>
-          <Input
-            id={`ns-${index}-carats`} type="number" step="0.001" min="0.001" required
-            value={carats} onChange={(e) => onChange({ carats: e.target.value })}
+        {fromStock ? (
+          <>
+            <Field>
+              <FieldLabel htmlFor={`ns-${index}-lot`}>Which parcel</FieldLabel>
+              <NativeSelect
+                id={`ns-${index}-lot`} required
+                className="w-full"
+                value={line.lotId}
+                onChange={(e) => {
+                  const u = units.find((x) => x.lotId === e.target.value);
+                  onChange({
+                    lotId: e.target.value,
+                    // Selling the whole parcel is the common case; overwrite only
+                    // while the operator has not typed carats of their own.
+                    carats: carats || (u ? u.balance.toFixed(3) : ''),
+                  });
+                }}
+              >
+                <NativeSelectOption value="">Select stock…</NativeSelectOption>
+                {units.map((u) => (
+                  <NativeSelectOption key={u.lotId} value={u.lotId}>
+                    {u.label} — {u.balance.toFixed(3)} ct{u.onMemo ? ` (on memo${u.partyName ? `, ${u.partyName}` : ''})` : ''}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </Field>
+            {picked && (
+              <p className="text-xs text-muted-foreground">
+                {ct(picked.balance)} in this parcel
+                {picked.costRate > 0 && ` · cost ${inr(picked.costRate)}/ct`}
+                {picked.onMemo && ' · still the supplier\u2019s goods until billed'}
+              </p>
+            )}
+          </>
+        ) : (
+          <SpecFields
+            id={`ns-${index}`} picklists={picklists} sieveShapes={sieveShapes}
+            value={spec} onChange={(v) => onChange({ spec: v })}
           />
-        </Field>
-        <Field label="Rate (₹/ct)" htmlFor={`ns-${index}-rate`}>
-          <Input
-            id={`ns-${index}-rate`} type="number" step="0.01" min="0"
-            value={line.quotedRate} onChange={(e) => onChange({ quotedRate: e.target.value })}
-          />
-        </Field>
-        <p className="pb-2 text-sm font-medium">
-          <Amount carats={want} rate={num(line.quotedRate)} />
-        </p>
-      </div>
+        )}
 
-      {!fromStock && (
-        <p className="text-xs">
-          {line.inStock === null ? (
-            <span className="text-muted-foreground">Choose a size to check live availability.</span>
-          ) : line.inStock > 0.0005 ? (
-            <span className="font-medium text-positive">
-              {ct(line.inStock)} of this spec is already in stock — switch to From stock to use it
-            </span>
-          ) : (
-            <span className="text-muted-foreground">Not in stock — this line gets sourced.</span>
-          )}
-        </p>
-      )}
+        <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-3">
+          <Field>
+            <FieldLabel htmlFor={`ns-${index}-carats`}>Carats</FieldLabel>
+            <Input
+              id={`ns-${index}-carats`} type="number" step="0.001" min="0.001" required
+              value={carats} onChange={(e) => onChange({ carats: e.target.value })}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor={`ns-${index}-rate`}>Rate (₹/ct)</FieldLabel>
+            <Input
+              id={`ns-${index}-rate`} type="number" step="0.01" min="0"
+              value={line.quotedRate} onChange={(e) => onChange({ quotedRate: e.target.value })}
+            />
+          </Field>
+          <p className="pb-2 text-sm font-medium">
+            <Amount carats={want} rate={num(line.quotedRate)} />
+          </p>
+        </div>
 
-      {(!fromStock || short > 0.0005) && sourceNow && (
-        <Field label="Supplier cost (₹/ct)" htmlFor={`ns-${index}-cost`}>
-          <Input
-            id={`ns-${index}-cost`} type="number" step="0.01" min="0"
-            value={line.costRate} onChange={(e) => onChange({ costRate: e.target.value })}
-          />
-        </Field>
-      )}
+        {!fromStock && (
+          <p className="text-xs">
+            {line.inStock === null ? (
+              <span className="text-muted-foreground">Choose a size to check live availability.</span>
+            ) : line.inStock > 0.0005 ? (
+              <span className="font-medium text-positive">
+                {ct(line.inStock)} of this spec is already in stock — switch to From stock to use it
+              </span>
+            ) : (
+              <span className="text-muted-foreground">Not in stock — this line gets sourced.</span>
+            )}
+          </p>
+        )}
 
-      {short > 0.0005 && (
-        <p className="text-xs text-warning">
-          That parcel is {ct(short)} short — the rest of this line is sourced.
-        </p>
-      )}
-    </div>
+        {(!fromStock || short > 0.0005) && sourceNow && (
+          <Field>
+            <FieldLabel htmlFor={`ns-${index}-cost`}>Supplier cost (₹/ct)</FieldLabel>
+            <Input
+              id={`ns-${index}-cost`} type="number" step="0.01" min="0"
+              value={line.costRate} onChange={(e) => onChange({ costRate: e.target.value })}
+            />
+          </Field>
+        )}
+
+        {short > 0.0005 && (
+          <p className="text-xs text-warning">
+            That parcel is {ct(short)} short — the rest of this line is sourced.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
-function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-    </div>
-  );
-}

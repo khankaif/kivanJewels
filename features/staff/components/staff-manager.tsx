@@ -4,7 +4,7 @@ import { useActionState, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
@@ -38,19 +38,23 @@ export function AddStaffSheet() {
         </SheetHeader>
 
         <form action={formAction} className="flex flex-1 flex-col gap-4">
-          <Field label="Name" htmlFor="st-name">
+          <Field>
+            <FieldLabel htmlFor="st-name">Name</FieldLabel>
             <Input id="st-name" name="name" required autoFocus placeholder="Rushabh" />
           </Field>
-          <Field label="Email" htmlFor="st-email">
+          <Field>
+            <FieldLabel htmlFor="st-email">Email</FieldLabel>
             <Input id="st-email" name="email" type="email" required placeholder="name@kaivanjewels.in" />
           </Field>
-          <Field label="First password" htmlFor="st-password">
+          <Field>
+            <FieldLabel htmlFor="st-password">First password</FieldLabel>
             <Input
               id="st-password" name="password" type="password" required minLength={12}
               autoComplete="new-password" placeholder="At least 12 characters"
             />
           </Field>
-          <Field label="Role" htmlFor="st-role">
+          <Field>
+            <FieldLabel htmlFor="st-role">Role</FieldLabel>
             <NativeSelect
               id="st-role" name="role" defaultValue="user"
               className="w-full"
@@ -61,7 +65,7 @@ export function AddStaffSheet() {
           </Field>
 
           {state && 'error' in state && (
-            <p role="alert" className="text-sm text-destructive">{state.error}</p>
+            <FieldError>{state.error}</FieldError>
           )}
 
           <SheetFooter>
@@ -132,14 +136,15 @@ function ResetPasswordSheet({ member }: { member: Staff }) {
         </SheetHeader>
         <form action={formAction} className="flex flex-1 flex-col gap-4">
           <input type="hidden" name="userId" value={member.id} />
-          <Field label="New password" htmlFor={`rp-${member.id}`}>
+          <Field>
+            <FieldLabel htmlFor={`rp-${member.id}`}>New password</FieldLabel>
             <Input
               id={`rp-${member.id}`} name="newPassword" type="password" required minLength={12}
               autoComplete="new-password" placeholder="At least 12 characters"
             />
           </Field>
           {state && 'error' in state && (
-            <p role="alert" className="text-sm text-destructive">{state.error}</p>
+            <FieldError>{state.error}</FieldError>
           )}
           <SheetFooter>
             <Button type="submit" disabled={isPending}>
@@ -169,10 +174,12 @@ export function ChangeMyPassword({
 
   return (
     <form ref={formRef} action={formAction} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-      <Field label="Current password" htmlFor="cp-current">
+      <Field>
+        <FieldLabel htmlFor="cp-current">Current password</FieldLabel>
         <Input id="cp-current" name="currentPassword" type="password" required autoComplete="current-password" />
       </Field>
-      <Field label="New password" htmlFor="cp-new">
+      <Field>
+        <FieldLabel htmlFor="cp-new">New password</FieldLabel>
         <Input
           id="cp-new" name="newPassword" type="password" required minLength={12}
           autoComplete="new-password" placeholder="At least 12 characters"
@@ -183,7 +190,7 @@ export function ChangeMyPassword({
       </Button>
 
       {state && 'error' in state && (
-        <p role="alert" className="text-sm text-destructive sm:col-span-3">{state.error}</p>
+        <FieldError className="sm:col-span-3">{state.error}</FieldError>
       )}
       {state && 'ok' in state && (
         <p role="status" className="text-sm text-positive sm:col-span-3">{state.ok}</p>
@@ -192,11 +199,3 @@ export function ChangeMyPassword({
   );
 }
 
-function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-    </div>
-  );
-}

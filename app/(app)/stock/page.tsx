@@ -76,25 +76,27 @@ export default async function StockPage({
       <SectionTabs items={TABS.map((t) => ({ href: href(t), label: LABELS[t], active: t === tab }))} />
 
       {tab !== 'movements' && (
-        <div className="rounded-xl border bg-card p-3 shadow-xs">
-          <FilterBar
-            /* Without this the filters would throw you back to the first tab. */
-            hidden={{ tab }}
-            fields={[
-              { type: 'text', name: 'q', label: 'Search', value: sp.q,
-                placeholder: 'Size, shape, colour, lot or supplier' },
-              { type: 'select', name: 'type', label: 'Diamond type', value: sp.type, options: [
-                { value: '', label: 'All types' },
-                ...(picklists.stone_type ?? []).map((v) => ({ value: v, label: v })),
-              ] },
-              { type: 'select', name: 'cert', label: 'Certified', value: sp.cert, options: [
-                { value: '', label: 'Certified & not' },
-                ...(picklists.certified ?? []).map((v) => ({ value: v, label: v })),
-                ...(picklists.lab ?? []).map((v) => ({ value: v, label: `${v} certified` })),
-              ] },
-            ]}
-          />
-        </div>
+        <Card size="sm">
+          <CardContent>
+            <FilterBar
+              /* Without this the filters would throw you back to the first tab. */
+              hidden={{ tab }}
+              fields={[
+                { type: 'text', name: 'q', label: 'Search', value: sp.q,
+                  placeholder: 'Size, shape, colour, lot or supplier' },
+                { type: 'select', name: 'type', label: 'Diamond type', value: sp.type, options: [
+                  { value: '', label: 'All types' },
+                  ...(picklists.stone_type ?? []).map((v) => ({ value: v, label: v })),
+                ] },
+                { type: 'select', name: 'cert', label: 'Certified', value: sp.cert, options: [
+                  { value: '', label: 'Certified & not' },
+                  ...(picklists.certified ?? []).map((v) => ({ value: v, label: v })),
+                  ...(picklists.lab ?? []).map((v) => ({ value: v, label: `${v} certified` })),
+                ] },
+              ]}
+            />
+          </CardContent>
+        </Card>
       )}
 
       {tab === 'owned' && (

@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
+import { FieldError } from '@/components/ui/field';
 import { adoptValueAction, aliasValueAction, type MasterState } from '../actions';
 import type { Mismatch } from '../queries';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
@@ -67,7 +68,7 @@ function MismatchRow({ mismatch, options }: { mismatch: Mismatch; options: strin
       </form>
 
       {state && 'error' in state && (
-        <p role="alert" className="basis-full text-xs text-destructive">{state.error}</p>
+        <FieldError className="basis-full text-xs">{state.error}</FieldError>
       )}
     </div>
   );

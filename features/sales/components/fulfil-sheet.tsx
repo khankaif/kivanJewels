@@ -4,13 +4,14 @@ import { useActionState, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Segmented } from '@/components/ui/segmented';
+import { Segmented } from '@/components/forms/segmented';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
 import { specLabel } from '@/lib/format';
-import { CaratsRate } from '@/components/ui/carats-rate';
+import { CaratsRate } from '@/components/forms/carats-rate';
 import { deliverAction, sourceAction, type ActionState } from '../actions';
 import type { RequirementLine, SpecLot } from '../queries';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
@@ -69,8 +70,8 @@ export function FulfilSheet({
         <form action={formAction} className="flex flex-1 flex-col gap-4">
           {mode === 'deliver' ? (
             <>
-              <div className="space-y-2">
-                <Label htmlFor="ff-lot">Lot</Label>
+              <Field>
+                <FieldLabel htmlFor="ff-lot">Lot</FieldLabel>
                 <NativeSelect
                   id="ff-lot" name="lotId" required
                   className="w-full"
@@ -89,7 +90,7 @@ export function FulfilSheet({
                     Allow a substitution from another specification
                   </Label>
                 )}
-              </div>
+              </Field>
 
               <Segmented
                 value={channel} set={setChannel}
@@ -98,8 +99,8 @@ export function FulfilSheet({
             </>
           ) : (
             <>
-              <div className="space-y-2">
-                <Label htmlFor="ff-supplier">Supplier</Label>
+              <Field>
+                <FieldLabel htmlFor="ff-supplier">Supplier</FieldLabel>
                 <NativeSelect
                   id="ff-supplier" name="supplierId" required
                   className="w-full"
@@ -111,7 +112,7 @@ export function FulfilSheet({
                   <NativeSelectOption value="">Select…</NativeSelectOption>
                   {suppliers.map((p) => <NativeSelectOption key={p.id} value={p.id}>{p.name}</NativeSelectOption>)}
                 </NativeSelect>
-              </div>
+              </Field>
 
               <Segmented
                 value={channel} set={setChannel}
@@ -127,49 +128,49 @@ export function FulfilSheet({
             rateLabel={mode === 'deliver' ? 'Rate (₹/ct)' : 'Cost (₹/ct)'}
           />
 
-          <div className="space-y-2">
-            <Label htmlFor="ff-on">Date</Label>
+          <Field>
+            <FieldLabel htmlFor="ff-on">Date</FieldLabel>
             <Input id="ff-on" name="on" type="date" defaultValue={today} required />
-          </div>
+          </Field>
 
           {channel === 'memo' ? (
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="ff-memoNo">Memo no.</Label>
+              <Field>
+                <FieldLabel htmlFor="ff-memoNo">Memo no.</FieldLabel>
                 <Input id="ff-memoNo" name="memoNo" placeholder="Blank = we number it" />
-              </div>
+              </Field>
               {mode === 'deliver' ? (
-                <div className="space-y-2">
-                  <Label htmlFor="ff-due">Due back</Label>
+                <Field>
+                  <FieldLabel htmlFor="ff-due">Due back</FieldLabel>
                   <Input id="ff-due" name="dueOn" type="date" defaultValue={due} />
-                </div>
+                </Field>
               ) : (
-                <div className="space-y-2">
-                  <Label htmlFor="ff-terms">Terms (days)</Label>
+                <Field>
+                  <FieldLabel htmlFor="ff-terms">Terms (days)</FieldLabel>
                   <Input id="ff-terms" name="termsDays" type="number" min="0" max="365"
                          value={terms} onChange={(e) => setTerms(Number(e.target.value))} />
-                </div>
+                </Field>
               )}
               {mode === 'deliver' && (
-                <div className="col-span-2 space-y-2">
-                  <Label htmlFor="ff-agent">Placed by</Label>
+                <Field className="col-span-2">
+                  <FieldLabel htmlFor="ff-agent">Placed by</FieldLabel>
                   <Input id="ff-agent" name="agent" list="ff-agents" placeholder="Rushabh" />
                   <datalist id="ff-agents">{agents.map((a) => <option key={a} value={a} />)}</datalist>
-                </div>
+                </Field>
               )}
             </div>
           ) : (
-            <div className="space-y-2">
-              <Label htmlFor="ff-doc">{mode === 'deliver' ? 'Invoice no.' : 'Bill no.'}</Label>
+            <Field>
+              <FieldLabel htmlFor="ff-doc">{mode === 'deliver' ? 'Invoice no.' : 'Bill no.'}</FieldLabel>
               <Input
                 id="ff-doc" name={mode === 'deliver' ? 'invoiceNo' : 'billNo'}
                 placeholder={mode === 'deliver' ? 'Blank = we number it' : 'Blank = cash'}
               />
-            </div>
+            </Field>
           )}
 
           {state && 'error' in state && (
-            <p role="alert" className="text-sm text-destructive">{state.error}</p>
+            <FieldError>{state.error}</FieldError>
           )}
 
           <SheetFooter>

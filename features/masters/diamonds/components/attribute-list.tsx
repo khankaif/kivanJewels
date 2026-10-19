@@ -2,6 +2,8 @@
 
 import { useActionState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { ButtonGroup } from '@/components/ui/button-group';
+import { FieldError } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -51,17 +53,19 @@ export function AttributeList({ bucket, values }: { bucket: Bucket; values: Diam
               {/* Both states are shown with the current one filled in. A single
                   button labelled with the current state reads as a choice you
                   have made, not one you are about to flip. */}
-              <form action={setUsesSieveAction} className="flex overflow-hidden rounded-md border">
+              <form action={setUsesSieveAction}>
                 <input type="hidden" name="id" value={v.id} />
-                {([['1', 'sieve', 'measured on a sieve'], ['', 'mm', 'measured in mm']] as const).map(([val, label, how]) => (
-                  <Button
-                    key={label} type="submit" name="usesSieve" value={val} size="xs" className="rounded-none"
-                    variant={v.usesSieve === !!val ? 'default' : 'ghost'} aria-pressed={v.usesSieve === !!val}
-                    title={`${v.value} is ${how}`}
-                  >
-                    {label}
-                  </Button>
-                ))}
+                <ButtonGroup>
+                  {([['1', 'sieve', 'measured on a sieve'], ['', 'mm', 'measured in mm']] as const).map(([val, label, how]) => (
+                    <Button
+                      key={label} type="submit" name="usesSieve" value={val} size="xs"
+                      variant={v.usesSieve === !!val ? 'default' : 'outline'} aria-pressed={v.usesSieve === !!val}
+                      title={`${v.value} is ${how}`}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </ButtonGroup>
               </form>
               <span className="flex-1">{v.value}</span>
               <form action={removeDiamondAttributeAction}>
@@ -102,7 +106,7 @@ export function AttributeList({ bucket, values }: { bucket: Bucket; values: Diam
         <Input name="value" placeholder={`Add a ${bucket.label.toLowerCase()}…`} className="max-w-48" required />
         <Button type="submit" size="sm" variant="outline" disabled={isPending}>Add</Button>
       </form>
-      {state && 'error' in state && <p role="alert" className="text-sm text-destructive">{state.error}</p>}
+      {state && 'error' in state && <FieldError>{state.error}</FieldError>}
     </div>
   );
 }
@@ -124,7 +128,7 @@ export function AddBucket({ action }: { action: (p: MasterState, fd: FormData) =
         <Input name="label" placeholder="New list — Cut, Growth type, Treatment…" className="max-w-72" required />
         <Button type="submit" size="sm" variant="outline" disabled={isPending}>Add list</Button>
       </form>
-      {state && 'error' in state && <p role="alert" className="text-sm text-destructive">{state.error}</p>}
+      {state && 'error' in state && <FieldError>{state.error}</FieldError>}
     </div>
   );
 }

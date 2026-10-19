@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth/server';
 import { MainNav } from '@/components/layout/main-nav';
 import { CommandPalette } from '@/components/layout/command-palette';
 import { Button } from '@/components/ui/button';
+import { Kbd } from '@/components/ui/kbd';
 import { Gem, Search } from 'lucide-react';
 import { signOut } from '@/features/auth/actions';
 
@@ -27,7 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <span className="hidden items-center gap-1.5 rounded-md border bg-card px-2 py-1 text-xs text-muted-foreground lg:flex">
-              <Search className="size-3" /> Search <kbd className="font-sans text-[10px]">⌘K</kbd>
+              <Search className="size-3" /> Search <Kbd>⌘K</Kbd>
             </span>
             <span className="hidden max-w-40 truncate text-sm text-muted-foreground md:inline">{session.user.email}</span>
             <form action={signOut}>

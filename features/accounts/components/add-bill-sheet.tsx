@@ -3,12 +3,13 @@
 import { useActionState, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
-import { Segmented } from '@/components/ui/segmented';
-import { Amount } from '@/components/ui/carats-rate';
+import { Segmented } from '@/components/forms/segmented';
+import { Amount } from '@/components/forms/carats-rate';
 import {
   SpecFields, blankSpec, type Picklists, type SpecValue,
 } from '@/features/masters/diamonds/components/spec-fields';
@@ -118,7 +119,8 @@ export function AddBillSheet({
             ]}
           />
 
-          <Field label={direction === 'sale' ? 'Customer' : 'Supplier'} htmlFor="ab-party">
+          <Field>
+            <FieldLabel htmlFor="ab-party">{direction === 'sale' ? 'Customer' : 'Supplier'}</FieldLabel>
             <NativeSelect
               id="ab-party" name="partyId" required autoFocus
               className="w-full"
@@ -135,13 +137,15 @@ export function AddBillSheet({
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label={direction === 'sale' ? 'Invoice no.' : "Supplier's bill no."} htmlFor="ab-billNo">
+            <Field>
+              <FieldLabel htmlFor="ab-billNo">{direction === 'sale' ? 'Invoice no.' : "Supplier's bill no."}</FieldLabel>
               <Input
                 id="ab-billNo" name="billNo" required={direction === 'purchase'}
                 placeholder={direction === 'sale' ? 'Blank = we number it' : 'As printed on their bill'}
               />
             </Field>
-            <Field label="Bill date" htmlFor="ab-on">
+            <Field>
+              <FieldLabel htmlFor="ab-on">Bill date</FieldLabel>
               <Input
                 id="ab-on" name="on" type="date" required
                 value={on} onChange={(e) => { setOn(e.target.value); setDueOn(addDays(e.target.value, terms)); }}
@@ -150,13 +154,15 @@ export function AddBillSheet({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Terms (days)" htmlFor="ab-terms">
+            <Field>
+              <FieldLabel htmlFor="ab-terms">Terms (days)</FieldLabel>
               <Input
                 id="ab-terms" type="number" min="0" max="365"
                 value={terms} onChange={(e) => applyTerms(Number(e.target.value))}
               />
             </Field>
-            <Field label="Payment due" htmlFor="ab-dueOn">
+            <Field>
+              <FieldLabel htmlFor="ab-dueOn">Payment due</FieldLabel>
               <Input
                 id="ab-dueOn" name="dueOn" type="date"
                 value={dueOn} onChange={(e) => setDueOn(e.target.value)}
@@ -215,13 +221,15 @@ export function AddBillSheet({
 
                 {withGoods ? (
                   <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-3">
-                    <Field label="Carats" htmlFor={`ab-${i}-carats`}>
+                    <Field>
+                      <FieldLabel htmlFor={`ab-${i}-carats`}>Carats</FieldLabel>
                       <Input
                         id={`ab-${i}-carats`} type="number" step="0.001" min="0.001" required
                         value={l.carats} onChange={(e) => set(i, { carats: e.target.value })}
                       />
                     </Field>
-                    <Field label="Rate (₹/ct)" htmlFor={`ab-${i}-rate`}>
+                    <Field>
+                      <FieldLabel htmlFor={`ab-${i}-rate`}>Rate (₹/ct)</FieldLabel>
                       <Input
                         id={`ab-${i}-rate`} type="number" step="0.01" min="0" required
                         value={l.rate} onChange={(e) => set(i, { rate: e.target.value })}
@@ -233,13 +241,15 @@ export function AddBillSheet({
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
-                    <Field label="Amount (₹)" htmlFor={`ab-${i}-amount`}>
+                    <Field>
+                      <FieldLabel htmlFor={`ab-${i}-amount`}>Amount (₹)</FieldLabel>
                       <Input
                         id={`ab-${i}-amount`} type="number" step="0.01" min="0.01" required
                         value={l.amount} onChange={(e) => set(i, { amount: e.target.value })}
                       />
                     </Field>
-                    <Field label="What for" htmlFor={`ab-${i}-notes`}>
+                    <Field>
+                      <FieldLabel htmlFor={`ab-${i}-notes`}>What for</FieldLabel>
                       <Input
                         id={`ab-${i}-notes`} placeholder="Freight, brokerage…"
                         value={l.notes} onChange={(e) => set(i, { notes: e.target.value })}
@@ -251,17 +261,19 @@ export function AddBillSheet({
             ))}
           </div>
 
-          <div className="flex items-center justify-between border-t pt-3 text-sm">
+          <Separator />
+          <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Bill total</span>
             <span className="text-base font-bold tabular-nums">{inr(total)}</span>
           </div>
 
-          <Field label="Note" htmlFor="ab-notes">
+          <Field>
+            <FieldLabel htmlFor="ab-notes">Note</FieldLabel>
             <Input id="ab-notes" name="notes" placeholder="Optional" />
           </Field>
 
           {state && 'error' in state && (
-            <p role="alert" className="text-sm text-destructive">{state.error}</p>
+            <FieldError>{state.error}</FieldError>
           )}
 
           <SheetFooter>
@@ -275,11 +287,3 @@ export function AddBillSheet({
   );
 }
 
-function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-    </div>
-  );
-}

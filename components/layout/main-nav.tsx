@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 /**
  * Five sections, flat. Sub-views are tabs inside a section, not nav entries:
@@ -32,18 +32,14 @@ export function MainNav() {
           ? pathname === '/'
           : prefixes.some((p) => pathname === p || pathname.startsWith(p + '/'));
         return (
-          <Link
-            key={href}
-            href={href}
-            className={cn(
-              'whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors sm:px-3',
-              active
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-            )}
+          <Button
+            key={href} variant="ghost" nativeButton={false}
+            aria-current={active ? 'page' : undefined}
+            className="text-muted-foreground sm:px-3 aria-[current=page]:bg-primary/10 aria-[current=page]:text-primary"
+            render={<Link href={href} />}
           >
             {label}
-          </Link>
+          </Button>
         );
       })}
     </nav>

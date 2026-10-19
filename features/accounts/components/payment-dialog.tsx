@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
@@ -53,24 +53,24 @@ export function PaymentDialog({
           {billNo && <input type="hidden" name="billNo" value={billNo} />}
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor={`amt-${partyId}-${direction}`}>Amount (₹)</Label>
+            <Field>
+              <FieldLabel htmlFor={`amt-${partyId}-${direction}`}>Amount (₹)</FieldLabel>
               <Input
                 id={`amt-${partyId}-${direction}`} name="amount" type="number" step="0.01"
                 min="0.01" required defaultValue={outstanding ? outstanding.toFixed(2) : ''}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor={`on-${partyId}-${direction}`}>Date</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`on-${partyId}-${direction}`}>Date</FieldLabel>
               <Input
                 id={`on-${partyId}-${direction}`} name="on" type="date"
                 defaultValue={today} required
               />
-            </div>
+            </Field>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor={`mode-${partyId}-${direction}`}>Mode</Label>
+          <Field>
+            <FieldLabel htmlFor={`mode-${partyId}-${direction}`}>Mode</FieldLabel>
             <NativeSelect
               id={`mode-${partyId}-${direction}`} name="mode" defaultValue="bank"
               className="w-full"
@@ -82,18 +82,18 @@ export function PaymentDialog({
               <NativeSelectOption value="adjustment">Adjustment / set-off</NativeSelectOption>
               <NativeSelectOption value="other">Other</NativeSelectOption>
             </NativeSelect>
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor={`note-${partyId}-${direction}`}>Reference / note</Label>
+          <Field>
+            <FieldLabel htmlFor={`note-${partyId}-${direction}`}>Reference / note</FieldLabel>
             <Input
               id={`note-${partyId}-${direction}`} name="notes"
               placeholder="UTR, cheque no., or what it settles"
             />
-          </div>
+          </Field>
 
           {state && 'error' in state && (
-            <p role="alert" className="text-sm text-destructive">{state.error}</p>
+            <FieldError>{state.error}</FieldError>
           )}
 
           <SheetFooter>

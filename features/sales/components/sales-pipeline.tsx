@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { ct } from '@/lib/format';
 import {
   STAGES, STAGE_LABEL, type AdhocApproval, type PipelineRow, type Stage,
@@ -57,9 +59,7 @@ export function SalesPipeline({
                 <h2 className="text-sm font-semibold">{STAGE_LABEL[stage]}</h2>
                 <p className="text-xs text-muted-foreground">{DESCRIPTION[stage]}</p>
               </div>
-              <span className="rounded-full bg-background px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
-                {cards.length + extra.length}
-              </span>
+              <Badge variant="outline" className="bg-background tabular-nums">{cards.length + extra.length}</Badge>
             </div>
 
             <div className="space-y-2">
@@ -130,9 +130,9 @@ export function SalesPipeline({
               ))}
 
               {!cards.length && !extra.length && (
-                <div className="rounded-lg border border-dashed bg-background/55 px-2 py-5 text-center text-xs text-muted-foreground">
-                  None
-                </div>
+                <Empty className="border bg-background/55 px-2 py-5">
+                  <EmptyDescription className="text-xs">None</EmptyDescription>
+                </Empty>
               )}
             </div>
           </section>

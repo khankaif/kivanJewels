@@ -1,5 +1,7 @@
 import Link from 'next/link';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
+import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { getDashboard, getWorklist } from '@/features/dashboard/queries';
 import { inr, ct, pct } from '@/lib/format';
@@ -52,20 +54,17 @@ export default async function DashboardPage() {
       />
 
       <section className="grid gap-3 lg:grid-cols-[1.4fr_0.9fr]">
-        <div className="rounded-xl border border-border/80 bg-card p-4 shadow-xs sm:p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold">Needs your attention</h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">Ordered by risk, not by when it was entered.</p>
-            </div>
-            <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
-              {work.length} open
-            </span>
-          </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Needs your attention</CardTitle>
+            <CardDescription>Ordered by risk, not by when it was entered.</CardDescription>
+            <CardAction><Badge variant="secondary">{work.length} open</Badge></CardAction>
+          </CardHeader>
+          <CardContent>
         {work.length === 0 ? (
-            <div className="rounded-lg border border-dashed bg-muted/30 py-10 text-center text-muted-foreground">
-              Nothing outstanding. No open memos, no bills past terms.
-            </div>
+            <Empty className="border bg-muted/30 py-10">
+              <EmptyDescription>Nothing outstanding. No open memos, no bills past terms.</EmptyDescription>
+            </Empty>
         ) : (
           <div className="space-y-2">
             {work.map((w) => {
@@ -90,7 +89,8 @@ export default async function DashboardPage() {
             })}
           </div>
         )}
-        </div>
+          </CardContent>
+        </Card>
         <PositionSummary d={d} />
       </section>
 
@@ -148,7 +148,8 @@ function PositionSummary({ d }: { d: Awaited<ReturnType<typeof getDashboard>> })
           <div className="mt-1 text-xl font-semibold tabular-nums">{inr(d.payable)}</div>
         </div>
       </div>
-      <div className="mt-5 border-t border-background/15 pt-4 text-xs leading-5 text-background/65">
+      <Separator className="mt-5 mb-4 bg-background/15" />
+      <div className="text-xs leading-5 text-background/65">
         Open client approvals: <span className="font-semibold text-background">{d.openMemos}</span>
         {d.overdueMemos > 0 && <> · <span className="font-semibold text-background">{d.overdueMemos} overdue</span></>}
       </div>

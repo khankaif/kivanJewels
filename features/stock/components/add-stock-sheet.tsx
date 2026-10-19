@@ -3,12 +3,12 @@
 import { useActionState, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
-import { Segmented } from '@/components/ui/segmented';
-import { CaratsRate } from '@/components/ui/carats-rate';
+import { Segmented } from '@/components/forms/segmented';
+import { CaratsRate } from '@/components/forms/carats-rate';
 import { SpecFields, type Picklists } from '@/features/masters/diamonds/components/spec-fields';
 import type { SieveShapes } from '@/lib/spec-rules';
 import { useLastUsed } from '@/lib/use-last-used';
@@ -71,11 +71,13 @@ export function AddStockSheet({
 
           <CaratsRate id="as" />
 
-          <Field label={mode === 'bill' ? 'Date' : 'Received on'} htmlFor="as-on">
+          <Field>
+            <FieldLabel htmlFor="as-on">{mode === 'bill' ? 'Date' : 'Received on'}</FieldLabel>
             <Input id="as-on" name="on" type="date" defaultValue={today} required />
           </Field>
 
-          <Field label="Supplier" htmlFor="as-partyId">
+          <Field>
+            <FieldLabel htmlFor="as-partyId">Supplier</FieldLabel>
             <NativeSelect
               id="as-partyId" name="partyId"
               required={mode === 'memo'}
@@ -93,21 +95,25 @@ export function AddStockSheet({
           </Field>
 
           {mode === 'bill' ? (
-            <Field label="Bill no." htmlFor="as-billNo">
+            <Field>
+              <FieldLabel htmlFor="as-billNo">Bill no.</FieldLabel>
               <Input id="as-billNo" name="billNo" placeholder="Blank = cash, no payable" />
             </Field>
           ) : (
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Memo no." htmlFor="as-memoNo">
+              <Field>
+                <FieldLabel htmlFor="as-memoNo">Memo no.</FieldLabel>
                 <Input id="as-memoNo" name="memoNo" placeholder="Blank = we number it" />
               </Field>
-              <Field label="Terms (days)" htmlFor="as-terms">
+              <Field>
+                <FieldLabel htmlFor="as-terms">Terms (days)</FieldLabel>
                 <Input
                   id="as-terms" name="termsDays" type="number" min="0" max="365"
                   value={terms} onChange={(e) => setTerms(Number(e.target.value))}
                 />
               </Field>
-              <Field label="Placed by" htmlFor="as-agent">
+              <Field>
+                <FieldLabel htmlFor="as-agent">Placed by</FieldLabel>
                 <Input id="as-agent" name="agent" list="as-agent-list" placeholder="Rushabh" />
                 <datalist id="as-agent-list">
                   {agents.map((a) => <option key={a} value={a} />)}
@@ -116,12 +122,13 @@ export function AddStockSheet({
             </div>
           )}
 
-          <Field label="Note" htmlFor="as-notes">
+          <Field>
+            <FieldLabel htmlFor="as-notes">Note</FieldLabel>
             <Input id="as-notes" name="notes" placeholder="Optional" />
           </Field>
 
           {state && 'error' in state && (
-            <p role="alert" className="text-sm text-destructive">{state.error}</p>
+            <FieldError>{state.error}</FieldError>
           )}
 
           {state && 'ok' in state && (
@@ -142,11 +149,3 @@ export function AddStockSheet({
   );
 }
 
-function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-    </div>
-  );
-}

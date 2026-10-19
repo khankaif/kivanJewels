@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';
 import {
@@ -87,11 +87,11 @@ export function SpecFields({
           || (f === 'mmSize' && hides(sieveShapes, spec, 'sieveSize'));
 
         return (
-          <div key={f} className="space-y-2">
-            <Label htmlFor={`${id}-${f}`} className={cn(hidden && 'text-muted-foreground/60')}>
+          <Field key={f}>
+            <FieldLabel htmlFor={`${id}-${f}`} className={cn(hidden && 'text-muted-foreground/60')}>
               {LABEL[f]}
               {required && <span className="text-destructive"> *</span>}
-            </Label>
+            </FieldLabel>
             {options ? (
               <NativeSelect
                 id={`${id}-${f}`} name={f}
@@ -111,7 +111,7 @@ export function SpecFields({
                 placeholder={hidden ? `not used for ${spec.shape}` : PLACEHOLDER[f]}
               />
             )}
-          </div>
+          </Field>
         );
       })}
     </div>

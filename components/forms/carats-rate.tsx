@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { cn } from '@/lib/utils';
 import { inr } from '@/lib/format';
 
@@ -31,20 +31,20 @@ export function CaratsRate({
   return (
     <div className={cn('space-y-2', className)}>
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label htmlFor={`${id}-carats`}>Carats</Label>
+        <Field>
+          <FieldLabel htmlFor={`${id}-carats`}>Carats</FieldLabel>
           <Input
             id={`${id}-carats`} name="carats" type="number" step="0.001" min="0.001" required
             value={carats} onChange={(e) => set(e.target.value, rate)}
           />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor={`${id}-rate`}>{rateLabel}</Label>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={`${id}-rate`}>{rateLabel}</FieldLabel>
           <Input
             id={`${id}-rate`} name="rate" type="number" step="0.01" min="0" required
             value={rate} onChange={(e) => set(carats, e.target.value)}
           />
-        </div>
+        </Field>
       </div>
       <p className="text-right text-sm tabular-nums text-muted-foreground" aria-live="polite">
         {amount > 0 ? <>Amount <span className="font-medium text-foreground">{inr(amount)}</span></> : 'Amount —'}

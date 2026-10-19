@@ -1,4 +1,7 @@
 import Link from 'next/link';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -126,10 +129,24 @@ export function MovementsTable({
         {pages > 1 && (
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Page {page} of {pages}</span>
-            <div className="flex gap-2">
-              {page > 1 && <Link className="underline" href={qs({ page: String(page - 1) })}>Previous</Link>}
-              {page < pages && <Link className="underline" href={qs({ page: String(page + 1) })}>Next</Link>}
-            </div>
+            <Pagination className="mx-0 w-auto">
+              <PaginationContent>
+                {page > 1 && (
+                  <PaginationItem>
+                    <Button variant="ghost" nativeButton={false} render={<Link href={qs({ page: String(page - 1) })} />}>
+                      <ChevronLeft data-icon="inline-start" /> Previous
+                    </Button>
+                  </PaginationItem>
+                )}
+                {page < pages && (
+                  <PaginationItem>
+                    <Button variant="ghost" nativeButton={false} render={<Link href={qs({ page: String(page + 1) })} />}>
+                      Next <ChevronRight data-icon="inline-end" />
+                    </Button>
+                  </PaginationItem>
+                )}
+              </PaginationContent>
+            </Pagination>
           </div>
         )}
       </CardContent>
