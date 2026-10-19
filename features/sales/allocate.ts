@@ -1,4 +1,4 @@
-import { EPS_CT } from '@/lib/spec-rules';
+import { EPS } from '@/lib/ledger/core';
 
 export type Available = { lotId: string; balance: number };
 export type Pick = { lotId: string; carats: number };
@@ -15,9 +15,9 @@ export function allocate(lots: Available[], want: number): { picks: Pick[]; shor
   const picks: Pick[] = [];
   let left = want;
   for (const lot of lots) {
-    if (left <= EPS_CT) break;
+    if (left <= EPS) break;
     const take = Math.min(left, Number(lot.balance));
-    if (take <= EPS_CT) continue;
+    if (take <= EPS) continue;
     // Carats are numeric(10,3); rounding here keeps the sum from overdrawing
     // a lot by a fraction the database would still reject.
     const carats = Math.floor(take * 1000) / 1000;
@@ -25,5 +25,5 @@ export function allocate(lots: Available[], want: number): { picks: Pick[]; shor
     picks.push({ lotId: lot.lotId, carats });
     left -= carats;
   }
-  return { picks, short: left > EPS_CT ? left : 0 };
+  return { picks, short: left > EPS ? left : 0 };
 }

@@ -63,6 +63,3 @@ export function validateSpec(spec: Spec, shapes: SieveShapes): string | null {
   }
   return null;
 }
-
-/** Matches the numeric(10,3) scale carats are stored at. */
-export const EPS_CT = 0.0005;

@@ -1,5 +1,8 @@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
 export type FieldDef =
   | { type: 'text'; name: string; label: string; placeholder?: string; value?: string }
@@ -26,32 +29,32 @@ export function FilterBar({
       {fields.map((f) => (
         <div key={f.name} className="space-y-1">
           {f.type !== 'checkbox' && (
-            <label htmlFor={f.name} className="block text-xs text-muted-foreground">{f.label}</label>
+            <Label htmlFor={f.name} className="block text-xs text-muted-foreground">{f.label}</Label>
           )}
           {f.type === 'text' && (
             <Input id={f.name} name={f.name} defaultValue={f.value ?? ''}
-                   placeholder={f.placeholder} className="h-9 w-48" />
+                   placeholder={f.placeholder} className="w-48" />
           )}
           {f.type === 'date' && (
-            <Input id={f.name} name={f.name} type="date" defaultValue={f.value ?? ''} className="h-9 w-40" />
+            <Input id={f.name} name={f.name} type="date" defaultValue={f.value ?? ''} className="w-40" />
           )}
           {f.type === 'select' && (
-            <select id={f.name} name={f.name} defaultValue={f.value ?? ''}
-                    className="h-9 w-44 rounded-md border bg-transparent px-3 text-sm">
-              {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            <NativeSelect id={f.name} name={f.name} defaultValue={f.value ?? ''}
+                    className="w-44">
+              {f.options.map((o) => <NativeSelectOption key={o.value} value={o.value}>{o.label}</NativeSelectOption>)}
+            </NativeSelect>
           )}
           {f.type === 'checkbox' && (
-            <label className="flex h-9 items-center gap-2 text-sm">
-              <input type="checkbox" name={f.name} value="1" defaultChecked={f.checked} className="size-4" />
+            <Label className="h-8 font-normal">
+              <Checkbox name={f.name} value="1" defaultChecked={f.checked} />
               {f.label}
-            </label>
+            </Label>
           )}
         </div>
       ))}
-      <Button type="submit" variant="secondary" className="h-9">Apply</Button>
+      <Button type="submit" variant="secondary">Apply</Button>
       {exportHref && (
-        <Button type="button" variant="outline" className="h-9" render={<a href={exportHref} />}>
+        <Button type="button" variant="outline" nativeButton={false} render={<a href={exportHref} />}>
           Export CSV
         </Button>
       )}

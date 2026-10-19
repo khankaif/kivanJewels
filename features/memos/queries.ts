@@ -67,24 +67,6 @@ export async function getMemos(
   return [...byMemo.values()];
 }
 
-export async function getMemoSummary() {
-  const rows = await sql`
-    SELECT direction,
-           count(DISTINCT memo_id) FILTER (WHERE memo_status = 'open')::int AS open,
-           count(DISTINCT memo_id) FILTER (WHERE overdue)::int              AS overdue,
-           COALESCE(SUM(outstanding) FILTER (WHERE memo_status = 'open'),0) AS carats,
-           COALESCE(SUM(outstanding * rate) FILTER (WHERE memo_status = 'open'),0) AS value
-    FROM memo_line_status GROUP BY direction`;
-  const base = { open: 0, overdue: 0, carats: 0, value: 0 };
-  const out = { in: { ...base }, out: { ...base } };
-  for (const r of rows as any[]) {
-    out[r.direction as 'in' | 'out'] = {
-      open: r.open, overdue: r.overdue, carats: Number(r.carats), value: Number(r.value),
-    };
-  }
-  return out;
-}
-
 /** Agents seen historically, for the "placed by" picker. */
 export async function getAgents(): Promise<string[]> {
   const rows = await sql`

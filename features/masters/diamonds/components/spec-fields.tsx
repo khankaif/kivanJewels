@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';
 import {
   hides, isCertified, SPEC_FIELDS, usesSieve, type SieveShapes, type SpecField,
@@ -92,16 +93,16 @@ export function SpecFields({
               {required && <span className="text-destructive"> *</span>}
             </Label>
             {options ? (
-              <select
+              <NativeSelect
                 id={`${id}-${f}`} name={f}
                 value={spec[f]} onChange={(e) => set(f, e.target.value)}
                 disabled={hidden} required={required}
                 autoFocus={autoFocus && i === 0}
-                className="h-9 w-full rounded-md border bg-transparent px-3 text-sm disabled:opacity-50"
+                className="w-full"
               >
-                <option value="">{hidden ? `not used for ${spec.shape}` : 'Select…'}</option>
-                {options.map((v) => <option key={v} value={v}>{v}</option>)}
-              </select>
+                <NativeSelectOption value="">{hidden ? `not used for ${spec.shape}` : 'Select…'}</NativeSelectOption>
+                {options.map((v) => <NativeSelectOption key={v} value={v}>{v}</NativeSelectOption>)}
+              </NativeSelect>
             ) : (
               <Input
                 id={`${id}-${f}`} name={f}

@@ -6,8 +6,8 @@ import { getDashboard, getWorklist } from '@/features/dashboard/queries';
 import { getPartyBalances, getAging, getAccountTotals, getPnl } from '@/features/accounts/queries';
 import { getBills } from '@/features/accounts/money';
 import { getParties, getPartyOptions } from '@/features/parties/queries';
-import { getPipeline, getAdhocApprovals, getRequirements } from '@/features/sales/queries';
-import { getMemos, getMemoSummary, getAgents } from '@/features/memos/queries';
+import { getPipeline, getAdhocApprovals } from '@/features/sales/queries';
+import { getMemos, getAgents } from '@/features/memos/queries';
 import {
   getAttributeBuckets, getDiamondPicklists, getMasterMismatches, getSieveShapes,
 } from '@/features/masters/diamonds/queries';
@@ -28,8 +28,8 @@ test('every page query runs against the live schema', async () => {
     getDashboard(), getWorklist(),
     getPartyBalances(), getAging(new Date().toISOString().slice(0, 10)), getAccountTotals(), getPnl(),
     getBills({ limit: 5 }), getParties(), getPartyOptions('client'),
-    getPipeline(), getAdhocApprovals(), getRequirements({ status: 'all' }),
-    getMemos('out'), getMemoSummary(), getAgents(),
+    getPipeline(), getAdhocApprovals(),
+    getMemos('out'), getAgents(),
     getAttributeBuckets(), getDiamondPicklists(), getSieveShapes(), getMasterMismatches(),
     search('a'),
   ]);

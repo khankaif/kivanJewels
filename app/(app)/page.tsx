@@ -5,6 +5,7 @@ import { getDashboard, getWorklist } from '@/features/dashboard/queries';
 import { inr, ct, pct } from '@/lib/format';
 import { PageHeader } from '@/components/layout/page-header';
 import { ArrowRight, CircleDollarSign, Gem, HandCoins, PackagePlus, ShoppingBag } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const URGENCY: Record<string, { badge: 'destructive' | 'default' | 'secondary'; ring: string }> = {
   critical: { badge: 'destructive', ring: 'border-negative/40' },
@@ -120,12 +121,12 @@ export default async function DashboardPage() {
 function QuickActions() {
   return (
     <div className="flex flex-wrap justify-end gap-2">
-      <Link href="/stock?new=1" className="inline-flex h-8 items-center gap-1.5 rounded-lg border bg-background px-2.5 text-sm font-medium transition-colors hover:bg-muted">
+      <Button variant="outline" nativeButton={false} render={<Link href="/stock?new=1" />}>
         <PackagePlus className="size-3.5" /> Add stock
-      </Link>
-      <Link href="/sales?new=1" className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85">
+      </Button>
+      <Button nativeButton={false} render={<Link href="/sales?new=1" />}>
         <ShoppingBag className="size-3.5" /> New sale
-      </Link>
+      </Button>
     </div>
   );
 }

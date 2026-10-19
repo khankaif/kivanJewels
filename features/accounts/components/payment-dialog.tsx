@@ -8,6 +8,7 @@ import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
 import { recordPaymentAction, type PaymentState } from '../actions';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
 export function PaymentDialog({
   partyId, partyName, direction, billNo, outstanding, label, size = 'default',
@@ -70,17 +71,17 @@ export function PaymentDialog({
 
           <div className="space-y-2">
             <Label htmlFor={`mode-${partyId}-${direction}`}>Mode</Label>
-            <select
+            <NativeSelect
               id={`mode-${partyId}-${direction}`} name="mode" defaultValue="bank"
-              className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+              className="w-full"
             >
-              <option value="bank">Bank transfer</option>
-              <option value="cash">Cash</option>
-              <option value="upi">UPI</option>
-              <option value="cheque">Cheque</option>
-              <option value="adjustment">Adjustment / set-off</option>
-              <option value="other">Other</option>
-            </select>
+              <NativeSelectOption value="bank">Bank transfer</NativeSelectOption>
+              <NativeSelectOption value="cash">Cash</NativeSelectOption>
+              <NativeSelectOption value="upi">UPI</NativeSelectOption>
+              <NativeSelectOption value="cheque">Cheque</NativeSelectOption>
+              <NativeSelectOption value="adjustment">Adjustment / set-off</NativeSelectOption>
+              <NativeSelectOption value="other">Other</NativeSelectOption>
+            </NativeSelect>
           </div>
 
           <div className="space-y-2">

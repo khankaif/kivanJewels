@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
 import { adoptValueAction, aliasValueAction, type MasterState } from '../actions';
 import type { Mismatch } from '../queries';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
 /**
  * What the book says that the master does not recognise. Every one of these
@@ -56,13 +57,12 @@ function MismatchRow({ mismatch, options }: { mismatch: Mismatch; options: strin
       <form action={formAction} className="flex items-center gap-2">
         <input type="hidden" name="bucket" value={mismatch.bucket} />
         <input type="hidden" name="value" value={mismatch.value} />
-        <select
+        <NativeSelect
           name="target" required defaultValue=""
-          className="h-8 rounded-md border bg-transparent px-2 text-sm"
         >
-          <option value="">same as…</option>
-          {options.map((v) => <option key={v} value={v}>{v}</option>)}
-        </select>
+          <NativeSelectOption value="">same as…</NativeSelectOption>
+          {options.map((v) => <NativeSelectOption key={v} value={v}>{v}</NativeSelectOption>)}
+        </NativeSelect>
         <Button type="submit" size="sm" variant="ghost" disabled={isPending}>Map</Button>
       </form>
 

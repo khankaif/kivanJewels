@@ -4,36 +4,18 @@ import { useActionState, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Segmented } from '@/components/ui/segmented';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
-import { cn } from '@/lib/utils';
 import { specLabel } from '@/lib/format';
 import { CaratsRate } from '@/components/ui/carats-rate';
 import { deliverAction, sourceAction, type ActionState } from '../actions';
 import type { RequirementLine, SpecLot } from '../queries';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
 type Party = { id: string; name: string; defaultTermsDays: number };
-
-function Toggle<T extends string>({ value, set, options }: {
-  value: T; set: (v: T) => void; options: [T, string][];
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
-      {options.map(([v, label]) => (
-        <button
-          key={v} type="button" onClick={() => set(v)}
-          className={cn(
-            'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-            value === v ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 export function FulfilSheet({
   line, stock, suppliers, agents, defaultOpen = false,
@@ -79,7 +61,7 @@ export function FulfilSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <Toggle
+        <Segmented
           value={mode} set={setMode}
           options={[['deliver', 'Use available stock'], ['source', 'Source from supplier']]}
         />
@@ -89,27 +71,27 @@ export function FulfilSheet({
             <>
               <div className="space-y-2">
                 <Label htmlFor="ff-lot">Lot</Label>
-                <select
+                <NativeSelect
                   id="ff-lot" name="lotId" required
-                  className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+                  className="w-full"
                 >
-                  <option value="">Select…</option>
+                  <NativeSelectOption value="">Select…</NativeSelectOption>
                   {lots.map((l) => (
-                    <option key={l.lotId} value={l.lotId}>
+                    <NativeSelectOption key={l.lotId} value={l.lotId}>
                       {l.lotNo} — {l.balance.toFixed(3)} ct{l.onMemo ? ' (on memo)' : ''}
                       {l.partyName ? ` · ${l.partyName}` : ''}
-                    </option>
+                    </NativeSelectOption>
                   ))}
-                </select>
+                </NativeSelect>
                 {stock.others.length > 0 && (
-                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} className="size-3.5" />
+                  <Label className="text-xs text-muted-foreground">
+                    <Checkbox checked={showAll} onCheckedChange={setShowAll} />
                     Allow a substitution from another specification
-                  </label>
+                  </Label>
                 )}
               </div>
 
-              <Toggle
+              <Segmented
                 value={channel} set={setChannel}
                 options={[['memo', 'Send on approval'], ['bill', 'Firm sale / invoice']]}
               />
@@ -118,20 +100,20 @@ export function FulfilSheet({
             <>
               <div className="space-y-2">
                 <Label htmlFor="ff-supplier">Supplier</Label>
-                <select
+                <NativeSelect
                   id="ff-supplier" name="supplierId" required
-                  className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+                  className="w-full"
                   onChange={(e) => {
                     const p = suppliers.find((s) => s.id === e.target.value);
                     if (p) setTerms(p.defaultTermsDays);
                   }}
                 >
-                  <option value="">Select…</option>
-                  {suppliers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                  <NativeSelectOption value="">Select…</NativeSelectOption>
+                  {suppliers.map((p) => <NativeSelectOption key={p.id} value={p.id}>{p.name}</NativeSelectOption>)}
+                </NativeSelect>
               </div>
 
-              <Toggle
+              <Segmented
                 value={channel} set={setChannel}
                 options={[['memo', 'Supplier approval'], ['bill', 'Purchase bill']]}
               />

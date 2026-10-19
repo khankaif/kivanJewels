@@ -37,24 +37,7 @@ export async function getMovements(f: MovementFilters = {}) {
   const limit = f.limit ?? 200;
   const offset = f.offset ?? 0;
 
-  const rows = await sql`
-    SELECT * FROM movement_entries
-    WHERE (${kind}::text  IS NULL OR kind = ${kind})
-      AND (${lotNo}::text IS NULL OR lot_no = ${lotNo})
-      AND (${from}::text  IS NULL OR moved_on >= ${from})
-      AND (${to}::text    IS NULL OR moved_on <= ${to})
-      AND (${dir}::text   IS NULL
-           OR (${dir} = 'in' AND is_inward) OR (${dir} = 'out' AND NOT is_inward))
-      AND (${q}::text     IS NULL OR lot_no ILIKE ${q} OR party_name ILIKE ${q}
-           OR stone_type ILIKE ${q} OR sieve_size ILIKE ${q} OR memo_no ILIKE ${q})
-    ORDER BY moved_on DESC, is_outward DESC, id DESC
-    LIMIT ${limit} OFFSET ${offset}`;
-
-  const [agg] = await sql`
-    SELECT count(*)::int AS n,
-           COALESCE(SUM(carats) FILTER (WHERE is_inward),0)      AS in_ct,
-           COALESCE(-SUM(carats) FILTER (WHERE NOT is_inward),0) AS out_ct
-    FROM movement_entries
+  const where = sql`
     WHERE (${kind}::text  IS NULL OR kind = ${kind})
       AND (${lotNo}::text IS NULL OR lot_no = ${lotNo})
       AND (${from}::text  IS NULL OR moved_on >= ${from})
@@ -63,6 +46,17 @@ export async function getMovements(f: MovementFilters = {}) {
            OR (${dir} = 'in' AND is_inward) OR (${dir} = 'out' AND NOT is_inward))
       AND (${q}::text     IS NULL OR lot_no ILIKE ${q} OR party_name ILIKE ${q}
            OR stone_type ILIKE ${q} OR sieve_size ILIKE ${q} OR memo_no ILIKE ${q})`;
+
+  const rows = await sql`
+    SELECT * FROM movement_entries ${where}
+    ORDER BY moved_on DESC, is_outward DESC, id DESC
+    LIMIT ${limit} OFFSET ${offset}`;
+
+  const [agg] = await sql`
+    SELECT count(*)::int AS n,
+           COALESCE(SUM(carats) FILTER (WHERE is_inward),0)      AS in_ct,
+           COALESCE(-SUM(carats) FILTER (WHERE NOT is_inward),0) AS out_ct
+    FROM movement_entries ${where}`;
 
   return {
     rows: (rows as any[]).map(map),

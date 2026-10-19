@@ -32,23 +32,6 @@ const mapLine = (r: any): RequirementLine => ({
   planSource: r.plan_source === null ? null : Number(r.plan_source),
 });
 
-/** Every line, with its live fulfilment state and how much matching stock exists now. */
-async function lineRows(opts: { status?: string | null; requirementNo?: string | null }) {
-  const status = opts.status ?? null;
-  const reqNo = opts.requirementNo ?? null;
-  return sql`
-    SELECT rls.*, r.notes,
-           COALESCE((
-             SELECT SUM(b.balance) FROM lot_balances b JOIN lots l ON l.id = b.lot_id
-             WHERE l.unit_key = rls.unit_key AND b.balance > 0.0005
-           ), 0) AS in_stock
-    FROM requirement_line_status rls
-    JOIN requirements r ON r.id = rls.requirement_id
-    WHERE (${status}::text IS NULL OR rls.requirement_status = ${status})
-      AND (${reqNo}::text IS NULL OR rls.requirement_no = ${reqNo})
-    ORDER BY rls.raised_on DESC, rls.requirement_no, rls.line_id`;
-}
-
 function group(rows: any[]): Requirement[] {
   const out = new Map<string, Requirement>();
   for (const r of rows) {
@@ -70,16 +53,18 @@ function group(rows: any[]): Requirement[] {
   return [...out.values()];
 }
 
-export async function getRequirements(
-  opts: { status?: 'open' | 'closed' | 'all' } = {},
-): Promise<Requirement[]> {
-  const st = opts.status ?? 'open';
-  const rows = await lineRows({ status: st === 'all' ? null : st });
-  return group(rows as any[]);
-}
-
+/** One requirement's lines, with live fulfilment state and how much matching stock exists now. */
 export async function getRequirement(requirementNo: string): Promise<Requirement | null> {
-  const rows = await lineRows({ requirementNo });
+  const rows = await sql`
+    SELECT rls.*, r.notes,
+           COALESCE((
+             SELECT SUM(b.balance) FROM lot_balances b JOIN lots l ON l.id = b.lot_id
+             WHERE l.unit_key = rls.unit_key AND b.balance > 0.0005
+           ), 0) AS in_stock
+    FROM requirement_line_status rls
+    JOIN requirements r ON r.id = rls.requirement_id
+    WHERE rls.requirement_no = ${requirementNo}
+    ORDER BY rls.raised_on DESC, rls.line_id`;
   return group(rows as any[])[0] ?? null;
 }
 

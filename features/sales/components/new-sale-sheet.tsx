@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
@@ -18,6 +19,7 @@ import { addDays } from '@/lib/dates';
 import { ct, inr } from '@/lib/format';
 import { createSaleAction, stockForSpecAction, type ActionState } from '../actions';
 import type { SellableUnit } from '../queries';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
 type Party = { id: string; name: string; defaultTermsDays: number };
 
@@ -121,14 +123,14 @@ export function NewSaleSheet({
             <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">1 · Customer</p>
             <div className="grid grid-cols-2 gap-3">
             <Field label="Customer" htmlFor="ns-party">
-              <select
+              <NativeSelect
                 id="ns-party" name="partyId" required autoFocus
-                className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+                className="w-full"
                 value={customer} onChange={(e) => setCustomer(e.target.value)}
               >
-                <option value="">Select…</option>
-                {customers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+                <NativeSelectOption value="">Select…</NativeSelectOption>
+                {customers.map((p) => <NativeSelectOption key={p.id} value={p.id}>{p.name}</NativeSelectOption>)}
+              </NativeSelect>
             </Field>
             <Field label="Raised on" htmlFor="ns-date">
               <Input
@@ -188,13 +190,10 @@ export function NewSaleSheet({
               <p className="text-sm font-semibold">3 · Act now or keep as a requirement</p>
               <p className="text-xs text-muted-foreground">Optional. You can complete either step later from the requirement.</p>
             </div>
-          <label className="flex items-center gap-2 text-sm font-medium">
-            <input
-              type="checkbox" checked={deliverNow} className="size-4"
-              onChange={(e) => setDeliverNow(e.target.checked)}
-            />
+          <Label>
+            <Checkbox checked={deliverNow} onCheckedChange={setDeliverNow} />
             Send available stock to the customer now
-          </label>
+          </Label>
           <input type="hidden" name="deliverNow" value={deliverNow ? '1' : ''} />
 
           {deliverNow && (
@@ -225,30 +224,27 @@ export function NewSaleSheet({
             </div>
           )}
 
-          <label className="flex items-center gap-2 text-sm font-medium">
-            <input
-              type="checkbox" checked={sourceNow} className="size-4"
-              onChange={(e) => setSourceNow(e.target.checked)}
-            />
+          <Label>
+            <Checkbox checked={sourceNow} onCheckedChange={setSourceNow} />
             Receive the sourced quantity from a supplier now
-          </label>
+          </Label>
           <input type="hidden" name="sourceNow" value={sourceNow ? '1' : ''} />
 
           {sourceNow && (
             <div className="space-y-3 rounded-lg border p-3">
               <input type="hidden" name="sourceChannel" value={sourceChannel} />
               <Field label="Supplier" htmlFor="ns-supplier">
-                <select
+                <NativeSelect
                   id="ns-supplier" name="supplierId" required
-                  className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+                  className="w-full"
                   onChange={(e) => {
                     const p = suppliers.find((x) => x.id === e.target.value);
                     if (p) setTerms(p.defaultTermsDays);
                   }}
                 >
-                  <option value="">Select…</option>
-                  {suppliers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                  <NativeSelectOption value="">Select…</NativeSelectOption>
+                  {suppliers.map((p) => <NativeSelectOption key={p.id} value={p.id}>{p.name}</NativeSelectOption>)}
+                </NativeSelect>
               </Field>
               <Segmented
                 value={sourceChannel} set={setSourceChannel}
@@ -344,7 +340,7 @@ function LineCard({
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span className="font-semibold uppercase tracking-[0.1em]">Stone {index + 1}</span>
         {onRemove && (
-          <button type="button" onClick={onRemove} className="hover:text-destructive">Remove</button>
+          <Button type="button" variant="ghost" size="xs" onClick={onRemove} className="hover:text-destructive">Remove</Button>
         )}
       </div>
 
@@ -357,9 +353,9 @@ function LineCard({
       {fromStock ? (
         <>
           <Field label="Which parcel" htmlFor={`ns-${index}-lot`}>
-            <select
+            <NativeSelect
               id={`ns-${index}-lot`} required
-              className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+              className="w-full"
               value={line.lotId}
               onChange={(e) => {
                 const u = units.find((x) => x.lotId === e.target.value);
@@ -371,13 +367,13 @@ function LineCard({
                 });
               }}
             >
-              <option value="">Select stock…</option>
+              <NativeSelectOption value="">Select stock…</NativeSelectOption>
               {units.map((u) => (
-                <option key={u.lotId} value={u.lotId}>
+                <NativeSelectOption key={u.lotId} value={u.lotId}>
                   {u.label} — {u.balance.toFixed(3)} ct{u.onMemo ? ` (on memo${u.partyName ? `, ${u.partyName}` : ''})` : ''}
-                </option>
+                </NativeSelectOption>
               ))}
-            </select>
+            </NativeSelect>
           </Field>
           {picked && (
             <p className="text-xs text-muted-foreground">

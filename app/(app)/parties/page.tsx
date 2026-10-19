@@ -10,6 +10,8 @@ import { PartyDialog } from '@/features/parties/components/party-dialog';
 import { MastersNav } from '@/features/masters/components/masters-nav';
 import { inr } from '@/lib/format';
 import { PageHeader } from '@/components/layout/page-header';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,10 +42,10 @@ export default async function PartiesPage({
           </div>
           <form className="flex gap-2">
             <Input name="q" defaultValue={q ?? ''} placeholder="Search name, business name, phone, GSTIN…" className="max-w-xs" />
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <input type="checkbox" name="all" value="1" defaultChecked={all === '1'} className="size-4" />
+            <Label className="text-muted-foreground">
+              <Checkbox name="all" value="1" defaultChecked={all === '1'} />
               show inactive
-            </label>
+            </Label>
           </form>
         </CardHeader>
         <CardContent className="overflow-x-auto">

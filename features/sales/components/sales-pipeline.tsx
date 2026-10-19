@@ -95,7 +95,7 @@ export function SalesPipeline({
                       <Button
                         size="sm" className="w-full"
                         variant={stage === 'ready' ? 'default' : 'outline'}
-                        render={<Link href={actionHref(r)} />}
+                        nativeButton={false} render={<Link href={actionHref(r)} />}
                       >
                         {ACTION[stage]}
                       </Button>
@@ -122,7 +122,7 @@ export function SalesPipeline({
                       </span>
                       <span className="font-medium tabular-nums">{ct(m.outstanding)} out</span>
                     </div>
-                    <Button size="sm" variant="outline" className="w-full" render={<Link href="/sales?tab=memo" />}>
+                    <Button size="sm" variant="outline" className="w-full" nativeButton={false} render={<Link href="/sales?tab=memo" />}>
                       Settle memo
                     </Button>
                   </CardContent>

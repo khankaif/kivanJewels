@@ -12,6 +12,7 @@ import {
   addStaffAction, setStaffAccessAction, setStaffPasswordAction, type StaffState,
 } from '../actions';
 import type { Staff } from '../queries';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
 export function AddStaffSheet() {
   const [open, setOpen] = useState(false);
@@ -50,13 +51,13 @@ export function AddStaffSheet() {
             />
           </Field>
           <Field label="Role" htmlFor="st-role">
-            <select
+            <NativeSelect
               id="st-role" name="role" defaultValue="user"
-              className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+              className="w-full"
             >
-              <option value="user">Staff — enters the day&apos;s work</option>
-              <option value="admin">Admin — also manages staff</option>
-            </select>
+              <NativeSelectOption value="user">Staff — enters the day&apos;s work</NativeSelectOption>
+              <NativeSelectOption value="admin">Admin — also manages staff</NativeSelectOption>
+            </NativeSelect>
           </Field>
 
           {state && 'error' in state && (
@@ -177,7 +178,7 @@ export function ChangeMyPassword({
           autoComplete="new-password" placeholder="At least 12 characters"
         />
       </Field>
-      <Button type="submit" disabled={isPending} className="h-9">
+      <Button type="submit" disabled={isPending}>
         {isPending ? 'Changing…' : 'Change password'}
       </Button>
 

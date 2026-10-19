@@ -9,6 +9,7 @@ import { getBills } from '@/features/accounts/money';
 import { PaymentDialog } from '@/features/accounts/components/payment-dialog';
 import { inr } from '@/lib/format';
 import { PageHeader } from '@/components/layout/page-header';
+import { Button } from '@/components/ui/button';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,7 @@ export default async function AccountsPage() {
         eyebrow="Cash control"
         title="Accounts desk"
         description={`See who needs chasing and who needs paying. Aging is calculated as of ${asOf}.`}
-        actions={<Link href="/accounts/bills?status=unpaid" className="inline-flex h-8 items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/85">Open unpaid bills</Link>}
+        actions={<Button nativeButton={false} render={<Link href="/accounts/bills?status=unpaid" />}>Open unpaid bills</Button>}
       />
 
       <div className="grid gap-3 sm:grid-cols-2">

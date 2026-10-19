@@ -17,6 +17,7 @@ import { useLastUsed } from '@/lib/use-last-used';
 import { inr } from '@/lib/format';
 import { addDays } from '@/lib/dates';
 import { addBillAction, type BillState } from '../actions';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
 type Party = { id: string; name: string; defaultTermsDays: number };
 type Unit = { lotId: string; lotNo: string; label: string; balance: number };
@@ -118,9 +119,9 @@ export function AddBillSheet({
           />
 
           <Field label={direction === 'sale' ? 'Customer' : 'Supplier'} htmlFor="ab-party">
-            <select
+            <NativeSelect
               id="ab-party" name="partyId" required autoFocus
-              className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+              className="w-full"
               value={party}
               onChange={(e) => {
                 setParty(e.target.value);
@@ -128,9 +129,9 @@ export function AddBillSheet({
                 if (p) applyTerms(p.defaultTermsDays);
               }}
             >
-              <option value="">Select…</option>
-              {parties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+              <NativeSelectOption value="">Select…</NativeSelectOption>
+              {parties.map((p) => <NativeSelectOption key={p.id} value={p.id}>{p.name}</NativeSelectOption>)}
+            </NativeSelect>
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
@@ -181,28 +182,28 @@ export function AddBillSheet({
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Line {i + 1}</span>
                   {lines.length > 1 && (
-                    <button
-                      type="button" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}
+                    <Button
+                      type="button" variant="ghost" size="xs" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}
                       className="hover:text-destructive"
                     >
                       Remove
-                    </button>
+                    </Button>
                   )}
                 </div>
 
                 {withGoods && direction === 'sale' && (
-                  <select
+                  <NativeSelect
                     value={l.lotId} onChange={(e) => set(i, { lotId: e.target.value })}
                     required
-                    className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+                    className="w-full"
                   >
-                    <option value="">Select stock…</option>
+                    <NativeSelectOption value="">Select stock…</NativeSelectOption>
                     {units.map((u) => (
-                      <option key={u.lotId} value={u.lotId}>
+                      <NativeSelectOption key={u.lotId} value={u.lotId}>
                         {u.label} — {u.balance.toFixed(2)} ct
-                      </option>
+                      </NativeSelectOption>
                     ))}
-                  </select>
+                  </NativeSelect>
                 )}
 
                 {withGoods && direction === 'purchase' && (

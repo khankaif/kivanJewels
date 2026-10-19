@@ -4,11 +4,13 @@ import { useActionState, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
 import { savePartyAction, type PartyState } from '../actions';
 import type { Party } from '../queries';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
 export function PartyDialog({ party, defaultOpen = false }: { party?: Party; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -57,14 +59,14 @@ export function PartyDialog({ party, defaultOpen = false }: { party?: Party; def
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="kind">Role</Label>
-              <select
+              <NativeSelect
                 id="kind" name="kind" defaultValue={party?.kind ?? 'both'}
-                className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+                className="w-full"
               >
-                <option value="both">Supplier &amp; client</option>
-                <option value="supplier">Supplier only</option>
-                <option value="client">Client only</option>
-              </select>
+                <NativeSelectOption value="both">Supplier &amp; client</NativeSelectOption>
+                <NativeSelectOption value="supplier">Supplier only</NativeSelectOption>
+                <NativeSelectOption value="client">Client only</NativeSelectOption>
+              </NativeSelect>
             </div>
             <div className="space-y-2">
               <Label htmlFor="defaultTermsDays">Credit terms (days)</Label>
@@ -113,13 +115,10 @@ export function PartyDialog({ party, defaultOpen = false }: { party?: Party; def
           </div>
 
           {editing && (
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox" name="isActive" defaultChecked={party.isActive}
-                className="size-4" value="on"
-              />
+            <Label>
+              <Checkbox name="isActive" value="on" defaultChecked={party.isActive} />
               Active
-            </label>
+            </Label>
           )}
 
           {state && 'error' in state && (

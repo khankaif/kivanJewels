@@ -13,6 +13,7 @@ import { SpecFields, type Picklists } from '@/features/masters/diamonds/componen
 import type { SieveShapes } from '@/lib/spec-rules';
 import { useLastUsed } from '@/lib/use-last-used';
 import { addStockAction, type ActionState } from '../actions';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
 type Party = { id: string; name: string; defaultTermsDays: number };
 type Mode = 'bill' | 'memo';
@@ -75,10 +76,10 @@ export function AddStockSheet({
           </Field>
 
           <Field label="Supplier" htmlFor="as-partyId">
-            <select
+            <NativeSelect
               id="as-partyId" name="partyId"
               required={mode === 'memo'}
-              className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+              className="w-full"
               value={supplier}
               onChange={(e) => {
                 setSupplier(e.target.value);
@@ -86,9 +87,9 @@ export function AddStockSheet({
                 if (p) setTerms(p.defaultTermsDays);
               }}
             >
-              <option value="">{mode === 'bill' ? 'Not recorded' : 'Select…'}</option>
-              {suppliers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+              <NativeSelectOption value="">{mode === 'bill' ? 'Not recorded' : 'Select…'}</NativeSelectOption>
+              {suppliers.map((p) => <NativeSelectOption key={p.id} value={p.id}>{p.name}</NativeSelectOption>)}
+            </NativeSelect>
           </Field>
 
           {mode === 'bill' ? (

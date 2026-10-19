@@ -23,35 +23,30 @@ export type BillFilters = {
   offset?: number;
 };
 
-function whereFor(f: BillFilters) {
-  return {
-    direction: f.direction ?? null,
-    status: f.status ?? 'all',
-    partyId: f.partyId || null,
-    from: f.from || null,
-    to: f.to || null,
-    q: f.q ? `%${f.q}%` : null,
-    named: f.namedOnly ?? false,
-  };
-}
-
 export async function getBills(f: BillFilters = {}): Promise<{ rows: Bill[]; total: number; totals: { gross: number; paid: number; balance: number } }> {
-  const w = whereFor(f);
+  const direction = f.direction ?? null;
+  const status = f.status ?? 'all';
+  const partyId = f.partyId || null;
+  const from = f.from || null;
+  const to = f.to || null;
+  const q = f.q ? `%${f.q}%` : null;
   const limit = f.limit ?? 100;
   const offset = f.offset ?? 0;
 
+  const where = sql`
+    WHERE (${direction}::text IS NULL OR direction = ${direction})
+      AND (${partyId}::uuid IS NULL OR party_id = ${partyId}::uuid)
+      AND (${from}::text  IS NULL OR billed_on >= ${from})
+      AND (${to}::text    IS NULL OR billed_on <= ${to})
+      AND (${q}::text     IS NULL OR bill_no ILIKE ${q} OR party_name ILIKE ${q})
+      AND (NOT ${f.namedOnly ?? false}::boolean OR bill_no IS NOT NULL)
+      AND (${status} = 'all'
+           OR (${status} = 'unpaid'  AND balance > 0.005)
+           OR (${status} = 'paid'    AND balance <= 0.005)
+           OR (${status} = 'overdue' AND status = 'overdue'))`;
+
   const rows = await sql`
-    SELECT * FROM bills
-    WHERE (${w.direction}::text IS NULL OR direction = ${w.direction})
-      AND (${w.partyId}::uuid IS NULL OR party_id = ${w.partyId}::uuid)
-      AND (${w.from}::text  IS NULL OR billed_on >= ${w.from})
-      AND (${w.to}::text    IS NULL OR billed_on <= ${w.to})
-      AND (${w.q}::text     IS NULL OR bill_no ILIKE ${w.q} OR party_name ILIKE ${w.q})
-      AND (NOT ${w.named}::boolean OR bill_no IS NOT NULL)
-      AND (${w.status} = 'all'
-           OR (${w.status} = 'unpaid'  AND balance > 0.005)
-           OR (${w.status} = 'paid'    AND balance <= 0.005)
-           OR (${w.status} = 'overdue' AND status = 'overdue'))
+    SELECT * FROM bills ${where}
     ORDER BY billed_on DESC NULLS LAST, gross DESC
     LIMIT ${limit} OFFSET ${offset}`;
 
@@ -60,17 +55,7 @@ export async function getBills(f: BillFilters = {}): Promise<{ rows: Bill[]; tot
            COALESCE(SUM(gross),0)   AS gross,
            COALESCE(SUM(paid),0)    AS paid,
            COALESCE(SUM(balance),0) AS balance
-    FROM bills
-    WHERE (${w.direction}::text IS NULL OR direction = ${w.direction})
-      AND (${w.partyId}::uuid IS NULL OR party_id = ${w.partyId}::uuid)
-      AND (${w.from}::text  IS NULL OR billed_on >= ${w.from})
-      AND (${w.to}::text    IS NULL OR billed_on <= ${w.to})
-      AND (${w.q}::text     IS NULL OR bill_no ILIKE ${w.q} OR party_name ILIKE ${w.q})
-      AND (NOT ${w.named}::boolean OR bill_no IS NOT NULL)
-      AND (${w.status} = 'all'
-           OR (${w.status} = 'unpaid'  AND balance > 0.005)
-           OR (${w.status} = 'paid'    AND balance <= 0.005)
-           OR (${w.status} = 'overdue' AND status = 'overdue'))`;
+    FROM bills ${where}`;
 
   return {
     rows: (rows as any[]).map(mapBill),
