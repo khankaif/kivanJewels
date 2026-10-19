@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useState } from 'react';
+import { useFormAction } from '@/lib/use-form-action';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
@@ -12,8 +13,9 @@ import { CaratsRate } from '@/components/forms/carats-rate';
 import { SpecFields, type Picklists } from '@/features/masters/diamonds/components/spec-fields';
 import type { SieveShapes } from '@/lib/spec-rules';
 import { useLastUsed } from '@/lib/use-last-used';
-import { addStockAction, type ActionState } from '../actions';
+import { addStockAction } from '../actions';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { todayIso } from '@/lib/dates';
 
 type Party = { id: string; name: string; defaultTermsDays: number };
 type Mode = 'bill' | 'memo';
@@ -33,18 +35,11 @@ export function AddStockSheet({
   // while supplier, date and mode stay put -- the next parcel from the same
   // supplier usually differs only in size and carats.
   const [round, setRound] = useState(0);
-  const [state, formAction, isPending] = useActionState<ActionState, FormData>(
-    async (prev, fd) => {
-      const res = await addStockAction(prev, fd);
-      if (res && 'ok' in res) {
-        if (fd.get('then') === 'again') setRound((r) => r + 1);
-        else setOpen(false);
-      }
-      return res;
-    },
-    null,
-  );
-  const today = new Date().toISOString().slice(0, 10);
+  const [state, formAction, isPending] = useFormAction(addStockAction, (fd) => {
+    if (fd.get('then') === 'again') setRound((r) => r + 1);
+    else setOpen(false);
+  });
+  const today = todayIso();
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>

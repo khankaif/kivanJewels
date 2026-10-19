@@ -17,7 +17,7 @@ import {
 } from '@/features/masters/diamonds/components/spec-fields';
 import type { SieveShapes } from '@/lib/spec-rules';
 import { useLastUsed } from '@/lib/use-last-used';
-import { addDays } from '@/lib/dates';
+import { addDays, todayIso } from '@/lib/dates';
 import { ct, inr } from '@/lib/format';
 import { createSaleAction, stockForSpecAction, type ActionState } from '../actions';
 import type { SellableUnit } from '../queries';
@@ -57,7 +57,7 @@ export function NewSaleSheet({
   const [open, setOpen] = useState(defaultOpen);
   const [customer, setCustomer] = useLastUsed('sales.customer');
   const [lines, setLines] = useState<Line[]>([blankLine()]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
   const [raisedOn, setRaisedOn] = useState(today);
 
   const [deliverNow, setDeliverNow] = useState(false);

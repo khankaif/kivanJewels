@@ -18,4 +18,14 @@ export async function currentUser() {
   return session?.user ?? null;
 }
 
+/**
+ * The first line of every server action. An action is a URL, so a page that
+ * merely hides a button guards nothing.
+ */
+export async function requireUser() {
+  const user = await currentUser();
+  if (!user) throw new Error('Not authenticated');
+  return user;
+}
+
 setActorResolver(async () => (await currentUser())?.id ?? null);

@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useFormAction } from '@/lib/use-form-action';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,14 +17,7 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 
 export function AddStaffSheet() {
   const [open, setOpen] = useState(false);
-  const [state, formAction, isPending] = useActionState<StaffState, FormData>(
-    async (prev, fd) => {
-      const res = await addStaffAction(prev, fd);
-      if (res && 'ok' in res) setOpen(false);
-      return res;
-    },
-    null,
-  );
+  const [state, formAction, isPending] = useFormAction(addStaffAction, () => setOpen(false));
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -114,14 +108,7 @@ export function StaffRow({ member, isMe }: { member: Staff; isMe: boolean }) {
 
 function ResetPasswordSheet({ member }: { member: Staff }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, isPending] = useActionState<StaffState, FormData>(
-    async (prev, fd) => {
-      const res = await setStaffPasswordAction(prev, fd);
-      if (res && 'ok' in res) setOpen(false);
-      return res;
-    },
-    null,
-  );
+  const [state, formAction, isPending] = useFormAction(setStaffPasswordAction, () => setOpen(false));
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -163,14 +150,7 @@ export function ChangeMyPassword({
   action: (prev: StaffState, fd: FormData) => Promise<StaffState>;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
-  const [state, formAction, isPending] = useActionState<StaffState, FormData>(
-    async (prev, fd) => {
-      const res = await action(prev, fd);
-      if (res && 'ok' in res) formRef.current?.reset();
-      return res;
-    },
-    null,
-  );
+  const [state, formAction, isPending] = useFormAction(action, () => formRef.current?.reset());
 
   return (
     <form ref={formRef} action={formAction} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">

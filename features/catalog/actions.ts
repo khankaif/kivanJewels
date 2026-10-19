@@ -3,18 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { sql } from '@/db/client';
-import { auth } from '@/lib/auth/server';
+import { requireUser } from '@/lib/auth/server';
 import { slugify } from '@/lib/normalize';
+import { UUID } from './queries';
 import { IMAGE_KEY, IMAGE_TYPES, presignUpload, removeImages } from '@/lib/r2';
 
 export type CatalogState = { error: string } | { ok: string } | null;
-
-async function requireUser() {
-  const { data: session } = await auth.getSession();
-  if (!session?.user) throw new Error('Not authenticated');
-}
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Both the admin list and every storefront page read the catalog. */
 function refresh() {

@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { auth, currentUser } from '@/lib/auth/server';
+import { auth, requireUser } from '@/lib/auth/server';
 
 export type StaffState = { error: string } | { ok: string } | null;
 
@@ -14,18 +14,10 @@ const MIN_PASSWORD = 12;
  * is not guarded at all.
  */
 async function requireAdmin() {
-  const user = await currentUser();
-  if (!user) throw new Error('Not authenticated');
+  const user = await requireUser();
   if ((user as { role?: string }).role !== 'admin') {
     throw new Error('Only an admin can manage staff.');
   }
-  return user;
-}
-
-/** Changing your OWN password needs a session, not a role. */
-async function requireSelf() {
-  const user = await currentUser();
-  if (!user) throw new Error('Not authenticated');
   return user;
 }
 
@@ -84,7 +76,7 @@ export async function setStaffAccessAction(form: FormData): Promise<void> {
 }
 
 export async function changeMyPasswordAction(_prev: StaffState, form: FormData): Promise<StaffState> {
-  await requireSelf();
+  await requireUser();
   const currentPassword = String(form.get('currentPassword') ?? '');
   const newPassword = String(form.get('newPassword') ?? '');
   if (!currentPassword) return { error: 'Enter your current password.' };

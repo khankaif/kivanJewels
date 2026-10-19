@@ -10,6 +10,8 @@ export type CatalogItem = {
   published: boolean;
 };
 
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const num = (v: unknown) => (v === null ? null : Number(v));
 
 const map = (r: any): CatalogItem => ({

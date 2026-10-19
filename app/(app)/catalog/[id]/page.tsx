@@ -3,15 +3,13 @@ import { notFound } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { PageHeader } from '@/components/layout/page-header';
-import { getCatalogItem } from '@/features/catalog/queries';
+import { getCatalogItem, UUID } from '@/features/catalog/queries';
 import { ItemForm } from '@/features/catalog/components/item-form';
 import { DeletePiece } from '@/features/catalog/components/delete-piece';
 import { getDiamondPicklists } from '@/features/masters/diamonds/queries';
 import { imageBase } from '@/lib/r2';
 
 export const dynamic = 'force-dynamic';
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** `/catalog/new` creates; `/catalog/<id>` edits. */
 export default async function CatalogItemPage({ params }: PageProps<'/catalog/[id]'>) {

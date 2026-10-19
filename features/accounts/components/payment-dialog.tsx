@@ -1,14 +1,16 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useState } from 'react';
+import { useFormAction } from '@/lib/use-form-action';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
-import { recordPaymentAction, type PaymentState } from '../actions';
+import { recordPaymentAction } from '../actions';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { todayIso } from '@/lib/dates';
 
 export function PaymentDialog({
   partyId, partyName, direction, billNo, outstanding, label, size = 'default',
@@ -18,15 +20,8 @@ export function PaymentDialog({
   size?: 'default' | 'sm';
 }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, isPending] = useActionState<PaymentState, FormData>(
-    async (prev, fd) => {
-      const res = await recordPaymentAction(prev, fd);
-      if (res && 'ok' in res) setOpen(false);
-      return res;
-    },
-    null,
-  );
-  const today = new Date().toISOString().slice(0, 10);
+  const [state, formAction, isPending] = useFormAction(recordPaymentAction, () => setOpen(false));
+  const today = todayIso();
   const received = direction === 'in';
 
   return (

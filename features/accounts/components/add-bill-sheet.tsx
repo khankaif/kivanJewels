@@ -16,7 +16,7 @@ import {
 import type { SieveShapes } from '@/lib/spec-rules';
 import { useLastUsed } from '@/lib/use-last-used';
 import { inr } from '@/lib/format';
-import { addDays } from '@/lib/dates';
+import { addDays, todayIso } from '@/lib/dates';
 import { addBillAction, type BillState } from '../actions';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
@@ -47,7 +47,7 @@ export function AddBillSheet({
   const [direction, setDirection] = useState<Direction>('sale');
   const [goods, setGoods] = useState<Goods>('stock');
   const [party, setParty] = useLastUsed(`bill.party.${direction}`);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
   const [on, setOn] = useState(today);
   const [terms, setTerms] = useState(7);
   const [dueOn, setDueOn] = useState(() => addDays(today, 7));

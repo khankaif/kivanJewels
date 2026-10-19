@@ -24,7 +24,19 @@ export const FIELD_LABELS: Record<SpecField, string> = {
   certified: 'certification', lab: 'lab',
 };
 
-const REQUIRED: SpecField[] = ['stoneType', 'shape', 'certified'];
+/**
+ * Which master list backs each field. Sieve and MM are absent on purpose:
+ * 507 and 427 distinct values in the book -- those are measurements, and
+ * lot_unit_key() normalizes them on write. Each list key is also the column
+ * name the value is stored under.
+ */
+export const BUCKET_FOR: Partial<Record<SpecField, string>> = {
+  stoneType: 'stone_type', shape: 'shape', colour: 'colour',
+  clarity: 'clarity', lab: 'lab', certified: 'certified',
+};
+
+/** Always asked for. The rest depend on the shape or on certification. */
+export const REQUIRED: SpecField[] = ['stoneType', 'shape', 'certified'];
 
 /** True when this value of `certified` means the stone carries a certificate. */
 export const isCertified = (v: string | null | undefined) =>

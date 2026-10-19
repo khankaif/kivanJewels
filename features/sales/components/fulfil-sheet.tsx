@@ -15,6 +15,7 @@ import { CaratsRate } from '@/components/forms/carats-rate';
 import { deliverAction, sourceAction, type ActionState } from '../actions';
 import type { RequirementLine, SpecLot } from '../queries';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { addDays, todayIso } from '@/lib/dates';
 
 type Party = { id: string; name: string; defaultTermsDays: number };
 
@@ -45,8 +46,8 @@ export function FulfilSheet({
     null,
   );
 
-  const today = new Date().toISOString().slice(0, 10);
-  const due = new Date(new Date(today).getTime() + 7 * 864e5).toISOString().slice(0, 10);
+  const today = todayIso();
+  const due = addDays(today, 7);
   const lots = showAll ? [...stock.exact, ...stock.others] : stock.exact;
   const label = specLabel(line);
 

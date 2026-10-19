@@ -1,13 +1,15 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useState } from 'react';
+import { useFormAction } from '@/lib/use-form-action';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
-import { settleLineAction, type ActionState } from '../actions';
+import { settleLineAction } from '../actions';
+import { todayIso } from '@/lib/dates';
 
 export function SettleLineDialog({
   lineId, lotNo, outstanding, rate, action, direction,
@@ -16,17 +18,10 @@ export function SettleLineDialog({
   action: 'return' | 'bill'; direction: 'in' | 'out';
 }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, isPending] = useActionState<ActionState, FormData>(
-    async (prev, fd) => {
-      const res = await settleLineAction(prev, fd);
-      if (res && 'ok' in res) setOpen(false);
-      return res;
-    },
-    null,
-  );
+  const [state, formAction, isPending] = useFormAction(settleLineAction, () => setOpen(false));
   const isBill = action === 'bill';
   const inward = direction === 'in';
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
 
   const title = isBill
     ? inward ? 'Record supplier bill' : 'Create customer invoice'

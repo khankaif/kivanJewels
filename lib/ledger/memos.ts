@@ -8,6 +8,7 @@ import {
 } from './core';
 
 import { unitLot, addToUnit } from './stock';
+import { addDays } from '@/lib/dates';
 
 // ------------------------------------------------------------ memo lifecycle
 //
@@ -34,12 +35,6 @@ export type InwardLineInput = {
   shape?: string | null; sieveSize?: string | null; mmSize?: string | null;
   clarity?: string | null; colour?: string | null;
   lab?: string | null; certified?: string | null;
-};
-
-const addDays = (iso: string, days: number) => {
-  const d = new Date(`${iso}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
 };
 
 async function partyTerms(partyId: string, c: PoolClientLike): Promise<number> {

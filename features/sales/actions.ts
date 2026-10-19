@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { sql, withTx, type PoolClientLike } from '@/db/client';
-import { auth } from '@/lib/auth/server';
+import { requireUser } from '@/lib/auth/server';
 import {
   issueOutwardMemo, receiveInwardMemo, recordDirectSale, recordPurchase,
   SettlementError, OverdrawError,
@@ -12,11 +12,6 @@ import { allocate } from './allocate';
 import { docNoOr } from '@/lib/doc-numbers';
 
 export type ActionState = { error: string } | { ok: string } | null;
-
-async function requireUser() {
-  const { data: session } = await auth.getSession();
-  if (!session?.user) throw new Error('Not authenticated');
-}
 
 const PATHS = ['/', '/sales', '/stock', '/accounts/bills', '/accounts', '/parties'];
 const revalidate = () => PATHS.forEach((p) => revalidatePath(p));

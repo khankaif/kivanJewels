@@ -2,14 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { sql, withTx } from '@/db/client';
-import { auth } from '@/lib/auth/server';
+import { requireUser } from '@/lib/auth/server';
+import { BUCKET_FOR } from '@/lib/spec-rules';
 
 export type MasterState = { error: string } | { ok: string } | null;
-
-async function requireUser() {
-  const { data: session } = await auth.getSession();
-  if (!session?.user) throw new Error('Not authenticated');
-}
 
 /** Buckets are rows now, so the whitelist is a lookup, not a constant. */
 async function checkBucket(key: string): Promise<string> {
@@ -88,12 +84,6 @@ export async function setUsesSieveAction(form: FormData): Promise<void> {
   for (const p of ['/masters/diamonds', '/stock', '/sales', '/accounts/bills']) revalidatePath(p);
 }
 
-/** Which column each bucket writes to, and in which tables. */
-const COLUMN_FOR: Record<string, string> = {
-  stone_type: 'stone_type', shape: 'shape', colour: 'colour',
-  clarity: 'clarity', lab: 'lab', certified: 'certified',
-};
-
 /**
  * Rewrites every stored copy of a stray value to the master spelling.
  *
@@ -103,7 +93,8 @@ const COLUMN_FOR: Record<string, string> = {
  * averages, which is a decision, not a cleanup.
  */
 async function rewrite(bucket: string, from: string, to: string) {
-  const col = COLUMN_FOR[bucket];
+  // Interpolated into SQL below, so it must come from the fixed spec lists.
+  const col = Object.values(BUCKET_FOR).find((b) => b === bucket);
   if (!col) throw new Error(`bucket ${bucket} has no column`);
   await withTx(async (c) => {
     for (const table of ['lots', 'requirement_lines']) {

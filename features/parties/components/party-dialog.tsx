@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useState } from 'react';
+import { useFormAction } from '@/lib/use-form-action';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,20 +10,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
-import { savePartyAction, type PartyState } from '../actions';
+import { savePartyAction } from '../actions';
 import type { Party } from '../queries';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
 export function PartyDialog({ party, defaultOpen = false }: { party?: Party; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
-  const [state, formAction, isPending] = useActionState<PartyState, FormData>(
-    async (prev, fd) => {
-      const res = await savePartyAction(prev, fd);
-      if (res && 'ok' in res) setOpen(false);
-      return res;
-    },
-    null,
-  );
+  const [state, formAction, isPending] = useFormAction(savePartyAction, () => setOpen(false));
   const editing = !!party;
 
   return (

@@ -7,12 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "migrate": "tsx -r dotenv/config scripts/migrate.ts dotenv_config_path=.env.local",
-    "import": "tsx -r dotenv/config scripts/import.ts dotenv_config_path=.env.local",
-    "test": "tsx -r dotenv/config --import ./tests/use-test-db.ts --test tests/*.test.ts dotenv_config_path=.env.local",
+    "migrate": "tsx --env-file=.env.local scripts/migrate.ts",
+    "test": "tsx --env-file=.env.local --import ./tests/use-test-db.ts --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "test:pure": "tsx --test tests/dates.test.ts tests/normalize.test.ts tests/routes.test.ts tests/tabs.test.ts",
-    "grant-admin": "tsx -r dotenv/config scripts/grant-admin.ts dotenv_config_path=.env.local"
+    "grant-admin": "tsx --env-file=.env.local scripts/grant-admin.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -33,7 +32,6 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "shadcn": "^4.19.0",

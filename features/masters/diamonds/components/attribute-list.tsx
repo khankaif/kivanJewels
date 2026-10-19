@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useRef } from 'react';
+import { useRef } from 'react';
+import { useFormAction } from '@/lib/use-form-action';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { FieldError } from '@/components/ui/field';
@@ -15,14 +16,7 @@ import type { Bucket, DiamondAttribute } from '../queries';
 /** One picklist: its current values, a delete button per value, an add form. */
 export function AttributeList({ bucket, values }: { bucket: Bucket; values: DiamondAttribute[] }) {
   const formRef = useRef<HTMLFormElement>(null);
-  const [state, formAction, isPending] = useActionState<MasterState, FormData>(
-    async (prev, fd) => {
-      const res = await addDiamondAttributeAction(prev, fd);
-      if (res && 'ok' in res) formRef.current?.reset();
-      return res;
-    },
-    null,
-  );
+  const [state, formAction, isPending] = useFormAction(addDiamondAttributeAction, () => formRef.current?.reset());
 
   return (
     <div className="space-y-3 rounded-lg border p-4">
@@ -114,14 +108,7 @@ export function AttributeList({ bucket, values }: { bucket: Bucket; values: Diam
 /** Adds a whole new picklist. Values go in once the list exists. */
 export function AddBucket({ action }: { action: (p: MasterState, fd: FormData) => Promise<MasterState> }) {
   const formRef = useRef<HTMLFormElement>(null);
-  const [state, formAction, isPending] = useActionState<MasterState, FormData>(
-    async (prev, fd) => {
-      const res = await action(prev, fd);
-      if (res && 'ok' in res) formRef.current?.reset();
-      return res;
-    },
-    null,
-  );
+  const [state, formAction, isPending] = useFormAction(action, () => formRef.current?.reset());
   return (
     <div className="space-y-2">
       <form ref={formRef} action={formAction} className="flex gap-2">

@@ -2,15 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { sql } from '@/db/client';
-import { auth } from '@/lib/auth/server';
+import { requireUser } from '@/lib/auth/server';
 import { canonicalPartyName } from '@/lib/normalize';
 
 export type PartyState = { error: string } | { ok: string } | null;
-
-async function requireUser() {
-  const { data: session } = await auth.getSession();
-  if (!session?.user) throw new Error('Not authenticated');
-}
 
 const KINDS = new Set(['supplier', 'client', 'both']);
 

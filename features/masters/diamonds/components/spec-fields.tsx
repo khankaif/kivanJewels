@@ -6,7 +6,7 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';
 import {
-  hides, isCertified, SPEC_FIELDS, usesSieve, type SieveShapes, type SpecField,
+  BUCKET_FOR, hides, isCertified, REQUIRED, SPEC_FIELDS, usesSieve, type SieveShapes, type SpecField,
 } from '@/lib/spec-rules';
 
 export type Picklists = Record<string, string[]>;
@@ -22,11 +22,6 @@ export const blankSpec = (): SpecValue => ({
   sieveSize: '', mmSize: '', certified: '', lab: '',
 });
 
-/** Which master list backs each field. Sieve and MM are measurements, not lists. */
-const LIST_FOR: Partial<Record<SpecField, string>> = {
-  stoneType: 'stone_type', colour: 'colour', clarity: 'clarity',
-  shape: 'shape', certified: 'certified', lab: 'lab',
-};
 const LABEL: Record<SpecField, string> = {
   stoneType: 'Diamond type', colour: 'Colour', clarity: 'Clarity', shape: 'Shape',
   sieveSize: 'Sieve size', mmSize: 'MM', certified: 'Certified', lab: 'Lab',
@@ -34,9 +29,6 @@ const LABEL: Record<SpecField, string> = {
 const PLACEHOLDER: Partial<Record<SpecField, string>> = {
   sieveSize: '8.5-9', mmSize: '2.20',
 };
-
-/** Always asked for. The rest depend on the shape or on certification. */
-const REQUIRED_FIELDS: SpecField[] = ['stoneType', 'shape', 'certified'];
 
 /**
  * The fields that name a stone, in the order one is described: type, colour,
@@ -63,8 +55,6 @@ export function SpecFields({
 
   const set = (k: SpecField, v: string) => {
     const next = { ...spec, [k]: v };
-    // A shape change can retire a field; clear it so a stale sieve never
-    // reaches the server or the unit key.
     // A shape that is measured in mm has no sieve; clear it so a stale value
     // never reaches the server or the unit key.
     if (k === 'shape' && !usesSieve(sieveShapes, v)) next.sieveSize = '';
@@ -75,13 +65,13 @@ export function SpecFields({
   return (
     <div className={cn('grid grid-cols-2 gap-3', className)}>
       {SPEC_FIELDS.map((f, i) => {
-        const listKey = LIST_FOR[f];
+        const listKey = BUCKET_FOR[f];
         const options = listKey ? picklists[listKey] ?? [] : null;
         const hidden = hides(sieveShapes, spec, f);
         // A lab only exists once a stone is certified, so the field appears
         // with the answer rather than sitting there greyed out.
         if (hidden && f === 'lab') return null;
-        const required = REQUIRED_FIELDS.includes(f)
+        const required = REQUIRED.includes(f)
           || (f === 'lab' && isCertified(spec.certified))
           || (f === 'sieveSize' && !hidden)
           || (f === 'mmSize' && hides(sieveShapes, spec, 'sieveSize'));

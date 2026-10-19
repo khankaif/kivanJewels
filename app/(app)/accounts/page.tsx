@@ -10,11 +10,12 @@ import { PaymentDialog } from '@/features/accounts/components/payment-dialog';
 import { inr } from '@/lib/format';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
+import { todayIso } from '@/lib/dates';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AccountsPage() {
-  const asOf = new Date().toISOString().slice(0, 10);
+  const asOf = todayIso();
   const [aging, balances, totals, receivables, payables] = await Promise.all([
     getAging(asOf), getPartyBalances(), getAccountTotals(),
     getBills({ direction: 'sale', status: 'unpaid', limit: 5 }),
