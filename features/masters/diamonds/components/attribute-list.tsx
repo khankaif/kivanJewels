@@ -1,7 +1,12 @@
 'use client';
 
-import { useActionState, useRef } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { useRef } from 'react';
+import { useFormAction } from '@/lib/use-form-action';
 import { Button } from '@/components/ui/button';
+import { ConfirmAction } from '@/components/forms/confirm-action';
+import { ButtonGroup } from '@/components/ui/button-group';
+import { FieldError } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -13,17 +18,10 @@ import type { Bucket, DiamondAttribute } from '../queries';
 /** One picklist: its current values, a delete button per value, an add form. */
 export function AttributeList({ bucket, values }: { bucket: Bucket; values: DiamondAttribute[] }) {
   const formRef = useRef<HTMLFormElement>(null);
-  const [state, formAction, isPending] = useActionState<MasterState, FormData>(
-    async (prev, fd) => {
-      const res = await addDiamondAttributeAction(prev, fd);
-      if (res && 'ok' in res) formRef.current?.reset();
-      return res;
-    },
-    null,
-  );
+  const [state, formAction, isPending] = useFormAction(addDiamondAttributeAction, () => formRef.current?.reset());
 
   return (
-    <div className="space-y-3 rounded-lg border p-4">
+    <Card size="sm"><CardContent className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <h3 className="font-medium">
           {bucket.label}
@@ -34,12 +32,13 @@ export function AttributeList({ bucket, values }: { bucket: Bucket; values: Diam
           )}
         </h3>
         {!bucket.isPreset && (
-          <form action={removeBucketAction}>
-            <input type="hidden" name="key" value={bucket.key} />
-            <button type="submit" className="text-xs text-muted-foreground hover:text-destructive">
-              delete list
-            </button>
-          </form>
+          <ConfirmAction
+            action={removeBucketAction} fields={{ key: bucket.key }}
+            trigger={<Button variant="ghost" size="xs" className="text-muted-foreground hover:text-destructive">Delete list</Button>}
+            title={`Delete the ${bucket.label} list?`}
+            description={`Its ${values.length} value${values.length === 1 ? '' : 's'} stop being offered on new entries. Existing stock keeps what it already has.`}
+            confirm="Delete list"
+          />
         )}
       </div>
 
@@ -48,26 +47,32 @@ export function AttributeList({ bucket, values }: { bucket: Bucket; values: Diam
         <div className="space-y-1">
           {values.map((v) => (
             <div key={v.id} className="flex items-center gap-2 text-sm">
-              <form action={setUsesSieveAction} className="flex items-center gap-2">
+              {/* Both states are shown with the current one filled in. A single
+                  button labelled with the current state reads as a choice you
+                  have made, not one you are about to flip. */}
+              <form action={setUsesSieveAction}>
                 <input type="hidden" name="id" value={v.id} />
-                <input type="hidden" name="usesSieve" value={v.usesSieve ? '' : '1'} />
-                <button
-                  type="submit"
-                  className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted"
-                  title={v.usesSieve ? 'Sieved — click to measure in mm' : 'Measured in mm — click to sieve'}
-                >
-                  {v.usesSieve ? 'sieve' : 'mm'}
-                </button>
+                <ButtonGroup>
+                  {([['1', 'sieve', 'measured on a sieve'], ['', 'mm', 'measured in mm']] as const).map(([val, label, how]) => (
+                    <Button
+                      key={label} type="submit" name="usesSieve" value={val} size="xs"
+                      variant={v.usesSieve === !!val ? 'default' : 'outline'} aria-pressed={v.usesSieve === !!val}
+                      title={`${v.value} is ${how}`}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </ButtonGroup>
               </form>
               <span className="flex-1">{v.value}</span>
               <form action={removeDiamondAttributeAction}>
                 <input type="hidden" name="id" value={v.id} />
-                <button
-                  type="submit" aria-label={`Remove ${v.value}`}
-                  className="px-1 text-muted-foreground hover:text-destructive"
+                <Button
+                  type="submit" variant="ghost" size="icon-xs" aria-label={`Remove ${v.value}`}
+                  className="text-muted-foreground hover:text-destructive"
                 >
                   ×
-                </button>
+                </Button>
               </form>
             </div>
           ))}
@@ -80,12 +85,12 @@ export function AttributeList({ bucket, values }: { bucket: Bucket; values: Diam
               <input type="hidden" name="id" value={v.id} />
               <Badge variant="outline" className="gap-1.5 pr-1">
                 {v.value}
-                <button
-                  type="submit" aria-label={`Remove ${v.value}`}
-                  className="rounded-full px-1 text-muted-foreground hover:text-destructive"
+                <Button
+                  type="submit" variant="ghost" size="icon-xs" aria-label={`Remove ${v.value}`}
+                  className="rounded-full text-muted-foreground hover:text-destructive"
                 >
                   ×
-                </button>
+                </Button>
               </Badge>
             </form>
           ))}
@@ -98,29 +103,22 @@ export function AttributeList({ bucket, values }: { bucket: Bucket; values: Diam
         <Input name="value" placeholder={`Add a ${bucket.label.toLowerCase()}…`} className="max-w-48" required />
         <Button type="submit" size="sm" variant="outline" disabled={isPending}>Add</Button>
       </form>
-      {state && 'error' in state && <p role="alert" className="text-sm text-destructive">{state.error}</p>}
-    </div>
+      {state && 'error' in state && <FieldError>{state.error}</FieldError>}
+    </CardContent></Card>
   );
 }
 
 /** Adds a whole new picklist. Values go in once the list exists. */
 export function AddBucket({ action }: { action: (p: MasterState, fd: FormData) => Promise<MasterState> }) {
   const formRef = useRef<HTMLFormElement>(null);
-  const [state, formAction, isPending] = useActionState<MasterState, FormData>(
-    async (prev, fd) => {
-      const res = await action(prev, fd);
-      if (res && 'ok' in res) formRef.current?.reset();
-      return res;
-    },
-    null,
-  );
+  const [state, formAction, isPending] = useFormAction(action, () => formRef.current?.reset());
   return (
     <div className="space-y-2">
       <form ref={formRef} action={formAction} className="flex gap-2">
         <Input name="label" placeholder="New list — Cut, Growth type, Treatment…" className="max-w-72" required />
         <Button type="submit" size="sm" variant="outline" disabled={isPending}>Add list</Button>
       </form>
-      {state && 'error' in state && <p role="alert" className="text-sm text-destructive">{state.error}</p>}
+      {state && 'error' in state && <FieldError>{state.error}</FieldError>}
     </div>
   );
 }

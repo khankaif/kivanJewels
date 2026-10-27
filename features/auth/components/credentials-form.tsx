@@ -3,7 +3,7 @@
 import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import type { AuthState } from '../actions';
 
 /** Sign-in only. Accounts are issued by an admin in Settings → Staff. */
@@ -16,17 +16,17 @@ export function CredentialsForm({
 
   return (
     <form action={formAction} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
+      <Field>
+        <FieldLabel htmlFor="email">Email</FieldLabel>
         <Input id="email" name="email" type="email" required autoComplete="email" placeholder="you@example.com" />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="password">Password</FieldLabel>
         <Input id="password" name="password" type="password" required autoComplete="current-password" />
-      </div>
+      </Field>
 
       {state?.error && (
-        <p role="alert" className="text-sm text-destructive">{state.error}</p>
+        <FieldError>{state.error}</FieldError>
       )}
 
       <Button type="submit" className="w-full" disabled={isPending}>

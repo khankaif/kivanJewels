@@ -9,13 +9,13 @@ export type MemoLine = {
 
 export type Memo = {
   memoId: string; memoNo: string; direction: 'in' | 'out';
-  partyId: string; partyName: string; agent: string | null;
+  partyId: string; partyName: string; partyPhone: string | null; agent: string | null;
   issuedOn: string; dueOn: string | null; status: string; overdue: boolean;
   carats: number; value: number; outstanding: number; lines: MemoLine[];
 };
 
 export type MemoFilters = {
-  partyId?: string; q?: string;
+  partyId?: string; q?: string; memoId?: string;
   /** 'open' hides settled memos; 'overdue' keeps only the ones past their date. */
   status?: 'all' | 'open' | 'overdue';
 };
@@ -25,12 +25,15 @@ export async function getMemos(
   direction: 'in' | 'out', f: MemoFilters = {},
 ): Promise<Memo[]> {
   const partyId = f.partyId || null;
+  const memoId = f.memoId || null;
   const q = f.q ? `%${f.q}%` : null;
   const status = f.status ?? 'all';
   const rows = await sql`
-    SELECT * FROM memo_line_status
+    SELECT *, (SELECT phone FROM parties p WHERE p.id = memo_line_status.party_id) AS party_phone
+    FROM memo_line_status
     WHERE direction = ${direction}
       AND (${partyId}::uuid IS NULL OR party_id = ${partyId}::uuid)
+      AND (${memoId}::uuid IS NULL OR memo_id = ${memoId}::uuid)
       AND (${q}::text IS NULL
            OR memo_no ILIKE ${q} OR party_name ILIKE ${q} OR lot_no ILIKE ${q}
            OR sieve_size ILIKE ${q} OR mm_size ILIKE ${q} OR shape ILIKE ${q})
@@ -45,7 +48,7 @@ export async function getMemos(
     if (!memo) {
       memo = {
         memoId: r.memo_id, memoNo: r.memo_no, direction: r.direction,
-        partyId: r.party_id, partyName: r.party_name, agent: r.agent,
+        partyId: r.party_id, partyName: r.party_name, partyPhone: r.party_phone ?? null, agent: r.agent,
         issuedOn: r.issued_on, dueOn: r.due_on, status: r.memo_status,
         overdue: !!r.overdue, carats: 0, value: 0, outstanding: 0, lines: [],
       };
@@ -67,22 +70,12 @@ export async function getMemos(
   return [...byMemo.values()];
 }
 
-export async function getMemoSummary() {
-  const rows = await sql`
-    SELECT direction,
-           count(DISTINCT memo_id) FILTER (WHERE memo_status = 'open')::int AS open,
-           count(DISTINCT memo_id) FILTER (WHERE overdue)::int              AS overdue,
-           COALESCE(SUM(outstanding) FILTER (WHERE memo_status = 'open'),0) AS carats,
-           COALESCE(SUM(outstanding * rate) FILTER (WHERE memo_status = 'open'),0) AS value
-    FROM memo_line_status GROUP BY direction`;
-  const base = { open: 0, overdue: 0, carats: 0, value: 0 };
-  const out = { in: { ...base }, out: { ...base } };
-  for (const r of rows as any[]) {
-    out[r.direction as 'in' | 'out'] = {
-      open: r.open, overdue: r.overdue, carats: Number(r.carats), value: Number(r.value),
-    };
-  }
-  return out;
+/** One memo, whichever way it went. */
+export async function getMemo(memoId: string): Promise<Memo | null> {
+  const [out] = await getMemos('out', { memoId });
+  if (out) return out;
+  const [inward] = await getMemos('in', { memoId });
+  return inward ?? null;
 }
 
 /** Agents seen historically, for the "placed by" picker. */

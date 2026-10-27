@@ -1,21 +1,26 @@
 'use client';
 
+import { Card, CardContent } from '@/components/ui/card';
+import { DateField } from '@/components/forms/date-field';
+import { Choice } from '@/components/forms/choice';
+import { toast } from 'sonner';
 import { useActionState, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
-import { Segmented } from '@/components/ui/segmented';
-import { Amount } from '@/components/ui/carats-rate';
+import { Segmented } from '@/components/forms/segmented';
+import { Amount } from '@/components/forms/carats-rate';
 import {
   SpecFields, blankSpec, type Picklists, type SpecValue,
 } from '@/features/masters/diamonds/components/spec-fields';
 import type { SieveShapes } from '@/lib/spec-rules';
 import { useLastUsed } from '@/lib/use-last-used';
 import { inr } from '@/lib/format';
-import { addDays } from '@/lib/dates';
+import { addDays, todayIso } from '@/lib/dates';
 import { addBillAction, type BillState } from '../actions';
 
 type Party = { id: string; name: string; defaultTermsDays: number };
@@ -45,7 +50,7 @@ export function AddBillSheet({
   const [direction, setDirection] = useState<Direction>('sale');
   const [goods, setGoods] = useState<Goods>('stock');
   const [party, setParty] = useLastUsed(`bill.party.${direction}`);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
   const [on, setOn] = useState(today);
   const [terms, setTerms] = useState(7);
   const [dueOn, setDueOn] = useState(() => addDays(today, 7));
@@ -63,6 +68,7 @@ export function AddBillSheet({
       }))));
       const res = await addBillAction(prev, fd);
       if (res && 'ok' in res) {
+        toast.success(res.ok);
         setOpen(false);
         setLines([blankLine()]);
       }
@@ -117,49 +123,48 @@ export function AddBillSheet({
             ]}
           />
 
-          <Field label={direction === 'sale' ? 'Customer' : 'Supplier'} htmlFor="ab-party">
-            <select
-              id="ab-party" name="partyId" required autoFocus
-              className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+          <Field>
+            <FieldLabel htmlFor="ab-party">{direction === 'sale' ? 'Customer' : 'Supplier'}</FieldLabel>
+            <Choice
+              id="ab-party" name="partyId" required searchable placeholder="Search parties…"
               value={party}
-              onChange={(e) => {
-                setParty(e.target.value);
-                const p = parties.find((x) => x.id === e.target.value);
+              onValueChange={(v) => {
+                setParty(v);
+                const p = parties.find((x) => x.id === v);
                 if (p) applyTerms(p.defaultTermsDays);
               }}
-            >
-              <option value="">Select…</option>
-              {parties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+              options={parties.map((p) => ({ value: p.id, label: p.name }))}
+            />
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label={direction === 'sale' ? 'Invoice no.' : "Supplier's bill no."} htmlFor="ab-billNo">
+            <Field>
+              <FieldLabel htmlFor="ab-billNo">{direction === 'sale' ? 'Invoice no.' : "Supplier's bill no."}</FieldLabel>
               <Input
                 id="ab-billNo" name="billNo" required={direction === 'purchase'}
                 placeholder={direction === 'sale' ? 'Blank = we number it' : 'As printed on their bill'}
               />
             </Field>
-            <Field label="Bill date" htmlFor="ab-on">
-              <Input
-                id="ab-on" name="on" type="date" required
-                value={on} onChange={(e) => { setOn(e.target.value); setDueOn(addDays(e.target.value, terms)); }}
+            <Field>
+              <FieldLabel htmlFor="ab-on">Bill date</FieldLabel>
+              <DateField
+                id="ab-on" name="on" required
+                value={on} onChange={(v) => { setOn(v); setDueOn(addDays(v, terms)); }}
               />
             </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Terms (days)" htmlFor="ab-terms">
+            <Field>
+              <FieldLabel htmlFor="ab-terms">Terms (days)</FieldLabel>
               <Input
                 id="ab-terms" type="number" min="0" max="365"
                 value={terms} onChange={(e) => applyTerms(Number(e.target.value))}
               />
             </Field>
-            <Field label="Payment due" htmlFor="ab-dueOn">
-              <Input
-                id="ab-dueOn" name="dueOn" type="date"
-                value={dueOn} onChange={(e) => setDueOn(e.target.value)}
-              />
+            <Field>
+              <FieldLabel htmlFor="ab-dueOn">Payment due</FieldLabel>
+              <DateField id="ab-dueOn" name="dueOn" value={dueOn} onChange={setDueOn} />
             </Field>
           </div>
 
@@ -177,32 +182,25 @@ export function AddBillSheet({
             </div>
 
             {lines.map((l, i) => (
-              <div key={i} className="space-y-3 rounded-lg border p-3">
+              <Card key={i} size="sm"><CardContent className="space-y-3">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Line {i + 1}</span>
                   {lines.length > 1 && (
-                    <button
-                      type="button" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}
+                    <Button
+                      type="button" variant="ghost" size="xs" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}
                       className="hover:text-destructive"
                     >
                       Remove
-                    </button>
+                    </Button>
                   )}
                 </div>
 
                 {withGoods && direction === 'sale' && (
-                  <select
-                    value={l.lotId} onChange={(e) => set(i, { lotId: e.target.value })}
-                    required
-                    className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-                  >
-                    <option value="">Select stock…</option>
-                    {units.map((u) => (
-                      <option key={u.lotId} value={u.lotId}>
-                        {u.label} — {u.balance.toFixed(2)} ct
-                      </option>
-                    ))}
-                  </select>
+                  <Choice
+                    value={l.lotId} onValueChange={(v) => set(i, { lotId: v })}
+                    required searchable placeholder="Search stock…"
+                    options={units.map((u) => ({ value: u.lotId, label: `${u.label} — ${u.balance.toFixed(2)} ct` }))}
+                  />
                 )}
 
                 {withGoods && direction === 'purchase' && (
@@ -214,13 +212,15 @@ export function AddBillSheet({
 
                 {withGoods ? (
                   <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-3">
-                    <Field label="Carats" htmlFor={`ab-${i}-carats`}>
+                    <Field>
+                      <FieldLabel htmlFor={`ab-${i}-carats`}>Carats</FieldLabel>
                       <Input
                         id={`ab-${i}-carats`} type="number" step="0.001" min="0.001" required
                         value={l.carats} onChange={(e) => set(i, { carats: e.target.value })}
                       />
                     </Field>
-                    <Field label="Rate (₹/ct)" htmlFor={`ab-${i}-rate`}>
+                    <Field>
+                      <FieldLabel htmlFor={`ab-${i}-rate`}>Rate (₹/ct)</FieldLabel>
                       <Input
                         id={`ab-${i}-rate`} type="number" step="0.01" min="0" required
                         value={l.rate} onChange={(e) => set(i, { rate: e.target.value })}
@@ -232,13 +232,15 @@ export function AddBillSheet({
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
-                    <Field label="Amount (₹)" htmlFor={`ab-${i}-amount`}>
+                    <Field>
+                      <FieldLabel htmlFor={`ab-${i}-amount`}>Amount (₹)</FieldLabel>
                       <Input
                         id={`ab-${i}-amount`} type="number" step="0.01" min="0.01" required
                         value={l.amount} onChange={(e) => set(i, { amount: e.target.value })}
                       />
                     </Field>
-                    <Field label="What for" htmlFor={`ab-${i}-notes`}>
+                    <Field>
+                      <FieldLabel htmlFor={`ab-${i}-notes`}>What for</FieldLabel>
                       <Input
                         id={`ab-${i}-notes`} placeholder="Freight, brokerage…"
                         value={l.notes} onChange={(e) => set(i, { notes: e.target.value })}
@@ -246,21 +248,23 @@ export function AddBillSheet({
                     </Field>
                   </div>
                 )}
-              </div>
+              </CardContent></Card>
             ))}
           </div>
 
-          <div className="flex items-center justify-between border-t pt-3 text-sm">
+          <Separator />
+          <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Bill total</span>
             <span className="text-base font-bold tabular-nums">{inr(total)}</span>
           </div>
 
-          <Field label="Note" htmlFor="ab-notes">
+          <Field>
+            <FieldLabel htmlFor="ab-notes">Note</FieldLabel>
             <Input id="ab-notes" name="notes" placeholder="Optional" />
           </Field>
 
           {state && 'error' in state && (
-            <p role="alert" className="text-sm text-destructive">{state.error}</p>
+            <FieldError>{state.error}</FieldError>
           )}
 
           <SheetFooter>
@@ -274,11 +278,3 @@ export function AddBillSheet({
   );
 }
 
-function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-    </div>
-  );
-}

@@ -7,13 +7,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getAging, getPartyBalances, getAccountTotals } from '@/features/accounts/queries';
 import { getBills } from '@/features/accounts/money';
 import { PaymentDialog } from '@/features/accounts/components/payment-dialog';
-import { inr } from '@/lib/format';
+import { WhatsAppButton } from '@/components/forms/whatsapp-button';
+import { inr, day, money } from '@/lib/format';
 import { PageHeader } from '@/components/layout/page-header';
+import { StatStrip } from '@/components/layout/stat';
+import { AccountsNav } from '@/features/accounts/components/accounts-nav';
+import { todayIso } from '@/lib/dates';
+import { CashMovementCard, parseRange } from '@/features/dashboard/components/cash-movement-card';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AccountsPage() {
-  const asOf = new Date().toISOString().slice(0, 10);
+export default async function AccountsPage({ searchParams }: PageProps<'/accounts'>) {
+  const range = parseRange((await searchParams).range);
+  const asOf = todayIso();
   const [aging, balances, totals, receivables, payables] = await Promise.all([
     getAging(asOf), getPartyBalances(), getAccountTotals(),
     getBills({ direction: 'sale', status: 'unpaid', limit: 5 }),
@@ -21,48 +27,29 @@ export default async function AccountsPage() {
   ]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
-        eyebrow="Cash control"
-        title="Accounts desk"
-        description={`See who needs chasing and who needs paying. Aging is calculated as of ${asOf}.`}
-        actions={<Link href="/accounts/bills?status=unpaid" className="inline-flex h-8 items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/85">Open unpaid bills</Link>}
+        title="Accounts"
+        tabs={<AccountsNav />}
       />
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Card className="shadow-xs">
-          <CardContent className="pt-4">
-            <div className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">To collect</div>
-            <div className="mt-1 text-2xl font-semibold tabular-nums text-positive">
-              {inr(totals.receivable)}
-            </div>
-            <Link href="/accounts/bills?direction=sale&status=unpaid"
-                  className="text-xs text-muted-foreground underline underline-offset-4">
-              see unpaid sale bills
-            </Link>
-          </CardContent>
-        </Card>
-        <Card className="shadow-xs">
-          <CardContent className="pt-4">
-            <div className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">To pay</div>
-            <div className="mt-1 text-2xl font-semibold tabular-nums text-warning">
-              {inr(totals.payable)}
-            </div>
-            <Link href="/accounts/bills?direction=purchase&status=unpaid"
-                  className="text-xs text-muted-foreground underline underline-offset-4">
-              see unpaid purchase bills
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+      <StatStrip items={[
+        {
+          label: 'To collect', value: money(totals.receivable), title: inr(totals.receivable),
+          sub: <Link href="/accounts/bills?direction=sale&status=unpaid" className="hover:text-foreground hover:underline">Unpaid sale bills</Link>,
+        },
+        {
+          label: 'To pay', value: money(totals.payable), title: inr(totals.payable),
+          sub: <Link href="/accounts/bills?direction=purchase&status=unpaid" className="hover:text-foreground hover:underline">Unpaid purchase bills</Link>,
+        },
+      ]} />
+
+      <CashMovementCard range={range} basePath="/accounts" />
 
       <section>
-        <div className="mb-3 flex items-end justify-between gap-3">
-          <div>
-            <h2 className="font-semibold">Cash workbench</h2>
-            <p className="text-xs text-muted-foreground">The next collections and supplier payments to resolve.</p>
-          </div>
-          <Link href="/accounts/bills?status=unpaid" className="text-xs font-medium text-primary hover:underline">View every unpaid bill</Link>
+        <div className="mb-2.5 flex items-end justify-between gap-3">
+          <h2 className="text-sm font-medium">Next to settle</h2>
+          <Link href="/accounts/bills?status=unpaid" className="text-sm text-muted-foreground hover:text-foreground hover:underline">All unpaid bills</Link>
         </div>
         <div className="grid gap-3 lg:grid-cols-2">
           <BillQueue title="Collect from clients" empty="Nothing to collect." rows={receivables.rows} />
@@ -80,7 +67,7 @@ export default async function AccountsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Aging</CardTitle>
-              <CardDescription>Sale invoices bucketed by age. {aging.length} parties.</CardDescription>
+              <CardDescription>Sale invoices by age, as of {day(asOf)}. {aging.length} parties.</CardDescription>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <Table>
@@ -98,17 +85,20 @@ export default async function AccountsPage() {
                   {aging.map((a) => (
                     <TableRow key={a.partyId}>
                       <TableCell className="font-medium">
-                        <Link href={`/parties/${a.partyId}`} className="underline underline-offset-4">
+                        <Link href={`/parties/${a.partyId}`} className="font-medium hover:underline">
                           {a.partyName}
                         </Link>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{inr(a.d0_30)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{inr(a.d31_60)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{inr(a.d61_90)}</TableCell>
-                      <TableCell className="text-right tabular-nums font-semibold text-negative">
-                        {inr(a.d90_plus)}
+                      {/* An empty bucket is a dash, not ₹0.00: the eye should land on the money. */}
+                      {[a.d0_30, a.d31_60, a.d61_90].map((v, i) => (
+                        <TableCell key={i} className="text-right tabular-nums">
+                          {v > 0.005 ? inr(v) : <span className="text-muted-foreground/50">—</span>}
+                        </TableCell>
+                      ))}
+                      <TableCell className={`text-right tabular-nums ${a.d90_plus > 0.005 ? 'font-medium text-negative' : ''}`}>
+                        {a.d90_plus > 0.005 ? inr(a.d90_plus) : <span className="text-muted-foreground/50">—</span>}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums font-bold">{inr(a.total)}</TableCell>
+                      <TableCell className="text-right tabular-nums font-semibold">{inr(a.total)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -137,17 +127,13 @@ export default async function AccountsPage() {
                   {balances.map((b) => (
                     <TableRow key={b.partyId}>
                       <TableCell className="font-medium">
-                        <Link href={`/parties/${b.partyId}`} className="underline underline-offset-4">
+                        <Link href={`/parties/${b.partyId}`} className="font-medium hover:underline">
                           {b.partyName}
                         </Link>
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{inr(b.receivable)}</TableCell>
                       <TableCell className="text-right tabular-nums">{inr(b.payable)}</TableCell>
-                      <TableCell
-                        className={`text-right tabular-nums font-bold ${
-                          b.net < 0 ? 'text-warning' : 'text-positive'
-                        }`}
-                      >
+                      <TableCell className="text-right tabular-nums font-semibold">
                         {inr(b.net)}
                       </TableCell>
                     </TableRow>
@@ -167,25 +153,34 @@ function BillQueue({ title, empty, rows }: {
   rows: Awaited<ReturnType<typeof getBills>>['rows'];
 }) {
   return (
-    <Card className="shadow-xs">
-      <CardHeader className="border-b bg-muted/20">
+    <Card>
+      <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
-      <CardContent className="divide-y pt-1">
+      <CardContent className="divide-y">
         {rows.map((bill) => (
           <div key={`${bill.direction}-${bill.billKey}`} className="flex items-center justify-between gap-3 py-3">
             <div className="min-w-0">
               <Link href={`/parties/${bill.partyId}`} className="block truncate text-sm font-medium hover:underline">{bill.partyName}</Link>
               <div className="text-xs text-muted-foreground">
-                {bill.billNo ?? 'Unnumbered'} · {bill.status === 'overdue' ? `${bill.daysOverdue}d overdue` : `due ${bill.dueOn ?? '—'}`}
+                {bill.billNo ?? 'Unnumbered'} ·{' '}
+                {bill.status === 'overdue'
+                  ? <span className="text-negative">{bill.daysOverdue} days overdue</span>
+                  : `due ${day(bill.dueOn)}`}
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <span className={bill.status === 'overdue' ? 'font-semibold tabular-nums text-negative' : 'font-semibold tabular-nums'}>{inr(bill.balance)}</span>
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="mr-1 font-medium tabular-nums">{inr(bill.balance)}</span>
+              {bill.direction === 'sale' && (
+                <WhatsAppButton
+                  size="xs" label="" phone={bill.partyPhone}
+                  text={`Hi ${bill.partyName}, a reminder that ${bill.billNo ? `bill ${bill.billNo}` : 'our bill'} of ${day(bill.billedOn)} for ${inr(bill.balance)} was due on ${day(bill.dueOn)}. Thank you.`}
+                />
+              )}
               <PaymentDialog
                 partyId={bill.partyId} partyName={bill.partyName}
                 direction={bill.direction === 'sale' ? 'in' : 'out'} billNo={bill.billNo}
-                outstanding={bill.balance} size="sm"
+                outstanding={bill.balance} size="sm" variant="outline"
                 label={bill.direction === 'sale' ? 'Receive' : 'Pay'}
               />
             </div>

@@ -1,36 +1,35 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { DateField } from '@/components/forms/date-field';
+import { Choice } from '@/components/forms/choice';
+import { useState } from 'react';
+import { useFormAction } from '@/lib/use-form-action';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
-import { recordPaymentAction, type PaymentState } from '../actions';
+import { recordPaymentAction } from '../actions';
+import { todayIso } from '@/lib/dates';
 
 export function PaymentDialog({
-  partyId, partyName, direction, billNo, outstanding, label, size = 'default',
+  partyId, partyName, direction, billNo, outstanding, label, size = 'default', variant,
 }: {
   partyId: string; partyName: string; direction: 'in' | 'out';
   billNo?: string | null; outstanding?: number; label?: string;
   size?: 'default' | 'sm';
+  /** Lists pass 'outline': a column of filled buttons is noise, not emphasis. */
+  variant?: 'default' | 'outline';
 }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, isPending] = useActionState<PaymentState, FormData>(
-    async (prev, fd) => {
-      const res = await recordPaymentAction(prev, fd);
-      if (res && 'ok' in res) setOpen(false);
-      return res;
-    },
-    null,
-  );
-  const today = new Date().toISOString().slice(0, 10);
+  const [state, formAction, isPending] = useFormAction(recordPaymentAction, () => setOpen(false));
+  const today = todayIso();
   const received = direction === 'in';
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger render={<Button size={size} variant={received ? 'default' : 'outline'} />}>
+      <SheetTrigger render={<Button size={size} variant={variant ?? (received ? 'default' : 'outline')} />}>
         {label ?? (received ? 'Record receipt' : 'Record payment')}
       </SheetTrigger>
       <SheetContent side="right" className="sm:max-w-md">
@@ -52,47 +51,41 @@ export function PaymentDialog({
           {billNo && <input type="hidden" name="billNo" value={billNo} />}
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor={`amt-${partyId}-${direction}`}>Amount (₹)</Label>
+            <Field>
+              <FieldLabel htmlFor={`amt-${partyId}-${direction}`}>Amount (₹)</FieldLabel>
               <Input
                 id={`amt-${partyId}-${direction}`} name="amount" type="number" step="0.01"
                 min="0.01" required defaultValue={outstanding ? outstanding.toFixed(2) : ''}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor={`on-${partyId}-${direction}`}>Date</Label>
-              <Input
-                id={`on-${partyId}-${direction}`} name="on" type="date"
-                defaultValue={today} required
-              />
-            </div>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`on-${partyId}-${direction}`}>Date</FieldLabel>
+              <DateField id={`on-${partyId}-${direction}`} name="on" defaultValue={today} required />
+            </Field>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor={`mode-${partyId}-${direction}`}>Mode</Label>
-            <select
+          <Field>
+            <FieldLabel htmlFor={`mode-${partyId}-${direction}`}>Mode</FieldLabel>
+            <Choice
               id={`mode-${partyId}-${direction}`} name="mode" defaultValue="bank"
-              className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-            >
-              <option value="bank">Bank transfer</option>
-              <option value="cash">Cash</option>
-              <option value="upi">UPI</option>
-              <option value="cheque">Cheque</option>
-              <option value="adjustment">Adjustment / set-off</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
+              options={[
+                { value: 'bank', label: 'Bank transfer' }, { value: 'cash', label: 'Cash' },
+                { value: 'upi', label: 'UPI' }, { value: 'cheque', label: 'Cheque' },
+                { value: 'adjustment', label: 'Adjustment / set-off' }, { value: 'other', label: 'Other' },
+              ]}
+            />
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor={`note-${partyId}-${direction}`}>Reference / note</Label>
+          <Field>
+            <FieldLabel htmlFor={`note-${partyId}-${direction}`}>Reference / note</FieldLabel>
             <Input
               id={`note-${partyId}-${direction}`} name="notes"
               placeholder="UTR, cheque no., or what it settles"
             />
-          </div>
+          </Field>
 
           {state && 'error' in state && (
-            <p role="alert" className="text-sm text-destructive">{state.error}</p>
+            <FieldError>{state.error}</FieldError>
           )}
 
           <SheetFooter>

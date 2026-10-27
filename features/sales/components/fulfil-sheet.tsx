@@ -1,39 +1,26 @@
 'use client';
 
+import { AgentField } from '@/components/forms/agent-field';
+import { DateField } from '@/components/forms/date-field';
+import { Choice } from '@/components/forms/choice';
+import { toast } from 'sonner';
 import { useActionState, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Segmented } from '@/components/forms/segmented';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
-import { cn } from '@/lib/utils';
 import { specLabel } from '@/lib/format';
-import { CaratsRate } from '@/components/ui/carats-rate';
+import { CaratsRate } from '@/components/forms/carats-rate';
 import { deliverAction, sourceAction, type ActionState } from '../actions';
 import type { RequirementLine, SpecLot } from '../queries';
+import { addDays, todayIso } from '@/lib/dates';
 
 type Party = { id: string; name: string; defaultTermsDays: number };
-
-function Toggle<T extends string>({ value, set, options }: {
-  value: T; set: (v: T) => void; options: [T, string][];
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
-      {options.map(([v, label]) => (
-        <button
-          key={v} type="button" onClick={() => set(v)}
-          className={cn(
-            'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-            value === v ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 export function FulfilSheet({
   line, stock, suppliers, agents, defaultOpen = false,
@@ -56,14 +43,17 @@ export function FulfilSheet({
       fd.set('lineId', line.lineId);
       fd.set('channel', channel);
       const res = await run(prev, fd);
-      if (res && 'ok' in res) setOpen(false);
+      if (res && 'ok' in res) {
+        toast.success(res.ok);
+        setOpen(false);
+      }
       return res;
     },
     null,
   );
 
-  const today = new Date().toISOString().slice(0, 10);
-  const due = new Date(new Date(today).getTime() + 7 * 864e5).toISOString().slice(0, 10);
+  const today = todayIso();
+  const due = addDays(today, 7);
   const lots = showAll ? [...stock.exact, ...stock.others] : stock.exact;
   const label = specLabel(line);
 
@@ -79,7 +69,7 @@ export function FulfilSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <Toggle
+        <Segmented
           value={mode} set={setMode}
           options={[['deliver', 'Use available stock'], ['source', 'Source from supplier']]}
         />
@@ -87,51 +77,43 @@ export function FulfilSheet({
         <form action={formAction} className="flex flex-1 flex-col gap-4">
           {mode === 'deliver' ? (
             <>
-              <div className="space-y-2">
-                <Label htmlFor="ff-lot">Lot</Label>
-                <select
-                  id="ff-lot" name="lotId" required
-                  className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-                >
-                  <option value="">Select…</option>
-                  {lots.map((l) => (
-                    <option key={l.lotId} value={l.lotId}>
-                      {l.lotNo} — {l.balance.toFixed(3)} ct{l.onMemo ? ' (on memo)' : ''}
-                      {l.partyName ? ` · ${l.partyName}` : ''}
-                    </option>
-                  ))}
-                </select>
+              <Field>
+                <FieldLabel htmlFor="ff-lot">Lot</FieldLabel>
+                <Choice
+                  id="ff-lot" name="lotId" required searchable placeholder="Search lots…"
+                  options={lots.map((l) => ({
+                    value: l.lotId,
+                    label: `${l.lotNo} — ${l.balance.toFixed(3)} ct${l.onMemo ? ' (on memo)' : ''}${l.partyName ? ` · ${l.partyName}` : ''}`,
+                  }))}
+                />
                 {stock.others.length > 0 && (
-                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} className="size-3.5" />
+                  <Label className="text-xs text-muted-foreground">
+                    <Checkbox checked={showAll} onCheckedChange={setShowAll} />
                     Allow a substitution from another specification
-                  </label>
+                  </Label>
                 )}
-              </div>
+              </Field>
 
-              <Toggle
+              <Segmented
                 value={channel} set={setChannel}
                 options={[['memo', 'Send on approval'], ['bill', 'Firm sale / invoice']]}
               />
             </>
           ) : (
             <>
-              <div className="space-y-2">
-                <Label htmlFor="ff-supplier">Supplier</Label>
-                <select
-                  id="ff-supplier" name="supplierId" required
-                  className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-                  onChange={(e) => {
-                    const p = suppliers.find((s) => s.id === e.target.value);
+              <Field>
+                <FieldLabel htmlFor="ff-supplier">Supplier</FieldLabel>
+                <Choice
+                  id="ff-supplier" name="supplierId" required searchable placeholder="Search suppliers…"
+                  onValueChange={(v) => {
+                    const p = suppliers.find((s) => s.id === v);
                     if (p) setTerms(p.defaultTermsDays);
                   }}
-                >
-                  <option value="">Select…</option>
-                  {suppliers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
+                  options={suppliers.map((p) => ({ value: p.id, label: p.name }))}
+                />
+              </Field>
 
-              <Toggle
+              <Segmented
                 value={channel} set={setChannel}
                 options={[['memo', 'Supplier approval'], ['bill', 'Purchase bill']]}
               />
@@ -145,49 +127,48 @@ export function FulfilSheet({
             rateLabel={mode === 'deliver' ? 'Rate (₹/ct)' : 'Cost (₹/ct)'}
           />
 
-          <div className="space-y-2">
-            <Label htmlFor="ff-on">Date</Label>
-            <Input id="ff-on" name="on" type="date" defaultValue={today} required />
-          </div>
+          <Field>
+            <FieldLabel htmlFor="ff-on">Date</FieldLabel>
+            <DateField id="ff-on" name="on" defaultValue={today} required />
+          </Field>
 
           {channel === 'memo' ? (
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="ff-memoNo">Memo no.</Label>
+              <Field>
+                <FieldLabel htmlFor="ff-memoNo">Memo no.</FieldLabel>
                 <Input id="ff-memoNo" name="memoNo" placeholder="Blank = we number it" />
-              </div>
+              </Field>
               {mode === 'deliver' ? (
-                <div className="space-y-2">
-                  <Label htmlFor="ff-due">Due back</Label>
-                  <Input id="ff-due" name="dueOn" type="date" defaultValue={due} />
-                </div>
+                <Field>
+                  <FieldLabel htmlFor="ff-due">Due back</FieldLabel>
+                  <DateField id="ff-due" name="dueOn" defaultValue={due} />
+                </Field>
               ) : (
-                <div className="space-y-2">
-                  <Label htmlFor="ff-terms">Terms (days)</Label>
+                <Field>
+                  <FieldLabel htmlFor="ff-terms">Terms (days)</FieldLabel>
                   <Input id="ff-terms" name="termsDays" type="number" min="0" max="365"
                          value={terms} onChange={(e) => setTerms(Number(e.target.value))} />
-                </div>
+                </Field>
               )}
               {mode === 'deliver' && (
-                <div className="col-span-2 space-y-2">
-                  <Label htmlFor="ff-agent">Placed by</Label>
-                  <Input id="ff-agent" name="agent" list="ff-agents" placeholder="Rushabh" />
-                  <datalist id="ff-agents">{agents.map((a) => <option key={a} value={a} />)}</datalist>
-                </div>
+                <Field className="col-span-2">
+                  <FieldLabel htmlFor="ff-agent">Placed by</FieldLabel>
+                  <AgentField id="ff-agent" agents={agents} />
+                </Field>
               )}
             </div>
           ) : (
-            <div className="space-y-2">
-              <Label htmlFor="ff-doc">{mode === 'deliver' ? 'Invoice no.' : 'Bill no.'}</Label>
+            <Field>
+              <FieldLabel htmlFor="ff-doc">{mode === 'deliver' ? 'Invoice no.' : 'Bill no.'}</FieldLabel>
               <Input
                 id="ff-doc" name={mode === 'deliver' ? 'invoiceNo' : 'billNo'}
                 placeholder={mode === 'deliver' ? 'Blank = we number it' : 'Blank = cash'}
               />
-            </div>
+            </Field>
           )}
 
           {state && 'error' in state && (
-            <p role="alert" className="text-sm text-destructive">{state.error}</p>
+            <FieldError>{state.error}</FieldError>
           )}
 
           <SheetFooter>

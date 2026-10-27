@@ -1,13 +1,16 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { DateField } from '@/components/forms/date-field';
+import { useState } from 'react';
+import { useFormAction } from '@/lib/use-form-action';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
-import { settleLineAction, type ActionState } from '../actions';
+import { settleLineAction } from '../actions';
+import { todayIso } from '@/lib/dates';
 
 export function SettleLineDialog({
   lineId, lotNo, outstanding, rate, action, direction,
@@ -16,17 +19,10 @@ export function SettleLineDialog({
   action: 'return' | 'bill'; direction: 'in' | 'out';
 }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, isPending] = useActionState<ActionState, FormData>(
-    async (prev, fd) => {
-      const res = await settleLineAction(prev, fd);
-      if (res && 'ok' in res) setOpen(false);
-      return res;
-    },
-    null,
-  );
+  const [state, formAction, isPending] = useFormAction(settleLineAction, () => setOpen(false));
   const isBill = action === 'bill';
   const inward = direction === 'in';
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
 
   const title = isBill
     ? inward ? 'Record supplier bill' : 'Create customer invoice'
@@ -59,45 +55,45 @@ export function SettleLineDialog({
           <input type="hidden" name="direction" value={direction} />
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor={`c-${lineId}-${action}`}>Carats</Label>
+            <Field>
+              <FieldLabel htmlFor={`c-${lineId}-${action}`}>Carats</FieldLabel>
               <Input
                 id={`c-${lineId}-${action}`} name="carats" type="number" step="0.001"
                 min="0.001" max={outstanding} defaultValue={outstanding.toFixed(3)} required
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor={`d-${lineId}-${action}`}>Date</Label>
-              <Input id={`d-${lineId}-${action}`} name="on" type="date" defaultValue={today} required />
-            </div>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`d-${lineId}-${action}`}>Date</FieldLabel>
+              <DateField id={`d-${lineId}-${action}`} name="on" defaultValue={today} required />
+            </Field>
           </div>
 
           {isBill && (
-            <div className="space-y-2">
-              <Label htmlFor={`i-${lineId}`}>{inward ? 'Supplier bill no.' : 'Customer invoice no.'}</Label>
+            <Field>
+              <FieldLabel htmlFor={`i-${lineId}`}>{inward ? 'Supplier bill no.' : 'Customer invoice no.'}</FieldLabel>
               <Input
                 id={`i-${lineId}`} name="invoiceNo" required={inward}
                 placeholder={inward ? "As printed on their bill" : 'Blank = we number it'}
               />
-            </div>
+            </Field>
           )}
 
           {isBill && (
-            <div className="space-y-2">
-              <Label htmlFor={`r-${lineId}`}>Rate (₹/ct)</Label>
+            <Field>
+              <FieldLabel htmlFor={`r-${lineId}`}>Rate (₹/ct)</FieldLabel>
               <Input
                 id={`r-${lineId}`} name="rate" type="number" step="0.01" min="0"
                 defaultValue={rate}
               />
-              <p className="text-xs text-muted-foreground">
+              <FieldDescription>
                 Memo rate was ₹{rate.toLocaleString('en-IN')}/ct. Override if the
                 {inward ? ' supplier invoiced' : ' client is billed'} at a different rate.
-              </p>
-            </div>
+              </FieldDescription>
+            </Field>
           )}
 
           {state && 'error' in state && (
-            <p role="alert" className="text-sm text-destructive">{state.error}</p>
+            <FieldError>{state.error}</FieldError>
           )}
 
           <SheetFooter>

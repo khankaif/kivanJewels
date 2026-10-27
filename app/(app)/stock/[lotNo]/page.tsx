@@ -1,4 +1,5 @@
-import Link from 'next/link';
+import { StatStrip } from '@/components/layout/stat';
+import { PageHeader } from '@/components/layout/page-header';
 import { notFound } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,7 +7,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { getLotHistory, MOVEMENT_LABEL } from '@/features/stock/register';
-import { inr, ct } from '@/lib/format';
+import { inr, ct, day } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,30 +25,17 @@ export default async function LotPage({ params }: { params: Promise<{ lotNo: str
   const soldBeforeSourced = history.some((m) => m.runningBalance < -0.0005);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link href="/stock?tab=movements" className="text-sm text-muted-foreground underline underline-offset-4">
-          ← All movements
-        </Link>
-        <h1 className="mt-2 flex items-center gap-3 font-mono text-2xl font-bold tracking-tight">
-          {first.lotNo}
-          <Badge variant={balance > 0.0005 ? 'default' : 'secondary'}>
-            {balance > 0.0005 ? `${ct(balance)} in vault` : 'depleted'}
-          </Badge>
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {first.stoneType}
-          {first.shape ? ` · ${first.shape}` : ''}
-          {first.sieveSize ? ` · ${first.sieveSize}` : ''}
-          {first.partyName ? ` · from ${first.partyName}` : ''}
-        </p>
-      </div>
+    <div className="space-y-4">
+      <PageHeader
+        parent={{ href: '/stock?tab=movements', label: 'Movements' }}
+        title={first.lotNo}
+        badges={<Badge variant={balance > 0.0005 ? 'outline' : 'secondary'}>{balance > 0.0005 ? `${ct(balance)} in vault` : 'Depleted'}</Badge>}
+        detail={[first.stoneType, first.shape, first.sieveSize, first.partyName && `from ${first.partyName}`].filter(Boolean).join(' · ')}
+      />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Stat label="Total in" value={ct(inCt)} />
-        <Stat label="Total out" value={ct(outCt)} />
-        <Stat label="Balance" value={ct(balance)} tone={balance > 0.0005 ? 'text-positive' : ''} />
-      </div>
+      <StatStrip items={[
+        { label: 'Balance', value: ct(balance), sub: `${ct(inCt)} in, ${ct(outCt)} out` },
+      ]} />
 
       <Card>
         <CardHeader>
@@ -80,17 +68,17 @@ export default async function LotPage({ params }: { params: Promise<{ lotNo: str
             <TableBody>
               {history.map((m) => (
                 <TableRow key={m.id}>
-                  <TableCell className="tabular-nums">{m.movedOn}</TableCell>
+                  <TableCell className="tabular-nums">{day(m.movedOn)}</TableCell>
                   <TableCell>
                     <Badge variant={m.isInward ? 'default' : 'outline'}>
                       {MOVEMENT_LABEL[m.kind] ?? m.kind}
                     </Badge>
                   </TableCell>
                   <TableCell className="font-mono text-xs">{m.memoNo ?? '—'}</TableCell>
-                  <TableCell className="text-right tabular-nums text-positive">
+                  <TableCell className="text-right tabular-nums">
                     {m.isInward ? ct(m.carats) : ''}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-warning">
+                  <TableCell className="text-right tabular-nums">
                     {!m.isInward ? ct(-m.carats) : ''}
                   </TableCell>
                   <TableCell className="text-right tabular-nums font-medium">
@@ -107,16 +95,5 @@ export default async function LotPage({ params }: { params: Promise<{ lotNo: str
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-        <div className={`mt-1 text-xl font-bold tabular-nums ${tone ?? ''}`}>{value}</div>
-      </CardContent>
-    </Card>
   );
 }

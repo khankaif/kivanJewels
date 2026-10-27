@@ -1,4 +1,9 @@
 import Link from 'next/link';
+import { RecordPanel } from '@/components/layout/record-panel';
+import { PartyDialog } from '@/features/parties/components/party-dialog';
+import { waLink } from '@/lib/whatsapp';
+import { PageHeader } from '@/components/layout/page-header';
+import { WhatsAppButton } from '@/components/forms/whatsapp-button';
 import { notFound } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +14,7 @@ import {
 import { getParty, getPartyStatement, getPartyActivity } from '@/features/parties/queries';
 import { getBills } from '@/features/accounts/money';
 import { PaymentDialog } from '@/features/accounts/components/payment-dialog';
-import { inr, ct } from '@/lib/format';
+import { inr, ct, day } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,210 +38,223 @@ export default async function PartyPage({ params }: { params: Promise<{ id: stri
   const unpaid = bills.rows.filter((b) => b.balance > 0.005);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link href="/parties" className="text-sm text-muted-foreground underline underline-offset-4">
-          ← All parties
-        </Link>
-        <h1 className="mt-2 flex items-center gap-3 text-2xl font-bold tracking-tight">
-          {party.name}
-          <Badge variant="outline">{party.kind === 'both' ? 'supplier & client' : party.kind}</Badge>
-          {!party.isActive && <Badge variant="secondary">inactive</Badge>}
-        </h1>
-        {party.businessName && <p className="text-sm font-medium">{party.businessName}</p>}
-        <p className="text-sm text-muted-foreground">
-          {party.defaultTermsDays}-day terms
-          {party.phone && ` · ${party.phone}`}
-          {party.gstin && ` · GSTIN ${party.gstin}`}
-          {party.pan && ` · PAN ${party.pan}`}
-          {party.contactPerson && ` · Contact: ${party.contactPerson}`}
-        </p>
-        {party.address && <p className="text-sm text-muted-foreground">{party.address}</p>}
-        <div className="mt-4 flex gap-2">
-          <PaymentDialog
-            partyId={party.id} partyName={party.name} direction="in" size="sm"
-            label="Record receipt"
+    <div className="space-y-4">
+      <PageHeader
+        parent={{ href: '/parties', label: 'Parties' }}
+        title={party.name}
+        badges={
+          <>
+            <Badge variant="outline">{party.kind === 'both' ? 'Supplier & client' : party.kind === 'supplier' ? 'Supplier' : 'Client'}</Badge>
+            {!party.isActive && <Badge variant="secondary">Inactive</Badge>}
+          </>
+        }
+        actions={
+          <>
+            {party.receivable > 0.005 && (
+              <WhatsAppButton
+                phone={party.phone}
+                text={`Hi ${party.name}, a gentle reminder that ${inr(party.receivable)} is outstanding`
+                  + `${unpaid.filter((b) => b.direction === 'sale').length ? ` across ${unpaid.filter((b) => b.direction === 'sale').length} bills` : ''}. Thank you.`}
+              />
+            )}
+            <PaymentDialog partyId={party.id} partyName={party.name} direction="in" size="sm" label="Record receipt" />
+            <PaymentDialog partyId={party.id} partyName={party.name} direction="out" size="sm" label="Record payment" />
+          </>
+        }
+      />
+
+      <div className="grid items-start gap-4 lg:grid-cols-[19rem_minmax(0,1fr)]">
+        {/* The record: facts on the left, once. Activity on the right. */}
+        <aside className="lg:sticky lg:top-24">
+          <RecordPanel
+            lead={
+              <>
+                <div className="text-xs text-muted-foreground">{party.net >= 0 ? 'They owe you, net' : 'You owe them, net'}</div>
+                <div className={`mt-1 text-2xl font-semibold leading-tight tabular-nums ${party.net < 0 ? 'text-negative' : ''}`}>
+                  {inr(Math.abs(party.net))}
+                </div>
+              </>
+            }
+            sections={[
+              { title: 'Balance', rows: [
+                ['Owed to you', party.receivable > 0.005 && inr(party.receivable)],
+                ['Owed by you', party.payable > 0.005 && inr(party.payable)],
+                ['Stones bought', activity.bought > 0 && ct(activity.bought)],
+                ['Stones sold', activity.sold > 0 && ct(activity.sold)],
+              ] },
+              { title: 'Details', rows: [
+                ['Role', party.kind === 'both' ? 'Supplier & client' : party.kind === 'supplier' ? 'Supplier' : 'Client'],
+                ['Terms', `${party.defaultTermsDays} days`],
+                ['Business', party.businessName],
+                ['Contact', party.contactPerson],
+                ['Phone', party.phone && (
+                  <a href={waLink('', party.phone)} target="_blank" rel="noreferrer" className="hover:underline">{party.phone}</a>
+                )],
+                ['Email', party.email && <a href={`mailto:${party.email}`} className="hover:underline">{party.email}</a>],
+                ['GSTIN', party.gstin],
+                ['PAN', party.pan],
+                ['Address', party.address && <span className="whitespace-pre-line">{party.address}</span>],
+                ['Notes', party.notes],
+              ] },
+            ]}
+            footer={<PartyDialog party={party} />}
           />
-          <PaymentDialog
-            partyId={party.id} partyName={party.name} direction="out" size="sm"
-            label="Record payment"
-          />
+        </aside>
+
+        <div className="min-w-0">
+          <Tabs defaultValue="statement">
+            <TabsList>
+              <TabsTrigger value="statement">Statement ({statement.length})</TabsTrigger>
+              <TabsTrigger value="unpaid">Unpaid bills ({unpaid.length})</TabsTrigger>
+              <TabsTrigger value="memos">Memos ({activity.memos.length})</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="statement">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Statement of account</CardTitle>
+                  <CardDescription>
+                    Newest first. A positive running balance means they owe you.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Entry</TableHead>
+                        <TableHead>Bill / ref</TableHead>
+                        <TableHead>Mode</TableHead>
+                        <TableHead className="text-right">Debit</TableHead>
+                        <TableHead className="text-right">Credit</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {statement.map((s) => (
+                        <TableRow key={s.id}>
+                          <TableCell className="tabular-nums">{day(s.datedOn)}</TableCell>
+                          <TableCell>{KIND_LABEL[s.kind] ?? s.kind}</TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {realBillNo(s.billNo) ?? s.refId ?? '—'}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {s.mode ?? ''}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {s.amount > 0 ? inr(s.amount) : ''}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {s.amount < 0 ? inr(-s.amount) : ''}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums font-medium">
+                            {inr(s.running)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="unpaid">
+              <Card>
+                <CardContent className="overflow-x-auto pt-6">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Bill no.</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                        <TableHead className="text-right">Age</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {unpaid.map((b) => (
+                        <TableRow key={`${b.direction}:${b.billKey}`}>
+                          <TableCell>
+                            <Link
+                              href={`/accounts/bills/${encodeURIComponent(b.billKey)}?direction=${b.direction}`}
+                              className="font-mono text-xs hover:underline"
+                            >
+                              {b.billNo ?? 'Unnumbered'}
+                            </Link>
+                          </TableCell>
+                          <TableCell className="tabular-nums">{day(b.billedOn)}</TableCell>
+                          <TableCell><Badge variant="outline">{b.direction}</Badge></TableCell>
+                          <TableCell className="text-right tabular-nums">{inr(b.gross)}</TableCell>
+                          <TableCell className="text-right tabular-nums font-semibold">
+                            {inr(b.balance)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-xs">
+                            {b.ageDays !== null ? `${b.ageDays}d` : '—'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {!unpaid.length && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                            Nothing outstanding.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="memos">
+              <Card>
+                <CardContent className="overflow-x-auto pt-6">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Memo</TableHead>
+                        <TableHead>Direction</TableHead>
+                        <TableHead>Issued</TableHead>
+                        <TableHead>Due</TableHead>
+                        <TableHead className="text-right">Carats</TableHead>
+                        <TableHead className="text-right">Outstanding</TableHead>
+                        <TableHead className="text-right">Value</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {activity.memos.map((m) => (
+                        <TableRow key={m.memoId} className={m.overdue ? 'bg-negative-surface' : undefined}>
+                          <TableCell className="font-mono text-xs">{m.memoNo}</TableCell>
+                          <TableCell>
+                            <Badge variant={m.direction === 'in' ? 'outline' : 'default'}>
+                              {m.direction === 'in' ? 'from them' : 'to them'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="tabular-nums">{day(m.issuedOn)}</TableCell>
+                          <TableCell className={`tabular-nums ${m.overdue ? 'font-semibold text-negative' : ''}`}>
+                            {day(m.dueOn)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">{ct(m.carats)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{ct(m.outstanding)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{inr(m.value)}</TableCell>
+                        </TableRow>
+                      ))}
+                      {!activity.memos.length && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                            No memos with this party.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
-
-      <div className="grid gap-4 sm:grid-cols-4">
-        <Stat label="They owe me" value={inr(party.receivable)} tone="text-positive" />
-        <Stat label="I owe them" value={inr(party.payable)} tone="text-warning" />
-        <Stat label="Net" value={inr(party.net)} tone={party.net >= 0 ? 'text-positive' : 'text-warning'} />
-        <Stat label="Stones traded" value={`${ct(activity.bought)} in · ${ct(activity.sold)} out`} />
-      </div>
-
-      <Tabs defaultValue="statement">
-        <TabsList>
-          <TabsTrigger value="statement">Statement ({statement.length})</TabsTrigger>
-          <TabsTrigger value="unpaid">Unpaid bills ({unpaid.length})</TabsTrigger>
-          <TabsTrigger value="memos">Memos ({activity.memos.length})</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="statement">
-          <Card>
-            <CardHeader>
-              <CardTitle>Statement of account</CardTitle>
-              <CardDescription>
-                Newest first. A positive running balance means they owe you.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Entry</TableHead>
-                    <TableHead>Bill / ref</TableHead>
-                    <TableHead>Mode</TableHead>
-                    <TableHead className="text-right">Debit</TableHead>
-                    <TableHead className="text-right">Credit</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {statement.map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell className="tabular-nums">{s.datedOn}</TableCell>
-                      <TableCell>{KIND_LABEL[s.kind] ?? s.kind}</TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {realBillNo(s.billNo) ?? s.refId ?? '—'}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {s.mode ?? ''}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {s.amount > 0 ? inr(s.amount) : ''}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {s.amount < 0 ? inr(-s.amount) : ''}
-                      </TableCell>
-                      <TableCell
-                        className={`text-right tabular-nums font-medium ${
-                          s.running >= 0 ? 'text-positive' : 'text-warning'
-                        }`}
-                      >
-                        {inr(s.running)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="unpaid">
-          <Card>
-            <CardContent className="overflow-x-auto pt-6">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Bill no.</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                    <TableHead className="text-right">Age</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {unpaid.map((b) => (
-                    <TableRow key={`${b.direction}:${b.billKey}`}>
-                      <TableCell>
-                        <Link
-                          href={`/accounts/bills/${encodeURIComponent(b.billKey)}?direction=${b.direction}`}
-                          className="font-mono text-xs underline underline-offset-4"
-                        >
-                          {b.billNo ?? 'Unnumbered'}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="tabular-nums">{b.billedOn ?? '—'}</TableCell>
-                      <TableCell><Badge variant="outline">{b.direction}</Badge></TableCell>
-                      <TableCell className="text-right tabular-nums">{inr(b.gross)}</TableCell>
-                      <TableCell className="text-right tabular-nums font-semibold text-warning">
-                        {inr(b.balance)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-xs">
-                        {b.ageDays !== null ? `${b.ageDays}d` : '—'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {!unpaid.length && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                        Nothing outstanding.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="memos">
-          <Card>
-            <CardContent className="overflow-x-auto pt-6">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Memo</TableHead>
-                    <TableHead>Direction</TableHead>
-                    <TableHead>Issued</TableHead>
-                    <TableHead>Due</TableHead>
-                    <TableHead className="text-right">Carats</TableHead>
-                    <TableHead className="text-right">Outstanding</TableHead>
-                    <TableHead className="text-right">Value</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activity.memos.map((m) => (
-                    <TableRow key={m.memoId} className={m.overdue ? 'bg-negative-surface' : undefined}>
-                      <TableCell className="font-mono text-xs">{m.memoNo}</TableCell>
-                      <TableCell>
-                        <Badge variant={m.direction === 'in' ? 'outline' : 'default'}>
-                          {m.direction === 'in' ? 'from them' : 'to them'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="tabular-nums">{m.issuedOn}</TableCell>
-                      <TableCell className={`tabular-nums ${m.overdue ? 'font-semibold text-negative' : ''}`}>
-                        {m.dueOn ?? '—'}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{ct(m.carats)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{ct(m.outstanding)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{inr(m.value)}</TableCell>
-                    </TableRow>
-                  ))}
-                  {!activity.memos.length && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                        No memos with this party.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
     </div>
-  );
-}
-
-function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-        <div className={`mt-1 text-lg font-bold tabular-nums ${tone ?? ''}`}>{value}</div>
-      </CardContent>
-    </Card>
   );
 }

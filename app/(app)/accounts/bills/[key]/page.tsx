@@ -1,13 +1,18 @@
 import Link from 'next/link';
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from '@/components/ui/item';
+import { StatStrip } from '@/components/layout/stat';
+import { PageHeader } from '@/components/layout/page-header';
 import { notFound } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Printer } from 'lucide-react';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { getBill, getBillLines, getBillTrail } from '@/features/accounts/money';
 import { PaymentDialog } from '@/features/accounts/components/payment-dialog';
-import { inr, ct } from '@/lib/format';
+import { inr, ct, day } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,45 +37,48 @@ export default async function BillPage({
   const totalCarats = items.reduce((s, l) => s + (l.carats ?? 0), 0);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link href="/accounts/bills" className="text-sm text-muted-foreground underline underline-offset-4">
-          ← All bills
-        </Link>
-        <h1 className="mt-2 flex items-center gap-3 font-mono text-2xl font-bold tracking-tight">
-          {bill.billNo ?? (bill.isCash ? 'Cash sale' : 'Unnumbered')}
-          <Badge variant={direction === 'sale' ? 'default' : 'outline'}>{direction}</Badge>
-          {bill.status === 'paid' && <Badge variant="secondary">settled</Badge>}
-          {bill.status === 'overdue' && (
-            <Badge variant="destructive">
-              {inr(bill.balance)} overdue{bill.daysOverdue ? ` by ${bill.daysOverdue}d` : ''}
-            </Badge>
-          )}
-          {(bill.status === 'due' || bill.status === 'part') && (
-            <Badge variant="outline">{inr(bill.balance)} {bill.status === 'part' ? 'left' : 'due'}</Badge>
-          )}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          <Link href={`/parties/${bill.partyId}`} className="underline underline-offset-4">
-            {bill.partyName}
-          </Link>
-          {' · '}{bill.billedOn ?? '—'}
-          {bill.dueOn && ` · due ${bill.dueOn}`}
-          {bill.ageDays !== null && bill.balance > 0.005 && ` · ${bill.ageDays} days old`}
-        </p>
-      </div>
+    <div className="space-y-4">
+      <PageHeader
+        parent={{ href: '/accounts/bills', label: 'Bills' }}
+        title={bill.billNo ?? (bill.isCash ? 'Cash sale' : 'Unnumbered')}
+        badges={
+          <>
+            <Badge variant="outline">{direction === 'sale' ? 'Sale' : 'Purchase'}</Badge>
+            {bill.status === 'paid' && <Badge variant="secondary">Settled</Badge>}
+            {bill.status === 'overdue' && <Badge variant="destructive">Overdue{bill.daysOverdue ? ` ${bill.daysOverdue}d` : ''}</Badge>}
+          </>
+        }
+        detail={
+          <>
+            <Link href={`/parties/${bill.partyId}`} className="font-medium text-foreground hover:underline">{bill.partyName}</Link>
+            {' · '}{day(bill.billedOn)}{bill.dueOn && ` · due ${day(bill.dueOn)}`}
+          </>
+        }
+        actions={
+          <Button
+            size="sm" variant="outline" nativeButton={false}
+            render={<a href={`/print/bill/${encodeURIComponent(billKey)}?direction=${direction}`} target="_blank" rel="noreferrer" />}
+          >
+            <Printer data-icon="inline-start" /> Print
+          </Button>
+        }
+      />
 
-      <div className="grid gap-4 sm:grid-cols-4">
-        <Stat label="Amount" value={inr(bill.gross)} />
-        <Stat label="Settled" value={inr(bill.paid)} />
-        <Stat label="Balance" value={inr(bill.balance)} tone={bill.balance > 0.005 ? 'text-warning' : 'text-positive'} />
-        <Stat label="Goods" value={totalCarats > 0 ? ct(totalCarats) : `${bill.lines} lines`} />
-      </div>
+      {/* Balance is amount less settled, so it leads and the other two explain it. */}
+      <StatStrip items={[
+        {
+          label: bill.balance > 0.005 ? 'Balance' : 'Settled in full',
+          value: inr(bill.balance > 0.005 ? bill.balance : bill.gross),
+          tone: bill.balance > 0.005 ? undefined : 'text-positive',
+          sub: bill.balance > 0.005 ? `${inr(bill.gross)} billed, ${inr(bill.paid)} settled` : undefined,
+        },
+        { label: 'Goods', value: totalCarats > 0 ? ct(totalCarats) : `${bill.lines} ${bill.lines === 1 ? 'line' : 'lines'}` },
+      ]} />
 
       <Card>
         <CardHeader>
           <CardTitle>Line items</CardTitle>
-          <CardDescription>{items.length} lines on this bill.</CardDescription>
+          <CardDescription>{items.length} {items.length === 1 ? 'line' : 'lines'} on this bill.</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
@@ -88,7 +96,7 @@ export default async function BillPage({
             <TableBody>
               {items.map((l) => (
                 <TableRow key={l.id}>
-                  <TableCell className="tabular-nums">{l.datedOn}</TableCell>
+                  <TableCell className="tabular-nums">{day(l.datedOn)}</TableCell>
                   <TableCell className="font-mono text-xs">{l.lotNo ?? l.refId ?? '—'}</TableCell>
                   <TableCell className="text-xs">
                     {l.stoneType ?? '—'}{l.shape ? ` · ${l.shape}` : ''}
@@ -120,31 +128,31 @@ export default async function BillPage({
         </CardHeader>
         <CardContent className="space-y-2">
           {trail.length ? trail.map((t) => (
-            <div key={t.ledgerId} className="rounded-lg border p-3 text-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium">{t.spec}</span>
-                <span className="tabular-nums">{inr(t.amount)}</span>
-              </div>
-              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <Item key={t.ledgerId} variant="outline" size="sm">
+              <ItemContent>
+              <ItemTitle>{t.spec}</ItemTitle>
+              <ItemDescription className="flex flex-wrap gap-x-4 gap-y-1">
                 {t.lotNo && <span>lot <span className="font-mono">{t.lotNo}</span></span>}
                 {t.stoneType && <span>{t.stoneType}</span>}
                 {t.memoNo && (
                   <span>
                     from <span className="font-mono">{t.memoNo}</span>
-                    {t.memoIssuedOn && ` · ${t.memoDirection === 'out' ? 'issued' : 'received'} ${t.memoIssuedOn}`}
+                    {t.memoIssuedOn && ` · ${t.memoDirection === 'out' ? 'issued' : 'received'} ${day(t.memoIssuedOn)}`}
                   </span>
                 )}
                 {t.requirementNo && (
                   <span>
                     for{' '}
-                    <Link href={`/sales/${encodeURIComponent(t.requirementNo)}`} className="underline underline-offset-4">
+                    <Link href={`/sales/${encodeURIComponent(t.requirementNo)}`} className="font-medium hover:underline">
                       {t.requirementNo}
                     </Link>
                     {t.requirementParty && ` · ${t.requirementParty}`}
                   </span>
                 )}
-              </div>
-            </div>
+              </ItemDescription>
+              </ItemContent>
+              <ItemActions className="tabular-nums">{inr(t.amount)}</ItemActions>
+            </Item>
           )) : (
             <p className="text-sm text-muted-foreground">
               No chain recorded — this bill predates the linked ledger, or it is a charges-only
@@ -191,7 +199,7 @@ export default async function BillPage({
             <TableBody>
               {payments.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell className="tabular-nums">{p.datedOn}</TableCell>
+                  <TableCell className="tabular-nums">{day(p.datedOn)}</TableCell>
                   <TableCell>{p.kind === 'payment_in' ? 'Received' : 'Paid out'}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{p.notes ?? '—'}</TableCell>
                   <TableCell className="text-right tabular-nums">{inr(Math.abs(p.amount))}</TableCell>
@@ -209,16 +217,5 @@ export default async function BillPage({
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-        <div className={`mt-1 text-xl font-bold tabular-nums ${tone ?? ''}`}>{value}</div>
-      </CardContent>
-    </Card>
   );
 }

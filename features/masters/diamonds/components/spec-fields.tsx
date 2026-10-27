@@ -1,11 +1,12 @@
 'use client';
 
+import { Choice } from '@/components/forms/choice';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { cn } from '@/lib/utils';
 import {
-  hides, isCertified, SPEC_FIELDS, usesSieve, type SieveShapes, type SpecField,
+  BUCKET_FOR, hides, isCertified, REQUIRED, SPEC_FIELDS, usesSieve, type SieveShapes, type SpecField,
 } from '@/lib/spec-rules';
 
 export type Picklists = Record<string, string[]>;
@@ -21,11 +22,6 @@ export const blankSpec = (): SpecValue => ({
   sieveSize: '', mmSize: '', certified: '', lab: '',
 });
 
-/** Which master list backs each field. Sieve and MM are measurements, not lists. */
-const LIST_FOR: Partial<Record<SpecField, string>> = {
-  stoneType: 'stone_type', colour: 'colour', clarity: 'clarity',
-  shape: 'shape', certified: 'certified', lab: 'lab',
-};
 const LABEL: Record<SpecField, string> = {
   stoneType: 'Diamond type', colour: 'Colour', clarity: 'Clarity', shape: 'Shape',
   sieveSize: 'Sieve size', mmSize: 'MM', certified: 'Certified', lab: 'Lab',
@@ -33,9 +29,6 @@ const LABEL: Record<SpecField, string> = {
 const PLACEHOLDER: Partial<Record<SpecField, string>> = {
   sieveSize: '8.5-9', mmSize: '2.20',
 };
-
-/** Always asked for. The rest depend on the shape or on certification. */
-const REQUIRED_FIELDS: SpecField[] = ['stoneType', 'shape', 'certified'];
 
 /**
  * The fields that name a stone, in the order one is described: type, colour,
@@ -52,9 +45,9 @@ const REQUIRED_FIELDS: SpecField[] = ['stoneType', 'shape', 'certified'];
  * `value`/`onChange` to drive it, which the multi-line sales form does.
  */
 export function SpecFields({
-  id, picklists, sieveShapes, autoFocus = false, value, onChange, className,
+  id, picklists, sieveShapes, value, onChange, className,
 }: {
-  id: string; picklists: Picklists; sieveShapes: SieveShapes; autoFocus?: boolean;
+  id: string; picklists: Picklists; sieveShapes: SieveShapes;
   value?: SpecValue; onChange?: (v: SpecValue) => void; className?: string;
 }) {
   const [own, setOwn] = useState<SpecValue>(() => value ?? blankSpec());
@@ -62,8 +55,6 @@ export function SpecFields({
 
   const set = (k: SpecField, v: string) => {
     const next = { ...spec, [k]: v };
-    // A shape change can retire a field; clear it so a stale sieve never
-    // reaches the server or the unit key.
     // A shape that is measured in mm has no sieve; clear it so a stale value
     // never reaches the server or the unit key.
     if (k === 'shape' && !usesSieve(sieveShapes, v)) next.sieveSize = '';
@@ -73,35 +64,32 @@ export function SpecFields({
 
   return (
     <div className={cn('grid grid-cols-2 gap-3', className)}>
-      {SPEC_FIELDS.map((f, i) => {
-        const listKey = LIST_FOR[f];
+      {SPEC_FIELDS.map((f) => {
+        const listKey = BUCKET_FOR[f];
         const options = listKey ? picklists[listKey] ?? [] : null;
         const hidden = hides(sieveShapes, spec, f);
         // A lab only exists once a stone is certified, so the field appears
         // with the answer rather than sitting there greyed out.
         if (hidden && f === 'lab') return null;
-        const required = REQUIRED_FIELDS.includes(f)
+        const required = REQUIRED.includes(f)
           || (f === 'lab' && isCertified(spec.certified))
           || (f === 'sieveSize' && !hidden)
           || (f === 'mmSize' && hides(sieveShapes, spec, 'sieveSize'));
 
         return (
-          <div key={f} className="space-y-2">
-            <Label htmlFor={`${id}-${f}`} className={cn(hidden && 'text-muted-foreground/60')}>
+          <Field key={f}>
+            <FieldLabel htmlFor={`${id}-${f}`} className={cn(hidden && 'text-muted-foreground/60')}>
               {LABEL[f]}
               {required && <span className="text-destructive"> *</span>}
-            </Label>
+            </FieldLabel>
             {options ? (
-              <select
+              <Choice
                 id={`${id}-${f}`} name={f}
-                value={spec[f]} onChange={(e) => set(f, e.target.value)}
+                value={spec[f]} onValueChange={(v) => set(f, v)}
                 disabled={hidden} required={required}
-                autoFocus={autoFocus && i === 0}
-                className="h-9 w-full rounded-md border bg-transparent px-3 text-sm disabled:opacity-50"
-              >
-                <option value="">{hidden ? `not used for ${spec.shape}` : 'Select…'}</option>
-                {options.map((v) => <option key={v} value={v}>{v}</option>)}
-              </select>
+                placeholder={hidden ? `Not used for ${spec.shape}` : 'Select…'}
+                options={options.map((v) => ({ value: v, label: v }))}
+              />
             ) : (
               <Input
                 id={`${id}-${f}`} name={f}
@@ -110,7 +98,7 @@ export function SpecFields({
                 placeholder={hidden ? `not used for ${spec.shape}` : PLACEHOLDER[f]}
               />
             )}
-          </div>
+          </Field>
         );
       })}
     </div>

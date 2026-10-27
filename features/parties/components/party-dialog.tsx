@@ -1,25 +1,25 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { Choice } from '@/components/forms/choice';
+import { useState } from 'react';
+import { useFormAction } from '@/lib/use-form-action';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
-import { savePartyAction, type PartyState } from '../actions';
+import { savePartyAction } from '../actions';
 import type { Party } from '../queries';
 
-export function PartyDialog({ party, defaultOpen = false }: { party?: Party; defaultOpen?: boolean }) {
+/** Takes any party record: the list row or the full record page's party. */
+type EditableParty = Omit<Party, 'openMemosIn' | 'openMemosOut' | 'receivable' | 'payable' | 'net'>;
+
+export function PartyDialog({ party, defaultOpen = false }: { party?: EditableParty; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
-  const [state, formAction, isPending] = useActionState<PartyState, FormData>(
-    async (prev, fd) => {
-      const res = await savePartyAction(prev, fd);
-      if (res && 'ok' in res) setOpen(false);
-      return res;
-    },
-    null,
-  );
+  const [state, formAction, isPending] = useFormAction(savePartyAction, () => setOpen(false));
   const editing = !!party;
 
   return (
@@ -40,90 +40,87 @@ export function PartyDialog({ party, defaultOpen = false }: { party?: Party; def
           {editing && <input type="hidden" name="id" value={party.id} />}
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
+            <Field>
+              <FieldLabel htmlFor="name">Name</FieldLabel>
               <Input id="name" name="name" required autoFocus defaultValue={party?.name}
                      placeholder="Naice Gems LLP" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="businessName">Business name</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="businessName">Business name</FieldLabel>
               <Input
                 id="businessName" name="businessName" defaultValue={party?.businessName ?? ''}
                 placeholder="If different from name"
               />
-            </div>
+            </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="kind">Role</Label>
-              <select
+            <Field>
+              <FieldLabel htmlFor="kind">Role</FieldLabel>
+              <Choice
                 id="kind" name="kind" defaultValue={party?.kind ?? 'both'}
-                className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-              >
-                <option value="both">Supplier &amp; client</option>
-                <option value="supplier">Supplier only</option>
-                <option value="client">Client only</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="defaultTermsDays">Credit terms (days)</Label>
+                options={[
+                  { value: 'both', label: 'Supplier & client' },
+                  { value: 'supplier', label: 'Supplier only' },
+                  { value: 'client', label: 'Client only' },
+                ]}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="defaultTermsDays">Credit terms (days)</FieldLabel>
               <Input
                 id="defaultTermsDays" name="defaultTermsDays" type="number" min="0" max="365"
                 defaultValue={party?.defaultTermsDays ?? 7} required
               />
-            </div>
+            </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
+            <Field>
+              <FieldLabel htmlFor="phone">Phone</FieldLabel>
               <Input id="phone" name="phone" defaultValue={party?.phone ?? ''} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="email">Email</FieldLabel>
               <Input id="email" name="email" type="email" defaultValue={party?.email ?? ''} />
-            </div>
+            </Field>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="contactPerson">Contact person</Label>
+          <Field>
+            <FieldLabel htmlFor="contactPerson">Contact person</FieldLabel>
             <Input id="contactPerson" name="contactPerson" defaultValue={party?.contactPerson ?? ''} />
-          </div>
+          </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="gstin">GSTIN</Label>
+            <Field>
+              <FieldLabel htmlFor="gstin">GSTIN</FieldLabel>
               <Input id="gstin" name="gstin" defaultValue={party?.gstin ?? ''} className="uppercase" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="pan">PAN</Label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="pan">PAN</FieldLabel>
               <Input id="pan" name="pan" defaultValue={party?.pan ?? ''} className="uppercase" />
-            </div>
+            </Field>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="address">Address</Label>
+          <Field>
+            <FieldLabel htmlFor="address">Address</FieldLabel>
             <Input id="address" name="address" defaultValue={party?.address ?? ''} />
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+          <Field>
+            <FieldLabel htmlFor="notes">Notes</FieldLabel>
             <Input id="notes" name="notes" defaultValue={party?.notes ?? ''} />
-          </div>
+          </Field>
 
           {editing && (
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox" name="isActive" defaultChecked={party.isActive}
-                className="size-4" value="on"
-              />
+            <Label>
+              <Checkbox name="isActive" value="on" defaultChecked={party.isActive} />
               Active
-            </label>
+            </Label>
           )}
 
           {state && 'error' in state && (
-            <p role="alert" className="text-sm text-destructive">{state.error}</p>
+            <FieldError>{state.error}</FieldError>
           )}
 
           <SheetFooter>

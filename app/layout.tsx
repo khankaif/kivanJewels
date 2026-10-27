@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { Inter } from 'next/font/google';
+import { Toaster } from '@/components/ui/sonner';
 import './globals.css';
 
-// The theme names Inter and JetBrains Mono in --font-sans/--font-mono; load them
-// here or the browser silently falls back and the typography never lands.
-const sans = Inter({ variable: '--font-inter', subsets: ['latin'], display: 'swap' });
-const mono = JetBrains_Mono({ variable: '--font-jetbrains', subsets: ['latin'], display: 'swap' });
+// The app is set in Inter at 13px, as Twenty's workspace is, with tabular
+// figures for money. The storefront loads its own display face.
+const text = Inter({ variable: '--font-text', subsets: ['latin'], display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'Kaivan Jewels',
@@ -14,8 +14,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en" className={`${text.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <Toaster position="top-center" />
+      </body>
     </html>
   );
 }

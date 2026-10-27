@@ -1,11 +1,14 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Printer } from 'lucide-react';
+import { WhatsAppButton } from '@/components/forms/whatsapp-button';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { SettleLineDialog } from './settle-line-dialog';
 import type { Memo } from '../queries';
-import { inr, ct } from '@/lib/format';
+import { inr, ct, day } from '@/lib/format';
 
 export function MemoList({ memos, direction }: { memos: Memo[]; direction: 'in' | 'out' }) {
   if (!memos.length) {
@@ -23,31 +26,42 @@ export function MemoList({ memos, direction }: { memos: Memo[]; direction: 'in' 
   return (
     <div className="space-y-4">
       {memos.map((m) => (
-        <Card key={m.memoId} className={m.overdue ? 'border-negative/40 shadow-xs' : 'shadow-xs'}>
+        <Card key={m.memoId}>
           <CardHeader className="border-b bg-muted/20">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <CardTitle className="flex items-center gap-2 font-mono text-base">
                   {m.memoNo}
-                  {m.status === 'closed' ? (
-                    <Badge variant="secondary">complete</Badge>
-                  ) : m.overdue ? (
-                    <Badge variant="destructive">overdue</Badge>
-                  ) : (
-                    <Badge>needs action</Badge>
-                  )}
+                  {m.status === 'closed'
+                    ? <Badge variant="secondary">Complete</Badge>
+                    : m.overdue && <Badge variant="destructive">Overdue</Badge>}
                 </CardTitle>
                 <CardDescription>
-                  {m.partyName} · {m.issuedOn}
-                  {m.dueOn && ` · due ${m.dueOn}`}
+                  {m.partyName} · {day(m.issuedOn)}
+                  {m.dueOn && ` · due ${day(m.dueOn)}`}
                   {m.agent && ` · by ${m.agent}`}
                 </CardDescription>
               </div>
+              <div className="flex items-start gap-2">
+              <Button
+                variant="ghost" size="sm" className="text-muted-foreground" nativeButton={false}
+                render={<a href={`/print/memo/${m.memoId}`} target="_blank" rel="noreferrer" />}
+              >
+                <Printer data-icon="inline-start" /> Print
+              </Button>
+              {direction === 'out' && m.status !== 'closed' && m.outstanding > 0.0005 && (
+                <WhatsAppButton
+                  phone={m.partyPhone}
+                  text={`Hi ${m.partyName}, memo ${m.memoNo}: ${ct(m.outstanding)} is still with you`
+                    + `${m.dueOn ? `, due back ${day(m.dueOn)}` : ''}. Please return it or confirm the bill. Thank you.`}
+                />
+              )}
               <div className="text-right text-sm">
                 <div className="font-semibold tabular-nums">{inr(m.value)}</div>
                 <div className="tabular-nums text-muted-foreground">
                   {ct(m.outstanding)} outstanding of {ct(m.carats)}
                 </div>
+              </div>
               </div>
             </div>
           </CardHeader>

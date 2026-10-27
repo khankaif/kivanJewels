@@ -36,9 +36,3 @@ export async function getStaff(): Promise<StaffList> {
     })),
   };
 }
-
-/** Whether the signed-in user may manage staff at all. */
-export async function amAdmin(): Promise<boolean> {
-  const { data: session } = await auth.getSession();
-  return (session?.user as { role?: string } | undefined)?.role === 'admin';
-}

@@ -1,20 +1,29 @@
 'use client';
 
+import { Item, ItemActions, ItemContent, ItemDescription } from '@/components/ui/item';
+import { AgentField } from '@/components/forms/agent-field';
+import { DateField } from '@/components/forms/date-field';
+import { Choice } from '@/components/forms/choice';
+import { toast } from 'sonner';
 import { useActionState, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
-import { Segmented } from '@/components/ui/segmented';
-import { Amount } from '@/components/ui/carats-rate';
+import { Segmented } from '@/components/forms/segmented';
+import { Amount } from '@/components/forms/carats-rate';
 import {
   SpecFields, blankSpec, type Picklists, type SpecValue,
 } from '@/features/masters/diamonds/components/spec-fields';
 import type { SieveShapes } from '@/lib/spec-rules';
 import { useLastUsed } from '@/lib/use-last-used';
-import { addDays } from '@/lib/dates';
+import { addDays, todayIso } from '@/lib/dates';
 import { ct, inr } from '@/lib/format';
 import { createSaleAction, stockForSpecAction, type ActionState } from '../actions';
 import type { SellableUnit } from '../queries';
@@ -44,16 +53,20 @@ const blankLine = (): Line => ({
 const num = (v: string) => Number(v) || 0;
 
 export function NewSaleSheet({
-  customers, suppliers, agents, picklists, sieveShapes, units, defaultOpen = false,
+  customers, suppliers, agents, picklists, sieveShapes, units, defaultOpen = false, defaultLot,
 }: {
   customers: Party[]; suppliers: Party[]; agents: string[];
   picklists: Picklists; sieveShapes: SieveShapes; units: SellableUnit[];
   defaultOpen?: boolean;
+  /** Opened from search on a parcel: the first line starts with it picked. */
+  defaultLot?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [customer, setCustomer] = useLastUsed('sales.customer');
-  const [lines, setLines] = useState<Line[]>([blankLine()]);
-  const today = new Date().toISOString().slice(0, 10);
+  const [lines, setLines] = useState<Line[]>(() => [
+    units.some((u) => u.lotId === defaultLot) ? { ...blankLine(), lotId: defaultLot! } : blankLine(),
+  ]);
+  const today = todayIso();
   const [raisedOn, setRaisedOn] = useState(today);
 
   const [deliverNow, setDeliverNow] = useState(false);
@@ -83,6 +96,7 @@ export function NewSaleSheet({
       ));
       const res = await createSaleAction(prev, fd);
       if (res && 'ok' in res) {
+        toast.success(res.ok);
         setOpen(false);
         setLines([blankLine()]);
         setDeliverNow(false);
@@ -117,43 +131,42 @@ export function NewSaleSheet({
         </SheetHeader>
 
         <form action={formAction} className="flex flex-1 flex-col gap-4">
-          <section className="space-y-3 rounded-xl border bg-muted/25 p-3.5">
-            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">1 · Customer</p>
+          <section className="space-y-3">
+            <h3 className="text-sm font-semibold">Order</h3>
             <div className="grid grid-cols-2 gap-3">
-            <Field label="Customer" htmlFor="ns-party">
-              <select
-                id="ns-party" name="partyId" required autoFocus
-                className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-                value={customer} onChange={(e) => setCustomer(e.target.value)}
-              >
-                <option value="">Select…</option>
-                {customers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Raised on" htmlFor="ns-date">
-              <Input
-                id="ns-date" name="raisedOn" type="date" required
-                value={raisedOn} onChange={(e) => setRaisedOn(e.target.value)}
+            <Field>
+              <FieldLabel htmlFor="ns-party">Customer</FieldLabel>
+              <Choice
+                id="ns-party" name="partyId" required searchable placeholder="Search customers…"
+                value={customer} onValueChange={setCustomer}
+                options={customers.map((p) => ({ value: p.id, label: p.name }))}
               />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="ns-date">Raised on</FieldLabel>
+              <DateField id="ns-date" name="raisedOn" required value={raisedOn} onChange={setRaisedOn} />
             </Field>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-            <Field label="Placed by" htmlFor="ns-agent">
-              <Input id="ns-agent" name="agent" list="ns-agents" placeholder="Rushabh" />
-              <datalist id="ns-agents">{agents.map((a) => <option key={a} value={a} />)}</datalist>
+            <Field>
+              <FieldLabel htmlFor="ns-agent">Placed by</FieldLabel>
+              <AgentField id="ns-agent" agents={agents} placeholder="Who took the order" />
             </Field>
-            <Field label="Note" htmlFor="ns-notes">
+            <Field>
+              <FieldLabel htmlFor="ns-notes">Note</FieldLabel>
               <Input id="ns-notes" name="notes" placeholder="Optional" />
             </Field>
             </div>
           </section>
 
+          <Separator />
+
           <section className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold">2 · Stones requested</p>
-                <p className="text-xs text-muted-foreground">Add each size/specification as a separate line.</p>
+                <h3 className="text-sm font-semibold">Stones</h3>
+                <p className="text-xs text-muted-foreground">One line per size or specification.</p>
               </div>
               <Button
                 type="button" size="sm" variant="outline"
@@ -173,82 +186,75 @@ export function NewSaleSheet({
             ))}
           </section>
 
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg border bg-muted/35 px-3 py-2.5 text-sm">
-            <span className="text-muted-foreground">
-              From stock <span className="font-medium text-foreground tabular-nums">{ct(totalStock)}</span>
-            </span>
-            <span className="text-muted-foreground">
-              To source <span className="font-medium text-foreground tabular-nums">{ct(totalSource)}</span>
-            </span>
-            <span className="ml-auto font-bold tabular-nums">{inr(totalValue)}</span>
-          </div>
+          <Item variant="muted" size="sm">
+            <ItemContent>
+              <ItemDescription>
+                From stock <span className="font-medium text-foreground tabular-nums">{ct(totalStock)}</span>
+                {' · '}To source <span className="font-medium text-foreground tabular-nums">{ct(totalSource)}</span>
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions className="text-base font-semibold tabular-nums">{inr(totalValue)}</ItemActions>
+          </Item>
 
-          <section className="space-y-3 rounded-xl border p-3.5">
+          <Separator />
+
+          <section className="space-y-3">
             <div>
-              <p className="text-sm font-semibold">3 · Act now or keep as a requirement</p>
-              <p className="text-xs text-muted-foreground">Optional. You can complete either step later from the requirement.</p>
+              <h3 className="text-sm font-semibold">Act now</h3>
+              <p className="text-xs text-muted-foreground">Optional. Either step can be done later from the requirement.</p>
             </div>
-          <label className="flex items-center gap-2 text-sm font-medium">
-            <input
-              type="checkbox" checked={deliverNow} className="size-4"
-              onChange={(e) => setDeliverNow(e.target.checked)}
-            />
+          <Label>
+            <Checkbox checked={deliverNow} onCheckedChange={setDeliverNow} />
             Send available stock to the customer now
-          </label>
+          </Label>
           <input type="hidden" name="deliverNow" value={deliverNow ? '1' : ''} />
 
           {deliverNow && (
-            <div className="space-y-3 rounded-lg border p-3">
+            <Card size="sm"><CardContent className="space-y-3">
               <input type="hidden" name="channel" value={channel} />
               <Segmented
                 value={channel} set={setChannel}
                 options={[['memo', 'On approval'], ['bill', 'Firm sale / invoice']]}
               />
               <div className="grid grid-cols-2 gap-3">
-                <Field
-                  label={channel === 'memo' ? 'Memo no.' : 'Invoice no.'}
-                  htmlFor="ns-doc"
-                >
+                <Field>
+                  <FieldLabel htmlFor="ns-doc">{channel === 'memo' ? 'Memo no.' : 'Invoice no.'}</FieldLabel>
                   <Input
                     id="ns-doc" name={channel === 'memo' ? 'memoNo' : 'invoiceNo'}
                     placeholder="Blank = we number it"
                   />
                 </Field>
-                <Field label={channel === 'memo' ? 'Due back' : 'Payment due'} htmlFor="ns-dueOn">
-                  <Input id="ns-dueOn" name="dueOn" type="date" defaultValue={addDays(raisedOn, 7)} />
+                <Field>
+                  <FieldLabel htmlFor="ns-dueOn">{channel === 'memo' ? 'Due back' : 'Payment due'}</FieldLabel>
+                  <DateField id="ns-dueOn" name="dueOn" defaultValue={addDays(raisedOn, 7)} />
                 </Field>
               </div>
               <p className="text-xs text-muted-foreground">
                 Carats come off owned stock first, then goods held on a supplier memo. Pick lots by
                 hand from the requirement page if this sale needs a particular parcel.
               </p>
-            </div>
+            </CardContent></Card>
           )}
 
-          <label className="flex items-center gap-2 text-sm font-medium">
-            <input
-              type="checkbox" checked={sourceNow} className="size-4"
-              onChange={(e) => setSourceNow(e.target.checked)}
-            />
+          <Label>
+            <Checkbox checked={sourceNow} onCheckedChange={setSourceNow} />
             Receive the sourced quantity from a supplier now
-          </label>
+          </Label>
           <input type="hidden" name="sourceNow" value={sourceNow ? '1' : ''} />
 
           {sourceNow && (
-            <div className="space-y-3 rounded-lg border p-3">
+            <Card size="sm"><CardContent className="space-y-3">
               <input type="hidden" name="sourceChannel" value={sourceChannel} />
-              <Field label="Supplier" htmlFor="ns-supplier">
-                <select
-                  id="ns-supplier" name="supplierId" required
-                  className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-                  onChange={(e) => {
-                    const p = suppliers.find((x) => x.id === e.target.value);
+              <Field>
+                <FieldLabel htmlFor="ns-supplier">Supplier</FieldLabel>
+                <Choice
+                  id="ns-supplier" name="supplierId" required searchable placeholder="Search suppliers…"
+                  onValueChange={(v) => {
+                    const p = suppliers.find((x) => x.id === v);
                     if (p) setTerms(p.defaultTermsDays);
                   }}
-                >
-                  <option value="">Select…</option>
-                  {suppliers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                  options={suppliers.map((p) => ({ value: p.id, label: p.name }))}
+                />
               </Field>
               <Segmented
                 value={sourceChannel} set={setSourceChannel}
@@ -257,10 +263,12 @@ export function NewSaleSheet({
               <div className="grid grid-cols-2 gap-3">
                 {sourceChannel === 'memo' ? (
                   <>
-                    <Field label="Memo no." htmlFor="ns-srcDoc">
+                    <Field>
+                      <FieldLabel htmlFor="ns-srcDoc">Memo no.</FieldLabel>
                       <Input id="ns-srcDoc" name="sourceMemoNo" placeholder="Blank = we number it" />
                     </Field>
-                    <Field label="Terms (days)" htmlFor="ns-terms">
+                    <Field>
+                      <FieldLabel htmlFor="ns-terms">Terms (days)</FieldLabel>
                       <Input
                         id="ns-terms" name="termsDays" type="number" min="0" max="365"
                         value={terms} onChange={(e) => setTerms(Number(e.target.value))}
@@ -268,7 +276,8 @@ export function NewSaleSheet({
                     </Field>
                   </>
                 ) : (
-                  <Field label="Bill no." htmlFor="ns-srcDoc">
+                  <Field>
+                    <FieldLabel htmlFor="ns-srcDoc">Bill no.</FieldLabel>
                     <Input id="ns-srcDoc" name="billNo" placeholder="Blank = cash" />
                   </Field>
                 )}
@@ -277,13 +286,13 @@ export function NewSaleSheet({
                 One supplier per save. Split a line across several suppliers from the requirement
                 page.
               </p>
-            </div>
+            </CardContent></Card>
           )}
 
           </section>
 
           {state && 'error' in state && (
-            <p role="alert" className="text-sm text-destructive">{state.error}</p>
+            <FieldError>{state.error}</FieldError>
           )}
 
           <SheetFooter className="sticky bottom-0 -mx-5 border-t bg-popover px-5 py-3">
@@ -340,115 +349,109 @@ function LineCard({
   const short = fromStock && picked ? want - picked.balance : 0;
 
   return (
-    <div className="space-y-3 rounded-xl border bg-card p-3.5 shadow-xs">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span className="font-semibold uppercase tracking-[0.1em]">Stone {index + 1}</span>
-        {onRemove && (
-          <button type="button" onClick={onRemove} className="hover:text-destructive">Remove</button>
-        )}
-      </div>
-
-      <Segmented
-        value={line.from}
-        set={(v) => onChange({ from: v, lotId: '', inStock: null })}
-        options={[['stock', 'From stock'], ['source', 'To source']]}
-      />
-
-      {fromStock ? (
-        <>
-          <Field label="Which parcel" htmlFor={`ns-${index}-lot`}>
-            <select
-              id={`ns-${index}-lot`} required
-              className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-              value={line.lotId}
-              onChange={(e) => {
-                const u = units.find((x) => x.lotId === e.target.value);
-                onChange({
-                  lotId: e.target.value,
-                  // Selling the whole parcel is the common case; overwrite only
-                  // while the operator has not typed carats of their own.
-                  carats: carats || (u ? u.balance.toFixed(3) : ''),
-                });
-              }}
-            >
-              <option value="">Select stock…</option>
-              {units.map((u) => (
-                <option key={u.lotId} value={u.lotId}>
-                  {u.label} — {u.balance.toFixed(3)} ct{u.onMemo ? ` (on memo${u.partyName ? `, ${u.partyName}` : ''})` : ''}
-                </option>
-              ))}
-            </select>
-          </Field>
-          {picked && (
-            <p className="text-xs text-muted-foreground">
-              {ct(picked.balance)} in this parcel
-              {picked.costRate > 0 && ` · cost ${inr(picked.costRate)}/ct`}
-              {picked.onMemo && ' · still the supplier\u2019s goods until billed'}
-            </p>
+    <Card size="sm">
+      <CardContent className="space-y-3">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span className="font-medium">Stone {index + 1}</span>
+          {onRemove && (
+            <Button type="button" variant="ghost" size="xs" onClick={onRemove} className="hover:text-destructive">Remove</Button>
           )}
-        </>
-      ) : (
-        <SpecFields
-          id={`ns-${index}`} picklists={picklists} sieveShapes={sieveShapes}
-          value={spec} onChange={(v) => onChange({ spec: v })}
+        </div>
+
+        <Segmented
+          value={line.from}
+          set={(v) => onChange({ from: v, lotId: '', inStock: null })}
+          options={[['stock', 'From stock'], ['source', 'To source']]}
         />
-      )}
 
-      <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-3">
-        <Field label="Carats" htmlFor={`ns-${index}-carats`}>
-          <Input
-            id={`ns-${index}-carats`} type="number" step="0.001" min="0.001" required
-            value={carats} onChange={(e) => onChange({ carats: e.target.value })}
+        {fromStock ? (
+          <>
+            <Field>
+              <FieldLabel htmlFor={`ns-${index}-lot`}>Which parcel</FieldLabel>
+              <Choice
+                id={`ns-${index}-lot`} required searchable placeholder="Search stock…"
+                value={line.lotId}
+                onValueChange={(v) => {
+                  const u = units.find((x) => x.lotId === v);
+                  onChange({
+                    lotId: v,
+                    // Selling the whole parcel is the common case; overwrite only
+                    // while the operator has not typed carats of their own.
+                    carats: carats || (u ? u.balance.toFixed(3) : ''),
+                  });
+                }}
+                options={units.map((u) => ({
+                  value: u.lotId,
+                  label: `${u.label} — ${u.balance.toFixed(3)} ct${u.onMemo ? ` (on memo${u.partyName ? `, ${u.partyName}` : ''})` : ''}`,
+                }))}
+              />
+            </Field>
+            {picked && (
+              <p className="text-xs text-muted-foreground">
+                {ct(picked.balance)} in this parcel
+                {picked.costRate > 0 && ` · cost ${inr(picked.costRate)}/ct`}
+                {picked.onMemo && ' · still the supplier\u2019s goods until billed'}
+              </p>
+            )}
+          </>
+        ) : (
+          <SpecFields
+            id={`ns-${index}`} picklists={picklists} sieveShapes={sieveShapes}
+            value={spec} onChange={(v) => onChange({ spec: v })}
           />
-        </Field>
-        <Field label="Rate (₹/ct)" htmlFor={`ns-${index}-rate`}>
-          <Input
-            id={`ns-${index}-rate`} type="number" step="0.01" min="0"
-            value={line.quotedRate} onChange={(e) => onChange({ quotedRate: e.target.value })}
-          />
-        </Field>
-        <p className="pb-2 text-sm font-medium">
-          <Amount carats={want} rate={num(line.quotedRate)} />
-        </p>
-      </div>
+        )}
 
-      {!fromStock && (
-        <p className="text-xs">
-          {line.inStock === null ? (
-            <span className="text-muted-foreground">Choose a size to check live availability.</span>
-          ) : line.inStock > 0.0005 ? (
-            <span className="font-medium text-positive">
-              {ct(line.inStock)} of this spec is already in stock — switch to From stock to use it
-            </span>
-          ) : (
-            <span className="text-muted-foreground">Not in stock — this line gets sourced.</span>
-          )}
-        </p>
-      )}
+        <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-3">
+          <Field>
+            <FieldLabel htmlFor={`ns-${index}-carats`}>Carats</FieldLabel>
+            <Input
+              id={`ns-${index}-carats`} type="number" step="0.001" min="0.001" required
+              value={carats} onChange={(e) => onChange({ carats: e.target.value })}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor={`ns-${index}-rate`}>Rate (₹/ct)</FieldLabel>
+            <Input
+              id={`ns-${index}-rate`} type="number" step="0.01" min="0"
+              value={line.quotedRate} onChange={(e) => onChange({ quotedRate: e.target.value })}
+            />
+          </Field>
+          <p className="pb-2 text-sm font-medium">
+            <Amount carats={want} rate={num(line.quotedRate)} />
+          </p>
+        </div>
 
-      {(!fromStock || short > 0.0005) && sourceNow && (
-        <Field label="Supplier cost (₹/ct)" htmlFor={`ns-${index}-cost`}>
-          <Input
-            id={`ns-${index}-cost`} type="number" step="0.01" min="0"
-            value={line.costRate} onChange={(e) => onChange({ costRate: e.target.value })}
-          />
-        </Field>
-      )}
+        {!fromStock && (
+          <p className="text-xs">
+            {line.inStock === null ? (
+              <span className="text-muted-foreground">Choose a size to check live availability.</span>
+            ) : line.inStock > 0.0005 ? (
+              <span className="font-medium text-positive">
+                {ct(line.inStock)} of this spec is already in stock — switch to From stock to use it
+              </span>
+            ) : (
+              <span className="text-muted-foreground">Not in stock — this line gets sourced.</span>
+            )}
+          </p>
+        )}
 
-      {short > 0.0005 && (
-        <p className="text-xs text-warning">
-          That parcel is {ct(short)} short — the rest of this line is sourced.
-        </p>
-      )}
-    </div>
+        {(!fromStock || short > 0.0005) && sourceNow && (
+          <Field>
+            <FieldLabel htmlFor={`ns-${index}-cost`}>Supplier cost (₹/ct)</FieldLabel>
+            <Input
+              id={`ns-${index}-cost`} type="number" step="0.01" min="0"
+              value={line.costRate} onChange={(e) => onChange({ costRate: e.target.value })}
+            />
+          </Field>
+        )}
+
+        {short > 0.0005 && (
+          <p className="text-xs text-warning">
+            That parcel is {ct(short)} short — the rest of this line is sourced.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
-function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-    </div>
-  );
-}

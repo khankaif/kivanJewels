@@ -1,18 +1,13 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { auth } from '@/lib/auth/server';
+import { requireUser } from '@/lib/auth/server';
 import { docNoOr } from '@/lib/doc-numbers';
 import {
   returnFromMemo, billMemoLine, OverdrawError, SettlementError,
 } from '@/lib/ledger/movements';
 
 export type ActionState = { error: string } | { ok: string } | null;
-
-async function requireUser() {
-  const { data: session } = await auth.getSession();
-  if (!session?.user) throw new Error('Not authenticated');
-}
 
 /** Turns domain errors into something a user can act on; rethrows the rest. */
 function toMessage(e: unknown): string {

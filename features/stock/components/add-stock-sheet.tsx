@@ -1,18 +1,24 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { AgentField } from '@/components/forms/agent-field';
+import { DateField } from '@/components/forms/date-field';
+import { Choice } from '@/components/forms/choice';
+import { useState } from 'react';
+import { useFormAction } from '@/lib/use-form-action';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
-import { Segmented } from '@/components/ui/segmented';
-import { CaratsRate } from '@/components/ui/carats-rate';
-import { SpecFields, type Picklists } from '@/features/masters/diamonds/components/spec-fields';
+import { Segmented } from '@/components/forms/segmented';
+import { CaratsRate } from '@/components/forms/carats-rate';
+import { SpecFields, blankSpec, type Picklists, type SpecValue } from '@/features/masters/diamonds/components/spec-fields';
+import { QuickEntry } from '@/components/forms/quick-entry';
 import type { SieveShapes } from '@/lib/spec-rules';
 import { useLastUsed } from '@/lib/use-last-used';
-import { addStockAction, type ActionState } from '../actions';
+import { addStockAction } from '../actions';
+import { todayIso } from '@/lib/dates';
 
 type Party = { id: string; name: string; defaultTermsDays: number };
 type Mode = 'bill' | 'memo';
@@ -32,18 +38,16 @@ export function AddStockSheet({
   // while supplier, date and mode stay put -- the next parcel from the same
   // supplier usually differs only in size and carats.
   const [round, setRound] = useState(0);
-  const [state, formAction, isPending] = useActionState<ActionState, FormData>(
-    async (prev, fd) => {
-      const res = await addStockAction(prev, fd);
-      if (res && 'ok' in res) {
-        if (fd.get('then') === 'again') setRound((r) => r + 1);
-        else setOpen(false);
-      }
-      return res;
-    },
-    null,
-  );
-  const today = new Date().toISOString().slice(0, 10);
+  // Held here, not in the fields, so a quick-entry line can fill them.
+  const [spec, setSpec] = useState<SpecValue>(blankSpec);
+  const [fill, setFill] = useState({ n: 0, carats: '', rate: '' });
+  const [state, formAction, isPending] = useFormAction(addStockAction, (fd) => {
+    setSpec(blankSpec());
+    setFill((f) => ({ n: f.n + 1, carats: '', rate: '' }));
+    if (fd.get('then') === 'again') setRound((r) => r + 1);
+    else setOpen(false);
+  });
+  const today = todayIso();
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -66,65 +70,76 @@ export function AddStockSheet({
         <form key={round} action={formAction} className="flex flex-1 flex-col gap-4">
           <input type="hidden" name="mode" value={mode} />
 
-          <SpecFields id="as" picklists={picklists} sieveShapes={sieveShapes} autoFocus />
+          <QuickEntry
+            id="as"
+            onParsed={(r) => {
+              setSpec((s) => ({ ...s, ...r.spec }));
+              setFill((f) => ({
+                n: f.n + 1,
+                carats: r.carats !== null ? String(r.carats) : f.carats,
+                rate: r.rate !== null ? String(r.rate) : f.rate,
+              }));
+            }}
+          />
 
-          <CaratsRate id="as" />
+          <SpecFields id="as" picklists={picklists} sieveShapes={sieveShapes} value={spec} onChange={setSpec} />
 
-          <Field label={mode === 'bill' ? 'Date' : 'Received on'} htmlFor="as-on">
-            <Input id="as-on" name="on" type="date" defaultValue={today} required />
+          {/* Remounted by a quick-entry fill so its defaults take the parsed values. */}
+          <CaratsRate key={fill.n} id="as" defaultCarats={fill.carats} defaultRate={fill.rate} />
+
+          <Field>
+            <FieldLabel htmlFor="as-on">{mode === 'bill' ? 'Date' : 'Received on'}</FieldLabel>
+            <DateField id="as-on" name="on" defaultValue={today} required />
           </Field>
 
-          <Field label="Supplier" htmlFor="as-partyId">
-            <select
-              id="as-partyId" name="partyId"
+          <Field>
+            <FieldLabel htmlFor="as-partyId">Supplier</FieldLabel>
+            <Choice
+              id="as-partyId" name="partyId" searchable
               required={mode === 'memo'}
-              className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+              placeholder={mode === 'bill' ? 'Not recorded — search to add' : 'Search suppliers…'}
               value={supplier}
-              onChange={(e) => {
-                setSupplier(e.target.value);
-                const p = suppliers.find((s) => s.id === e.target.value);
+              onValueChange={(v) => {
+                setSupplier(v);
+                const p = suppliers.find((s) => s.id === v);
                 if (p) setTerms(p.defaultTermsDays);
               }}
-            >
-              <option value="">{mode === 'bill' ? 'Not recorded' : 'Select…'}</option>
-              {suppliers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+              options={suppliers.map((p) => ({ value: p.id, label: p.name }))}
+            />
           </Field>
 
           {mode === 'bill' ? (
-            <Field label="Bill no." htmlFor="as-billNo">
+            <Field>
+              <FieldLabel htmlFor="as-billNo">Bill no.</FieldLabel>
               <Input id="as-billNo" name="billNo" placeholder="Blank = cash, no payable" />
             </Field>
           ) : (
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Memo no." htmlFor="as-memoNo">
+              <Field>
+                <FieldLabel htmlFor="as-memoNo">Memo no.</FieldLabel>
                 <Input id="as-memoNo" name="memoNo" placeholder="Blank = we number it" />
               </Field>
-              <Field label="Terms (days)" htmlFor="as-terms">
+              <Field>
+                <FieldLabel htmlFor="as-terms">Terms (days)</FieldLabel>
                 <Input
                   id="as-terms" name="termsDays" type="number" min="0" max="365"
                   value={terms} onChange={(e) => setTerms(Number(e.target.value))}
                 />
               </Field>
-              <Field label="Placed by" htmlFor="as-agent">
-                <Input id="as-agent" name="agent" list="as-agent-list" placeholder="Rushabh" />
-                <datalist id="as-agent-list">
-                  {agents.map((a) => <option key={a} value={a} />)}
-                </datalist>
+              <Field>
+                <FieldLabel htmlFor="as-agent">Placed by</FieldLabel>
+                <AgentField id="as-agent" agents={agents} />
               </Field>
             </div>
           )}
 
-          <Field label="Note" htmlFor="as-notes">
+          <Field>
+            <FieldLabel htmlFor="as-notes">Note</FieldLabel>
             <Input id="as-notes" name="notes" placeholder="Optional" />
           </Field>
 
           {state && 'error' in state && (
-            <p role="alert" className="text-sm text-destructive">{state.error}</p>
-          )}
-
-          {state && 'ok' in state && (
-            <p role="status" className="text-sm text-positive">{state.ok}</p>
+            <FieldError>{state.error}</FieldError>
           )}
 
           <SheetFooter>
@@ -141,11 +156,3 @@ export function AddStockSheet({
   );
 }
 
-function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-    </div>
-  );
-}

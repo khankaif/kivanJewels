@@ -1,25 +1,22 @@
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 export type TabItem = { href: string; label: string; active: boolean };
 
+/** Views of a section, as the header's second row. Links, not shadcn Tabs: each is its own route. */
 export function SectionTabs({ items }: { items: TabItem[] }) {
   return (
-    <div className="flex gap-1 border-b">
+    <nav className="-mb-px flex gap-1 overflow-x-auto">
       {items.map((t) => (
-        <Link
-          key={t.href}
-          href={t.href}
-          className={cn(
-            '-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-            t.active
-              ? 'border-foreground text-foreground'
-              : 'border-transparent text-muted-foreground hover:text-foreground',
-          )}
+        <Button
+          key={t.href} variant="ghost" size="sm" nativeButton={false}
+          aria-current={t.active ? 'page' : undefined}
+          className="h-9 rounded-none border-b-2 border-b-transparent px-2 text-sm text-muted-foreground hover:bg-transparent hover:text-foreground aria-[current=page]:border-b-foreground aria-[current=page]:text-foreground"
+          render={<Link href={t.href} />}
         >
           {t.label}
-        </Link>
+        </Button>
       ))}
-    </div>
+    </nav>
   );
 }

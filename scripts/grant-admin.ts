@@ -16,7 +16,7 @@
 import { sql } from '../db/client';
 
 async function main() {
-  const args = process.argv.slice(2).filter((a) => !a.startsWith('dotenv_config'));
+  const args = process.argv.slice(2);
   const revoke = args.includes('--revoke');
   const email = args.find((a) => a.includes('@'))?.toLowerCase();
 

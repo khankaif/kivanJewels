@@ -1,7 +1,6 @@
-// Loaded via `--import` before any test module, so db/client.ts sees the
+// Loaded via `--import` (after --env-file) before any test module, so db/client.ts sees the
 // already-swapped DATABASE_URL. Tests TRUNCATE tables; this guard is the only
 // thing standing between a typo and the real books.
-import 'dotenv/config';
 
 const test = process.env.TEST_DATABASE_URL;
 const prod = process.env.DATABASE_URL;

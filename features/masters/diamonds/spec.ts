@@ -1,5 +1,5 @@
 import { sql } from '@/db/client';
-import { cleanSpec, validateSpec, SPEC_FIELDS, type Spec, type SpecField } from '@/lib/spec-rules';
+import { BUCKET_FOR, cleanSpec, validateSpec, SPEC_FIELDS, type Spec, type SpecField } from '@/lib/spec-rules';
 import { getSieveShapes } from './queries';
 
 export type SpecResult = { ok: true; spec: StoredSpec } | { ok: false; error: string };
@@ -8,16 +8,6 @@ export type StoredSpec = {
   stoneType: string; shape: string | null; sieveSize: string | null;
   mmSize: string | null; colour: string | null; clarity: string | null;
   lab: string | null; certified: string | null;
-};
-
-/**
- * Which master list backs each field. Sieve and MM are absent on purpose:
- * 507 and 427 distinct values in the book -- those are measurements, and
- * lot_unit_key() normalizes them on write.
- */
-const BUCKET_FOR: Partial<Record<SpecField, string>> = {
-  stoneType: 'stone_type', shape: 'shape', colour: 'colour',
-  clarity: 'clarity', lab: 'lab', certified: 'certified',
 };
 
 /**

@@ -77,10 +77,3 @@ export async function getMasterMismatches(): Promise<Mismatch[]> {
     bucket: r.bucket, label: r.label, value: r.value, lots: r.lots,
   }));
 }
-
-export type Alias = { bucket: string; alias: string; value: string };
-
-export async function getAliases(): Promise<Alias[]> {
-  const rows = await sql`SELECT bucket, alias, value FROM attribute_aliases ORDER BY bucket, alias`;
-  return rows as unknown as Alias[];
-}

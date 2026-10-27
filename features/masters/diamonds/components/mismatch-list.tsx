@@ -1,7 +1,10 @@
 'use client';
 
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from '@/components/ui/item';
+import { Choice } from '@/components/forms/choice';
 import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
+import { FieldError } from '@/components/ui/field';
 import { adoptValueAction, aliasValueAction, type MasterState } from '../actions';
 import type { Mismatch } from '../queries';
 
@@ -39,36 +42,33 @@ function MismatchRow({ mismatch, options }: { mismatch: Mismatch; options: strin
   const [state, formAction, isPending] = useActionState<MasterState, FormData>(aliasValueAction, null);
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm">
-      <div className="min-w-40">
-        <span className="font-medium">{mismatch.value}</span>
-        <span className="ml-2 text-xs text-muted-foreground">
-          {mismatch.label} · {mismatch.lots} row{mismatch.lots === 1 ? '' : 's'}
-        </span>
-      </div>
+    <Item variant="outline" size="sm">
+      <ItemContent className="min-w-40">
+        <ItemTitle>{mismatch.value}</ItemTitle>
+        <ItemDescription>{mismatch.label} · {mismatch.lots} row{mismatch.lots === 1 ? '' : 's'}</ItemDescription>
+      </ItemContent>
 
-      <form action={adoptValueAction} className="ml-auto">
-        <input type="hidden" name="bucket" value={mismatch.bucket} />
-        <input type="hidden" name="value" value={mismatch.value} />
-        <Button type="submit" size="sm" variant="outline">Add to master</Button>
-      </form>
+      <ItemActions>
+        <form action={adoptValueAction}>
+          <input type="hidden" name="bucket" value={mismatch.bucket} />
+          <input type="hidden" name="value" value={mismatch.value} />
+          <Button type="submit" size="sm" variant="outline">Add to master</Button>
+        </form>
 
-      <form action={formAction} className="flex items-center gap-2">
-        <input type="hidden" name="bucket" value={mismatch.bucket} />
-        <input type="hidden" name="value" value={mismatch.value} />
-        <select
-          name="target" required defaultValue=""
-          className="h-8 rounded-md border bg-transparent px-2 text-sm"
-        >
-          <option value="">same as…</option>
-          {options.map((v) => <option key={v} value={v}>{v}</option>)}
-        </select>
-        <Button type="submit" size="sm" variant="ghost" disabled={isPending}>Map</Button>
-      </form>
+        <form action={formAction} className="flex items-center gap-2">
+          <input type="hidden" name="bucket" value={mismatch.bucket} />
+          <input type="hidden" name="value" value={mismatch.value} />
+          <Choice
+            name="target" required placeholder="Same as…" size="sm" className="w-40"
+            options={options.map((v) => ({ value: v, label: v }))}
+          />
+          <Button type="submit" size="sm" variant="ghost" disabled={isPending}>Map</Button>
+        </form>
+      </ItemActions>
 
       {state && 'error' in state && (
-        <p role="alert" className="basis-full text-xs text-destructive">{state.error}</p>
+        <FieldError className="basis-full text-xs">{state.error}</FieldError>
       )}
-    </div>
+    </Item>
   );
 }

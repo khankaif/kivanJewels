@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { inRollback } from './helpers';
 import { recordBill, recordPayment } from '@/lib/ledger/movements';
-import { addDays } from '@/lib/dates';
+import { addDays, todayIso } from '@/lib/dates';
 
 const uniq = () => `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-const today = new Date().toISOString().slice(0, 10);
+const today = todayIso();
 
 async function party(c: any) {
   const { rows } = await c.query(
