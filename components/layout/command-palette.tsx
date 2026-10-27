@@ -2,13 +2,17 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Kbd } from '@/components/ui/kbd';
+import {
+  Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from '@/components/ui/command';
 import { searchAction } from '@/features/search/actions';
 import type { Hit } from '@/features/search/queries';
+import { waLink } from '@/lib/whatsapp';
 
-/** Shown on an empty query: the three things you open the app to type. */
+/** Shown on an empty query: the things you open the app to do. */
 const ACTIONS: Hit[] = [
   { kind: 'stock', label: 'Add diamonds', sub: 'on bill or on memo', href: '/stock?new=1' },
   { kind: 'requirement', label: 'New requirement', sub: 'a customer asked for something', href: '/sales?new=1' },
@@ -16,16 +20,17 @@ const ACTIONS: Hit[] = [
   { kind: 'party', label: 'New party', sub: 'supplier or client', href: '/parties?new=1' },
 ];
 
-const KIND_LABEL: Record<Hit['kind'], string> = {
-  stock: 'Stock', party: 'Party', bill: 'Bill', requirement: 'Requirement',
-};
+const GROUPS: [Hit['kind'], string][] = [
+  ['stock', 'Stock'], ['party', 'Parties'], ['bill', 'Bills'], ['requirement', 'Requirements'],
+];
 
 export function CommandPalette() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<Hit[]>(ACTIONS);
-  const [cursor, setCursor] = useState(0);
+  // cmdk tracks the highlighted row by its value; we key rows by href.
+  const [active, setActive] = useState('');
   const [, startTransition] = useTransition();
 
   useEffect(() => {
@@ -40,70 +45,85 @@ export function CommandPalette() {
   }, []);
 
   // 150ms is under the threshold where typing feels laggy and still collapses
-  // a burst of keystrokes into one round trip.
+  // a burst of keystrokes into one round trip. Searching happens on the server,
+  // so cmdk's own filtering is off.
   useEffect(() => {
-    if (!q.trim()) {
-      setHits(ACTIONS);
-      setCursor(0);
-      return;
-    }
     const t = setTimeout(() => {
-      startTransition(async () => {
-        setHits(await searchAction(q));
-        setCursor(0);
-      });
-    }, 150);
+      startTransition(async () => setHits(q.trim() ? await searchAction(q) : ACTIONS));
+    }, q.trim() ? 150 : 0);
     return () => clearTimeout(t);
   }, [q]);
 
-  const go = (hit: Hit | undefined) => {
-    if (!hit) return;
+  const go = (href: string) => {
     setOpen(false);
     setQ('');
-    router.push(hit.href);
+    router.push(href);
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setQ(''); }}>
-      <DialogContent className="max-w-lg gap-0 p-0" showCloseButton={false}>
-        <DialogTitle className="sr-only">Search</DialogTitle>
-        <Input
-          autoFocus
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
+    <>
+      <Button
+        variant="outline" size="sm" onClick={() => setOpen(true)} aria-label="Search"
+        className="w-full justify-start gap-2 bg-background font-normal text-muted-foreground"
+      >
+        <Search />
+        <span className="truncate">Search</span>
+        <Kbd className="ml-auto">⌘K</Kbd>
+      </Button>
+      <CommandDialog
+        open={open} onOpenChange={(v) => { setOpen(v); if (!v) setQ(''); }}
+        title="Search" description="Search stock by spec, parties, bills and requirements"
+        className="sm:max-w-xl"
+      >
+        <Command
+          shouldFilter={false} value={active} onValueChange={setActive}
           onKeyDown={(e) => {
-            if (e.key === 'ArrowDown') { e.preventDefault(); setCursor((c) => Math.min(c + 1, hits.length - 1)); }
-            if (e.key === 'ArrowUp') { e.preventDefault(); setCursor((c) => Math.max(c - 1, 0)); }
-            if (e.key === 'Enter') { e.preventDefault(); go(hits[cursor]); }
+            // ⌘↵ on a parcel goes straight to selling it.
+            const hit = hits.find((h) => h.href === active);
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && hit?.sellHref) {
+              e.preventDefault();
+              go(hit.sellHref);
+            }
           }}
-          placeholder="Search stock, parties, bills, requirements…"
-          className="h-12 rounded-none border-0 border-b text-base shadow-none focus-visible:ring-0"
-        />
-        <ul className="max-h-80 overflow-y-auto p-1">
-          {hits.map((h, i) => (
-            <li key={`${h.kind}-${h.href}-${i}`}>
-              <button
-                type="button"
-                onMouseEnter={() => setCursor(i)}
-                onClick={() => go(h)}
-                className={cn(
-                  'flex w-full items-baseline gap-3 rounded-md px-3 py-2 text-left text-sm',
-                  i === cursor && 'bg-accent text-accent-foreground',
-                )}
-              >
-                <span className="font-medium">{h.label}</span>
-                <span className="flex-1 truncate text-xs text-muted-foreground">{h.sub}</span>
-                <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  {KIND_LABEL[h.kind]}
-                </span>
-              </button>
-            </li>
-          ))}
-          {!hits.length && (
-            <li className="px-3 py-8 text-center text-sm text-muted-foreground">Nothing matches.</li>
-          )}
-        </ul>
-      </DialogContent>
-    </Dialog>
+        >
+          <CommandInput value={q} onValueChange={setQ} placeholder="Try “9-9.5 round def vvs”, a party, or a bill no." />
+          <CommandList>
+            <CommandEmpty>Nothing matches.</CommandEmpty>
+            {GROUPS.map(([kind, heading]) => {
+              const rows = hits.filter((h) => h.kind === kind);
+              if (!rows.length) return null;
+              return (
+                <CommandGroup key={kind} heading={q.trim() ? heading : undefined}>
+                  {rows.map((h) => (
+                    <CommandItem key={h.href} value={h.href} onSelect={() => go(h.href)} className="group/hit gap-3">
+                      <span className="font-medium">{h.label}</span>
+                      <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{h.sub}</span>
+                      {h.sellHref && (
+                        // Only on the highlighted row, so the list stays quiet.
+                        <span className="hidden shrink-0 items-center gap-1 group-data-selected/hit:flex">
+                          <Button
+                            size="xs" variant="ghost" nativeButton={false} title="Share on WhatsApp"
+                            onClick={(e) => e.stopPropagation()}
+                            render={<a href={waLink(h.offer ?? '')} target="_blank" rel="noreferrer" />}
+                          >
+                            WhatsApp
+                          </Button>
+                          <Button
+                            size="xs" variant="outline" title="Sell (⌘↵)"
+                            onClick={(e) => { e.stopPropagation(); go(h.sellHref!); }}
+                          >
+                            Sell
+                          </Button>
+                        </span>
+                      )}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              );
+            })}
+          </CommandList>
+        </Command>
+      </CommandDialog>
+    </>
   );
 }

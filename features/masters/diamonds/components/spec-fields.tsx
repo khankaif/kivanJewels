@@ -1,9 +1,9 @@
 'use client';
 
+import { Choice } from '@/components/forms/choice';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Field, FieldLabel } from '@/components/ui/field';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';
 import {
   BUCKET_FOR, hides, isCertified, REQUIRED, SPEC_FIELDS, usesSieve, type SieveShapes, type SpecField,
@@ -45,9 +45,9 @@ const PLACEHOLDER: Partial<Record<SpecField, string>> = {
  * `value`/`onChange` to drive it, which the multi-line sales form does.
  */
 export function SpecFields({
-  id, picklists, sieveShapes, autoFocus = false, value, onChange, className,
+  id, picklists, sieveShapes, value, onChange, className,
 }: {
-  id: string; picklists: Picklists; sieveShapes: SieveShapes; autoFocus?: boolean;
+  id: string; picklists: Picklists; sieveShapes: SieveShapes;
   value?: SpecValue; onChange?: (v: SpecValue) => void; className?: string;
 }) {
   const [own, setOwn] = useState<SpecValue>(() => value ?? blankSpec());
@@ -64,7 +64,7 @@ export function SpecFields({
 
   return (
     <div className={cn('grid grid-cols-2 gap-3', className)}>
-      {SPEC_FIELDS.map((f, i) => {
+      {SPEC_FIELDS.map((f) => {
         const listKey = BUCKET_FOR[f];
         const options = listKey ? picklists[listKey] ?? [] : null;
         const hidden = hides(sieveShapes, spec, f);
@@ -83,16 +83,13 @@ export function SpecFields({
               {required && <span className="text-destructive"> *</span>}
             </FieldLabel>
             {options ? (
-              <NativeSelect
+              <Choice
                 id={`${id}-${f}`} name={f}
-                value={spec[f]} onChange={(e) => set(f, e.target.value)}
+                value={spec[f]} onValueChange={(v) => set(f, v)}
                 disabled={hidden} required={required}
-                autoFocus={autoFocus && i === 0}
-                className="w-full"
-              >
-                <NativeSelectOption value="">{hidden ? `not used for ${spec.shape}` : 'Select…'}</NativeSelectOption>
-                {options.map((v) => <NativeSelectOption key={v} value={v}>{v}</NativeSelectOption>)}
-              </NativeSelect>
+                placeholder={hidden ? `Not used for ${spec.shape}` : 'Select…'}
+                options={options.map((v) => ({ value: v, label: v }))}
+              />
             ) : (
               <Input
                 id={`${id}-${f}`} name={f}

@@ -1,5 +1,6 @@
 'use client';
 
+import { Choice } from '@/components/forms/choice';
 import { useState } from 'react';
 import { useFormAction } from '@/lib/use-form-action';
 import { Button } from '@/components/ui/button';
@@ -12,9 +13,11 @@ import {
 } from '@/components/ui/sheet';
 import { savePartyAction } from '../actions';
 import type { Party } from '../queries';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
-export function PartyDialog({ party, defaultOpen = false }: { party?: Party; defaultOpen?: boolean }) {
+/** Takes any party record: the list row or the full record page's party. */
+type EditableParty = Omit<Party, 'openMemosIn' | 'openMemosOut' | 'receivable' | 'payable' | 'net'>;
+
+export function PartyDialog({ party, defaultOpen = false }: { party?: EditableParty; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   const [state, formAction, isPending] = useFormAction(savePartyAction, () => setOpen(false));
   const editing = !!party;
@@ -54,14 +57,14 @@ export function PartyDialog({ party, defaultOpen = false }: { party?: Party; def
           <div className="grid grid-cols-2 gap-3">
             <Field>
               <FieldLabel htmlFor="kind">Role</FieldLabel>
-              <NativeSelect
+              <Choice
                 id="kind" name="kind" defaultValue={party?.kind ?? 'both'}
-                className="w-full"
-              >
-                <NativeSelectOption value="both">Supplier &amp; client</NativeSelectOption>
-                <NativeSelectOption value="supplier">Supplier only</NativeSelectOption>
-                <NativeSelectOption value="client">Client only</NativeSelectOption>
-              </NativeSelect>
+                options={[
+                  { value: 'both', label: 'Supplier & client' },
+                  { value: 'supplier', label: 'Supplier only' },
+                  { value: 'client', label: 'Client only' },
+                ]}
+              />
             </Field>
             <Field>
               <FieldLabel htmlFor="defaultTermsDays">Credit terms (days)</FieldLabel>

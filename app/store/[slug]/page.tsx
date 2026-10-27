@@ -2,8 +2,10 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { Monogram } from '@/features/catalog/components/gallery';
 import { getPublishedItem, getPublishedItems } from '@/features/catalog/queries';
+import { enquire, storeUrl } from '@/features/catalog/store';
 import { mrp, weight } from '@/lib/format';
 import { imageBase } from '@/lib/r2';
 
@@ -40,42 +42,57 @@ export default async function PiecePage({ params }: PageProps<'/store/[slug]'>) 
   ];
 
   return (
-    <div className="space-y-6">
-      <Link href="/" className="text-xs uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground">
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-8 sm:py-10">
+      <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
         ← All pieces
       </Link>
-      <div className="grid gap-8 lg:grid-cols-[1.3fr_1fr] lg:gap-12">
-        <div className="grid grid-cols-2 gap-2">
-          {photos.map((src, i) => (
-            <div key={src} className={`relative aspect-[4/5] bg-muted ${i === 0 ? 'col-span-2' : ''}`}>
+      <div className="mt-6 grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:gap-16">
+        {/* Swipe through on a phone; a grid with the cover across the top on desktop. */}
+        <div className="-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto sm:mx-0 lg:grid lg:grid-cols-2 lg:overflow-visible">
+          {photos.length === 0 ? (
+            <div className="relative aspect-[4/5] w-full shrink-0 bg-muted lg:col-span-2"><Monogram /></div>
+          ) : photos.map((src, i) => (
+            <div
+              key={src}
+              className={`relative aspect-[4/5] w-[88%] shrink-0 snap-center bg-muted sm:w-full lg:w-auto ${i === 0 ? 'lg:col-span-2' : ''}`}
+            >
               <Image
                 src={src} alt={i === 0 ? item.title : ''} fill priority={i === 0}
-                sizes={i === 0 ? '(min-width: 1024px) 55vw, 100vw' : '(min-width: 1024px) 28vw, 50vw'}
+                sizes={i === 0 ? '(min-width: 1024px) 55vw, 90vw' : '(min-width: 1024px) 28vw, 90vw'}
                 className="object-cover"
               />
             </div>
           ))}
         </div>
 
-        <div className="space-y-6 lg:sticky lg:top-8 lg:self-start">
+        <div className="space-y-8 lg:sticky lg:top-24 lg:self-start">
           <div className="space-y-3">
-            <div className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground">{item.category}</div>
-            <h1 className="font-[family-name:var(--font-display)] text-3xl leading-tight sm:text-4xl">{item.title}</h1>
+            <h1 className="font-display text-4xl font-medium leading-[1.02] tracking-[-0.01em] sm:text-5xl">{item.title}</h1>
             {item.mrp !== null && (
               <div className="text-lg tabular-nums">
                 {mrp(item.mrp)} <span className="text-xs text-muted-foreground">MRP</span>
               </div>
             )}
           </div>
+          <Button
+            nativeButton={false} size="lg" className="h-12 w-full text-sm tracking-[0.06em] uppercase"
+            render={
+              <a
+                href={enquire(`Hi, I'd like to know more about ${item.title}: ${storeUrl(`/${item.slug}`)}`)}
+                target="_blank" rel="noopener noreferrer"
+              />
+            }
+          >
+            Enquire on WhatsApp
+          </Button>
           {item.description && (
             <p className="whitespace-pre-line text-sm leading-7 text-muted-foreground">{item.description}</p>
           )}
-          <Separator />
-          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
+          <dl className="divide-y border-y text-sm">
             {specs.filter(([, v]) => v).map(([k, v]) => (
-              <div key={k} className="contents">
+              <div key={k} className="flex justify-between gap-6 py-3">
                 <dt className="text-muted-foreground">{k}</dt>
-                <dd>{v}</dd>
+                <dd className="text-right">{v}</dd>
               </div>
             ))}
           </dl>

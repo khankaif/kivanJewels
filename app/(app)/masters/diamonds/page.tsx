@@ -1,4 +1,6 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   getAttributeBuckets, getDiamondAttributes, getMasterMismatches,
 } from '@/features/masters/diamonds/queries';
@@ -19,34 +21,35 @@ export default async function DiamondMasterPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
-        eyebrow="Administration"
-        title="Diamond master"
-        description="Control the values and rules used by transaction forms. Sieve and MM stay free measurements and are normalized automatically."
+        title="Masters"
+        tabs={<MastersNav />}
       />
 
-      <MastersNav />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            Values the master doesn&apos;t know
-            {mismatches.length > 0 && (
-              <span className="ml-2 text-sm font-normal text-warning">{mismatches.length}</span>
-            )}
-          </CardTitle>
-          <CardDescription>
-            Every stone field is filled from these lists — nothing is typed free-hand, so the book
-            can&apos;t grow a seventh spelling of &quot;Lab Grown&quot;. Anything already stored that
-            the master can&apos;t resolve is listed here: adopt it, or map it onto the value it
-            really means.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <MismatchList mismatches={mismatches} valuesByBucket={valuesByBucket} />
-        </CardContent>
-      </Card>
+      {mismatches.length > 0 && (
+        <Card size="sm">
+          <Collapsible className="flex flex-col gap-3">
+            <CardHeader>
+              <CardTitle>
+                {mismatches.length} stored value{mismatches.length === 1 ? '' : 's'} don&apos;t match the master
+              </CardTitle>
+              <CardDescription>
+                Adopt each one, or map it onto the value it really means, so the book keeps one
+                spelling of every grade.
+              </CardDescription>
+              <CardAction>
+                <CollapsibleTrigger render={<Button variant="outline" size="sm" />}>Review</CollapsibleTrigger>
+              </CardAction>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent>
+                <MismatchList mismatches={mismatches} valuesByBucket={valuesByBucket} />
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -58,7 +61,9 @@ export default async function DiamondMasterPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+          {/* Columns, not a grid: lists differ wildly in length, and a grid row
+              would stretch every short list to match the longest one. */}
+          <div className="gap-3 sm:columns-2 [&>*]:mb-3 [&>*]:break-inside-avoid">
             {buckets.map((b) => (
               <AttributeList key={b.key} bucket={b} values={grouped[b.key] ?? []} />
             ))}

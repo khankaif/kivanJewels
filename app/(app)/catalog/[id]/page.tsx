@@ -1,11 +1,12 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { PageHeader } from '@/components/layout/page-header';
 import { getCatalogItem, UUID } from '@/features/catalog/queries';
 import { ItemForm } from '@/features/catalog/components/item-form';
-import { DeletePiece } from '@/features/catalog/components/delete-piece';
+import { ConfirmAction } from '@/components/forms/confirm-action';
+import { deleteItemAction } from '@/features/catalog/actions';
 import { getDiamondPicklists } from '@/features/masters/diamonds/queries';
 import { imageBase } from '@/lib/r2';
 
@@ -28,16 +29,11 @@ export default async function CatalogItemPage({ params }: PageProps<'/catalog/[i
     : null;
 
   return (
-    <div className="space-y-6">
-      <Link href="/catalog" className="text-sm text-muted-foreground underline underline-offset-4">
-        ← Catalog
-      </Link>
+    <div className="space-y-4">
       <PageHeader
-        eyebrow="Storefront"
+        parent={{ href: '/catalog', label: 'Catalog' }}
         title={item?.title ?? 'New piece'}
-        description={item
-          ? item.published ? 'Live on the storefront. Changes show up as soon as you save.' : 'Draft. Only staff can see it.'
-          : 'Fill in what the piece card shows. It stays a draft until you tick “Show on the storefront”.'}
+        badges={item && <Badge variant={item.published ? 'default' : 'outline'}>{item.published ? 'Live' : 'Draft'}</Badge>}
         actions={
           <>
             {liveUrl && (
@@ -45,7 +41,15 @@ export default async function CatalogItemPage({ params }: PageProps<'/catalog/[i
                 View in store
               </Button>
             )}
-            {item && <DeletePiece id={item.id} title={item.title} />}
+            {item && (
+              <ConfirmAction
+                action={deleteItemAction} fields={{ id: item.id }}
+                trigger={<Button variant="destructive">Delete</Button>}
+                title={`Delete ${item.title}?`}
+                description="It comes off the storefront and its photos are deleted. This can't be undone."
+                confirm="Delete piece"
+              />
+            )}
           </>
         }
       />

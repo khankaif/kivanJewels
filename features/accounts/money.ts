@@ -1,17 +1,22 @@
 import { sql } from '@/db/client';
+import type { Sort } from '@/lib/sort';
 import { specLabel } from '@/lib/format';
 
 export type Bill = {
   billKey: string; billNo: string | null; isCash: boolean;
   direction: 'sale' | 'purchase';
-  partyId: string; partyName: string;
+  partyId: string; partyName: string; partyPhone: string | null;
   billedOn: string | null; lastPaidOn: string | null; dueOn: string | null;
   lines: number; gross: number; paid: number; balance: number;
   ageDays: number | null; daysOverdue: number | null;
   status: 'paid' | 'part' | 'due' | 'overdue';
 };
 
+export const BILL_SORTS = ['date', 'party', 'amount', 'balance', 'due'] as const;
+export type BillSort = Sort<(typeof BILL_SORTS)[number]>;
+
 export type BillFilters = {
+  sort?: BillSort;
   direction?: 'sale' | 'purchase';
   status?: 'all' | 'unpaid' | 'paid' | 'overdue';
   partyId?: string;
@@ -22,6 +27,18 @@ export type BillFilters = {
   limit?: number;
   offset?: number;
 };
+
+/** Whitelisted columns only: the sort arrives from the URL. */
+function billOrder(s: BillSort | undefined) {
+  const dir = s?.dir === 'asc' ? sql`ASC` : sql`DESC`;
+  switch (s?.col) {
+    case 'party': return sql`party_name ${dir}, billed_on DESC`;
+    case 'amount': return sql`gross ${dir} NULLS LAST`;
+    case 'balance': return sql`balance ${dir} NULLS LAST`;
+    case 'due': return sql`due_on::date ${dir} NULLS LAST`;
+    default: return sql`billed_on ${dir} NULLS LAST, gross DESC`;
+  }
+}
 
 export async function getBills(f: BillFilters = {}): Promise<{ rows: Bill[]; total: number; totals: { gross: number; paid: number; balance: number } }> {
   const direction = f.direction ?? null;
@@ -46,8 +63,8 @@ export async function getBills(f: BillFilters = {}): Promise<{ rows: Bill[]; tot
            OR (${status} = 'overdue' AND status = 'overdue'))`;
 
   const rows = await sql`
-    SELECT * FROM bills ${where}
-    ORDER BY billed_on DESC NULLS LAST, gross DESC
+    SELECT *, (SELECT phone FROM parties p WHERE p.id = bills.party_id) AS party_phone FROM bills ${where}
+    ORDER BY ${billOrder(f.sort)}
     LIMIT ${limit} OFFSET ${offset}`;
 
   const [agg] = await sql`
@@ -66,7 +83,7 @@ export async function getBills(f: BillFilters = {}): Promise<{ rows: Bill[]; tot
 
 const mapBill = (r: any): Bill => ({
   billKey: r.bill_key, billNo: r.bill_no, isCash: !!r.is_cash, direction: r.direction,
-  partyId: r.party_id, partyName: r.party_name,
+  partyId: r.party_id, partyName: r.party_name, partyPhone: r.party_phone ?? null,
   billedOn: r.billed_on, lastPaidOn: r.last_paid_on, dueOn: r.due_on,
   lines: r.lines, gross: Number(r.gross), paid: Number(r.paid),
   balance: Number(r.balance), ageDays: r.age_days === null ? null : Number(r.age_days),
@@ -76,7 +93,8 @@ const mapBill = (r: any): Bill => ({
 
 export async function getBill(billKey: string, direction: 'sale' | 'purchase'): Promise<Bill | null> {
   const rows = await sql`
-    SELECT * FROM bills WHERE bill_key = ${billKey} AND direction = ${direction}`;
+    SELECT *, (SELECT phone FROM parties p WHERE p.id = bills.party_id) AS party_phone
+    FROM bills WHERE bill_key = ${billKey} AND direction = ${direction}`;
   return rows.length ? mapBill(rows[0]) : null;
 }
 
@@ -105,16 +123,27 @@ export async function getBillLines(billKey: string, direction: 'sale' | 'purchas
     )
     SELECT k.id, k.dated_on::text AS dated_on, k.kind, k.amount, k.ref_id, k.notes,
            l.lot_no, l.stone_type, l.shape, l.sieve_size,
-           mv.carats, mv.rate
+           COALESCE(mb.carats, mv.carats) AS carats, COALESCE(mb.rate, mv.rate) AS rate
     FROM keyed k
+    -- Three ways a ledger row names its parcel: the import's 'DH-<id>' lot
+    -- number, a purchase's lot_id, or the memo line a memo bill settled.
     LEFT JOIN lots l
-      ON l.lot_no = k.ref_id AND k.ref_type = 'diamond_hisab'
+      ON (k.ref_type = 'diamond_hisab' AND l.lot_no = k.ref_id)
+      OR l.id = k.lot_id
+      OR l.id = (SELECT ml.lot_id FROM memo_lines ml WHERE ml.id = k.memo_line_id)
     LEFT JOIN LATERAL (
       SELECT m.carats, m.rate FROM movements m
       WHERE m.lot_id = l.id
         AND m.kind = CASE WHEN k.dir = 'sale' THEN 'sale' ELSE 'purchase' END
       LIMIT 1
     ) mv ON true
+    -- A memo bill's carats are the ones billed on that line, not the parcel's.
+    LEFT JOIN LATERAL (
+      SELECT b.carats, round(abs(k.amount) / NULLIF(b.carats, 0), 2) AS rate
+      FROM memo_line_billings b
+      WHERE b.memo_line_id = k.memo_line_id AND b.invoice_no = k.bill_no
+      LIMIT 1
+    ) mb ON k.memo_line_id IS NOT NULL
     WHERE k.bill_key = ${billKey} AND k.dir = ${direction}
     ORDER BY k.kind, k.dated_on, l.lot_no`;
 

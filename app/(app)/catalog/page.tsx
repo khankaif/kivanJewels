@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Empty, EmptyDescription, EmptyTitle, EmptyHeader } from '@/components/ui/empty';
+import { Empty, EmptyContent, EmptyDescription, EmptyTitle, EmptyHeader } from '@/components/ui/empty';
 import { PageHeader } from '@/components/layout/page-header';
 import { getCatalogItems } from '@/features/catalog/queries';
 import { setPublishedAction } from '@/features/catalog/actions';
@@ -19,11 +19,10 @@ export default async function CatalogPage() {
   const live = items.filter((i) => i.published).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
-        eyebrow="Storefront"
+        detail={`${items.length} pieces, ${live} live`}
         title="Catalog"
-        description={`${items.length} pieces, ${live} on the storefront. Drafts stay here until you publish them.`}
         actions={
           <Button nativeButton={false} render={<Link href="/catalog/new" />}>
             <Plus data-icon="inline-start" /> Add piece
@@ -32,11 +31,16 @@ export default async function CatalogPage() {
       />
 
       {items.length === 0 ? (
-        <Empty className="border py-16">
+        <Empty className="border border-dashed py-16">
           <EmptyHeader>
             <EmptyTitle>No pieces yet</EmptyTitle>
             <EmptyDescription>Add a piece with its photos, weights and MRP, then publish it.</EmptyDescription>
           </EmptyHeader>
+          <EmptyContent>
+            <Button nativeButton={false} render={<Link href="/catalog/new" />}>
+              <Plus data-icon="inline-start" /> Add your first piece
+            </Button>
+          </EmptyContent>
         </Empty>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

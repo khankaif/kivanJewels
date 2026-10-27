@@ -1,8 +1,14 @@
 'use client';
 
+import { Item, ItemActions, ItemContent, ItemDescription } from '@/components/ui/item';
+import { AgentField } from '@/components/forms/agent-field';
+import { DateField } from '@/components/forms/date-field';
+import { Choice } from '@/components/forms/choice';
+import { toast } from 'sonner';
 import { useActionState, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
@@ -21,7 +27,6 @@ import { addDays, todayIso } from '@/lib/dates';
 import { ct, inr } from '@/lib/format';
 import { createSaleAction, stockForSpecAction, type ActionState } from '../actions';
 import type { SellableUnit } from '../queries';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
 type Party = { id: string; name: string; defaultTermsDays: number };
 
@@ -48,15 +53,19 @@ const blankLine = (): Line => ({
 const num = (v: string) => Number(v) || 0;
 
 export function NewSaleSheet({
-  customers, suppliers, agents, picklists, sieveShapes, units, defaultOpen = false,
+  customers, suppliers, agents, picklists, sieveShapes, units, defaultOpen = false, defaultLot,
 }: {
   customers: Party[]; suppliers: Party[]; agents: string[];
   picklists: Picklists; sieveShapes: SieveShapes; units: SellableUnit[];
   defaultOpen?: boolean;
+  /** Opened from search on a parcel: the first line starts with it picked. */
+  defaultLot?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [customer, setCustomer] = useLastUsed('sales.customer');
-  const [lines, setLines] = useState<Line[]>([blankLine()]);
+  const [lines, setLines] = useState<Line[]>(() => [
+    units.some((u) => u.lotId === defaultLot) ? { ...blankLine(), lotId: defaultLot! } : blankLine(),
+  ]);
   const today = todayIso();
   const [raisedOn, setRaisedOn] = useState(today);
 
@@ -87,6 +96,7 @@ export function NewSaleSheet({
       ));
       const res = await createSaleAction(prev, fd);
       if (res && 'ok' in res) {
+        toast.success(res.ok);
         setOpen(false);
         setLines([blankLine()]);
         setDeliverNow(false);
@@ -121,34 +131,27 @@ export function NewSaleSheet({
         </SheetHeader>
 
         <form action={formAction} className="flex flex-1 flex-col gap-4">
-          <section className="space-y-3 rounded-xl border bg-muted/25 p-3.5">
-            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">1 · Customer</p>
+          <section className="space-y-3">
+            <h3 className="text-sm font-semibold">Order</h3>
             <div className="grid grid-cols-2 gap-3">
             <Field>
               <FieldLabel htmlFor="ns-party">Customer</FieldLabel>
-              <NativeSelect
-                id="ns-party" name="partyId" required autoFocus
-                className="w-full"
-                value={customer} onChange={(e) => setCustomer(e.target.value)}
-              >
-                <NativeSelectOption value="">Select…</NativeSelectOption>
-                {customers.map((p) => <NativeSelectOption key={p.id} value={p.id}>{p.name}</NativeSelectOption>)}
-              </NativeSelect>
+              <Choice
+                id="ns-party" name="partyId" required searchable placeholder="Search customers…"
+                value={customer} onValueChange={setCustomer}
+                options={customers.map((p) => ({ value: p.id, label: p.name }))}
+              />
             </Field>
             <Field>
               <FieldLabel htmlFor="ns-date">Raised on</FieldLabel>
-              <Input
-                id="ns-date" name="raisedOn" type="date" required
-                value={raisedOn} onChange={(e) => setRaisedOn(e.target.value)}
-              />
+              <DateField id="ns-date" name="raisedOn" required value={raisedOn} onChange={setRaisedOn} />
             </Field>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
             <Field>
               <FieldLabel htmlFor="ns-agent">Placed by</FieldLabel>
-              <Input id="ns-agent" name="agent" list="ns-agents" placeholder="Rushabh" />
-              <datalist id="ns-agents">{agents.map((a) => <option key={a} value={a} />)}</datalist>
+              <AgentField id="ns-agent" agents={agents} placeholder="Who took the order" />
             </Field>
             <Field>
               <FieldLabel htmlFor="ns-notes">Note</FieldLabel>
@@ -157,11 +160,13 @@ export function NewSaleSheet({
             </div>
           </section>
 
+          <Separator />
+
           <section className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold">2 · Stones requested</p>
-                <p className="text-xs text-muted-foreground">Add each size/specification as a separate line.</p>
+                <h3 className="text-sm font-semibold">Stones</h3>
+                <p className="text-xs text-muted-foreground">One line per size or specification.</p>
               </div>
               <Button
                 type="button" size="sm" variant="outline"
@@ -181,20 +186,22 @@ export function NewSaleSheet({
             ))}
           </section>
 
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg border bg-muted/35 px-3 py-2.5 text-sm">
-            <span className="text-muted-foreground">
-              From stock <span className="font-medium text-foreground tabular-nums">{ct(totalStock)}</span>
-            </span>
-            <span className="text-muted-foreground">
-              To source <span className="font-medium text-foreground tabular-nums">{ct(totalSource)}</span>
-            </span>
-            <span className="ml-auto font-bold tabular-nums">{inr(totalValue)}</span>
-          </div>
+          <Item variant="muted" size="sm">
+            <ItemContent>
+              <ItemDescription>
+                From stock <span className="font-medium text-foreground tabular-nums">{ct(totalStock)}</span>
+                {' · '}To source <span className="font-medium text-foreground tabular-nums">{ct(totalSource)}</span>
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions className="text-base font-semibold tabular-nums">{inr(totalValue)}</ItemActions>
+          </Item>
 
-          <section className="space-y-3 rounded-xl border p-3.5">
+          <Separator />
+
+          <section className="space-y-3">
             <div>
-              <p className="text-sm font-semibold">3 · Act now or keep as a requirement</p>
-              <p className="text-xs text-muted-foreground">Optional. You can complete either step later from the requirement.</p>
+              <h3 className="text-sm font-semibold">Act now</h3>
+              <p className="text-xs text-muted-foreground">Optional. Either step can be done later from the requirement.</p>
             </div>
           <Label>
             <Checkbox checked={deliverNow} onCheckedChange={setDeliverNow} />
@@ -203,7 +210,7 @@ export function NewSaleSheet({
           <input type="hidden" name="deliverNow" value={deliverNow ? '1' : ''} />
 
           {deliverNow && (
-            <div className="space-y-3 rounded-lg border p-3">
+            <Card size="sm"><CardContent className="space-y-3">
               <input type="hidden" name="channel" value={channel} />
               <Segmented
                 value={channel} set={setChannel}
@@ -219,14 +226,14 @@ export function NewSaleSheet({
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="ns-dueOn">{channel === 'memo' ? 'Due back' : 'Payment due'}</FieldLabel>
-                  <Input id="ns-dueOn" name="dueOn" type="date" defaultValue={addDays(raisedOn, 7)} />
+                  <DateField id="ns-dueOn" name="dueOn" defaultValue={addDays(raisedOn, 7)} />
                 </Field>
               </div>
               <p className="text-xs text-muted-foreground">
                 Carats come off owned stock first, then goods held on a supplier memo. Pick lots by
                 hand from the requirement page if this sale needs a particular parcel.
               </p>
-            </div>
+            </CardContent></Card>
           )}
 
           <Label>
@@ -236,21 +243,18 @@ export function NewSaleSheet({
           <input type="hidden" name="sourceNow" value={sourceNow ? '1' : ''} />
 
           {sourceNow && (
-            <div className="space-y-3 rounded-lg border p-3">
+            <Card size="sm"><CardContent className="space-y-3">
               <input type="hidden" name="sourceChannel" value={sourceChannel} />
               <Field>
                 <FieldLabel htmlFor="ns-supplier">Supplier</FieldLabel>
-                <NativeSelect
-                  id="ns-supplier" name="supplierId" required
-                  className="w-full"
-                  onChange={(e) => {
-                    const p = suppliers.find((x) => x.id === e.target.value);
+                <Choice
+                  id="ns-supplier" name="supplierId" required searchable placeholder="Search suppliers…"
+                  onValueChange={(v) => {
+                    const p = suppliers.find((x) => x.id === v);
                     if (p) setTerms(p.defaultTermsDays);
                   }}
-                >
-                  <NativeSelectOption value="">Select…</NativeSelectOption>
-                  {suppliers.map((p) => <NativeSelectOption key={p.id} value={p.id}>{p.name}</NativeSelectOption>)}
-                </NativeSelect>
+                  options={suppliers.map((p) => ({ value: p.id, label: p.name }))}
+                />
               </Field>
               <Segmented
                 value={sourceChannel} set={setSourceChannel}
@@ -282,7 +286,7 @@ export function NewSaleSheet({
                 One supplier per save. Split a line across several suppliers from the requirement
                 page.
               </p>
-            </div>
+            </CardContent></Card>
           )}
 
           </section>
@@ -348,7 +352,7 @@ function LineCard({
     <Card size="sm">
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span className="font-semibold uppercase tracking-[0.1em]">Stone {index + 1}</span>
+          <span className="font-medium">Stone {index + 1}</span>
           {onRemove && (
             <Button type="button" variant="ghost" size="xs" onClick={onRemove} className="hover:text-destructive">Remove</Button>
           )}
@@ -364,27 +368,23 @@ function LineCard({
           <>
             <Field>
               <FieldLabel htmlFor={`ns-${index}-lot`}>Which parcel</FieldLabel>
-              <NativeSelect
-                id={`ns-${index}-lot`} required
-                className="w-full"
+              <Choice
+                id={`ns-${index}-lot`} required searchable placeholder="Search stock…"
                 value={line.lotId}
-                onChange={(e) => {
-                  const u = units.find((x) => x.lotId === e.target.value);
+                onValueChange={(v) => {
+                  const u = units.find((x) => x.lotId === v);
                   onChange({
-                    lotId: e.target.value,
+                    lotId: v,
                     // Selling the whole parcel is the common case; overwrite only
                     // while the operator has not typed carats of their own.
                     carats: carats || (u ? u.balance.toFixed(3) : ''),
                   });
                 }}
-              >
-                <NativeSelectOption value="">Select stock…</NativeSelectOption>
-                {units.map((u) => (
-                  <NativeSelectOption key={u.lotId} value={u.lotId}>
-                    {u.label} — {u.balance.toFixed(3)} ct{u.onMemo ? ` (on memo${u.partyName ? `, ${u.partyName}` : ''})` : ''}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                options={units.map((u) => ({
+                  value: u.lotId,
+                  label: `${u.label} — ${u.balance.toFixed(3)} ct${u.onMemo ? ` (on memo${u.partyName ? `, ${u.partyName}` : ''})` : ''}`,
+                }))}
+              />
             </Field>
             {picked && (
               <p className="text-xs text-muted-foreground">

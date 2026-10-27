@@ -1,5 +1,6 @@
 'use client';
 
+import { DateField } from '@/components/forms/date-field';
 import { useState } from 'react';
 import { useFormAction } from '@/lib/use-form-action';
 import { Button } from '@/components/ui/button';
@@ -63,7 +64,7 @@ export function SettleLineDialog({
             </Field>
             <Field>
               <FieldLabel htmlFor={`d-${lineId}-${action}`}>Date</FieldLabel>
-              <Input id={`d-${lineId}-${action}`} name="on" type="date" defaultValue={today} required />
+              <DateField id={`d-${lineId}-${action}`} name="on" defaultValue={today} required />
             </Field>
           </div>
 

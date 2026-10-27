@@ -1,5 +1,8 @@
 'use client';
 
+import { AgentField } from '@/components/forms/agent-field';
+import { DateField } from '@/components/forms/date-field';
+import { Choice } from '@/components/forms/choice';
 import { useState } from 'react';
 import { useFormAction } from '@/lib/use-form-action';
 import { Button } from '@/components/ui/button';
@@ -10,11 +13,11 @@ import {
 } from '@/components/ui/sheet';
 import { Segmented } from '@/components/forms/segmented';
 import { CaratsRate } from '@/components/forms/carats-rate';
-import { SpecFields, type Picklists } from '@/features/masters/diamonds/components/spec-fields';
+import { SpecFields, blankSpec, type Picklists, type SpecValue } from '@/features/masters/diamonds/components/spec-fields';
+import { QuickEntry } from '@/components/forms/quick-entry';
 import type { SieveShapes } from '@/lib/spec-rules';
 import { useLastUsed } from '@/lib/use-last-used';
 import { addStockAction } from '../actions';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { todayIso } from '@/lib/dates';
 
 type Party = { id: string; name: string; defaultTermsDays: number };
@@ -35,7 +38,12 @@ export function AddStockSheet({
   // while supplier, date and mode stay put -- the next parcel from the same
   // supplier usually differs only in size and carats.
   const [round, setRound] = useState(0);
+  // Held here, not in the fields, so a quick-entry line can fill them.
+  const [spec, setSpec] = useState<SpecValue>(blankSpec);
+  const [fill, setFill] = useState({ n: 0, carats: '', rate: '' });
   const [state, formAction, isPending] = useFormAction(addStockAction, (fd) => {
+    setSpec(blankSpec());
+    setFill((f) => ({ n: f.n + 1, carats: '', rate: '' }));
     if (fd.get('then') === 'again') setRound((r) => r + 1);
     else setOpen(false);
   });
@@ -62,31 +70,42 @@ export function AddStockSheet({
         <form key={round} action={formAction} className="flex flex-1 flex-col gap-4">
           <input type="hidden" name="mode" value={mode} />
 
-          <SpecFields id="as" picklists={picklists} sieveShapes={sieveShapes} autoFocus />
+          <QuickEntry
+            id="as"
+            onParsed={(r) => {
+              setSpec((s) => ({ ...s, ...r.spec }));
+              setFill((f) => ({
+                n: f.n + 1,
+                carats: r.carats !== null ? String(r.carats) : f.carats,
+                rate: r.rate !== null ? String(r.rate) : f.rate,
+              }));
+            }}
+          />
 
-          <CaratsRate id="as" />
+          <SpecFields id="as" picklists={picklists} sieveShapes={sieveShapes} value={spec} onChange={setSpec} />
+
+          {/* Remounted by a quick-entry fill so its defaults take the parsed values. */}
+          <CaratsRate key={fill.n} id="as" defaultCarats={fill.carats} defaultRate={fill.rate} />
 
           <Field>
             <FieldLabel htmlFor="as-on">{mode === 'bill' ? 'Date' : 'Received on'}</FieldLabel>
-            <Input id="as-on" name="on" type="date" defaultValue={today} required />
+            <DateField id="as-on" name="on" defaultValue={today} required />
           </Field>
 
           <Field>
             <FieldLabel htmlFor="as-partyId">Supplier</FieldLabel>
-            <NativeSelect
-              id="as-partyId" name="partyId"
+            <Choice
+              id="as-partyId" name="partyId" searchable
               required={mode === 'memo'}
-              className="w-full"
+              placeholder={mode === 'bill' ? 'Not recorded — search to add' : 'Search suppliers…'}
               value={supplier}
-              onChange={(e) => {
-                setSupplier(e.target.value);
-                const p = suppliers.find((s) => s.id === e.target.value);
+              onValueChange={(v) => {
+                setSupplier(v);
+                const p = suppliers.find((s) => s.id === v);
                 if (p) setTerms(p.defaultTermsDays);
               }}
-            >
-              <NativeSelectOption value="">{mode === 'bill' ? 'Not recorded' : 'Select…'}</NativeSelectOption>
-              {suppliers.map((p) => <NativeSelectOption key={p.id} value={p.id}>{p.name}</NativeSelectOption>)}
-            </NativeSelect>
+              options={suppliers.map((p) => ({ value: p.id, label: p.name }))}
+            />
           </Field>
 
           {mode === 'bill' ? (
@@ -109,10 +128,7 @@ export function AddStockSheet({
               </Field>
               <Field>
                 <FieldLabel htmlFor="as-agent">Placed by</FieldLabel>
-                <Input id="as-agent" name="agent" list="as-agent-list" placeholder="Rushabh" />
-                <datalist id="as-agent-list">
-                  {agents.map((a) => <option key={a} value={a} />)}
-                </datalist>
+                <AgentField id="as-agent" agents={agents} />
               </Field>
             </div>
           )}
@@ -124,10 +140,6 @@ export function AddStockSheet({
 
           {state && 'error' in state && (
             <FieldError>{state.error}</FieldError>
-          )}
-
-          {state && 'ok' in state && (
-            <p role="status" className="text-sm text-positive">{state.ok}</p>
           )}
 
           <SheetFooter>

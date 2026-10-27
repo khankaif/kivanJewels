@@ -1,4 +1,5 @@
 import { sql } from '@/db/client';
+import type { Sort } from '@/lib/sort';
 
 export type Party = {
   id: string; name: string; kind: 'supplier' | 'client' | 'both';
@@ -10,7 +11,23 @@ export type Party = {
   openMemosIn: number; openMemosOut: number;
 };
 
-export async function getParties(opts: { search?: string; includeInactive?: boolean } = {}): Promise<Party[]> {
+export const PARTY_SORTS = ['name', 'terms', 'receivable', 'payable', 'net'] as const;
+export type PartySort = Sort<(typeof PARTY_SORTS)[number]>;
+
+/** Whitelisted columns only: the sort arrives from the URL. Default is size of balance. */
+function partyOrder(s: PartySort | undefined) {
+  const dir = s?.dir === 'asc' ? sql`ASC` : sql`DESC`;
+  switch (s?.col) {
+    case 'name': return sql`p.name ${dir}`;
+    case 'terms': return sql`p.default_terms_days ${dir}, p.name`;
+    case 'receivable': return sql`COALESCE(b.receivable,0) ${dir}, p.name`;
+    case 'payable': return sql`COALESCE(b.payable,0) ${dir}, p.name`;
+    case 'net': return sql`COALESCE(b.net,0) ${dir}, p.name`;
+    default: return sql`ABS(COALESCE(b.net,0)) DESC, p.name`;
+  }
+}
+
+export async function getParties(opts: { search?: string; includeInactive?: boolean; sort?: PartySort } = {}): Promise<Party[]> {
   const like = opts.search ? `%${opts.search}%` : null;
   const rows = await sql`
     SELECT p.id, p.name, p.kind, p.default_terms_days, p.phone, p.email,
@@ -28,7 +45,7 @@ export async function getParties(opts: { search?: string; includeInactive?: bool
       AND (${like}::text IS NULL
            OR p.name ILIKE ${like} OR p.business_name ILIKE ${like}
            OR p.phone ILIKE ${like} OR p.gstin ILIKE ${like})
-    ORDER BY ABS(COALESCE(b.net,0)) DESC, p.name`;
+    ORDER BY ${partyOrder(opts.sort)}`;
 
   return rows.map((r: any) => ({
     id: r.id, name: r.name, kind: r.kind, defaultTermsDays: r.default_terms_days,

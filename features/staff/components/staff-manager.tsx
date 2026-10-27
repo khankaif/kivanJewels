@@ -1,9 +1,13 @@
 'use client';
 
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from '@/components/ui/item';
+import { Choice } from '@/components/forms/choice';
 import { useRef, useState } from 'react';
+import { day } from '@/lib/format';
 import { useFormAction } from '@/lib/use-form-action';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ConfirmAction } from '@/components/forms/confirm-action';
 import { Input } from '@/components/ui/input';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import {
@@ -13,7 +17,6 @@ import {
   addStaffAction, setStaffAccessAction, setStaffPasswordAction, type StaffState,
 } from '../actions';
 import type { Staff } from '../queries';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
 export function AddStaffSheet() {
   const [open, setOpen] = useState(false);
@@ -49,13 +52,13 @@ export function AddStaffSheet() {
           </Field>
           <Field>
             <FieldLabel htmlFor="st-role">Role</FieldLabel>
-            <NativeSelect
+            <Choice
               id="st-role" name="role" defaultValue="user"
-              className="w-full"
-            >
-              <NativeSelectOption value="user">Staff — enters the day&apos;s work</NativeSelectOption>
-              <NativeSelectOption value="admin">Admin — also manages staff</NativeSelectOption>
-            </NativeSelect>
+              options={[
+                { value: 'user', label: 'Staff — enters the day’s work' },
+                { value: 'admin', label: 'Admin — also manages staff' },
+              ]}
+            />
           </Field>
 
           {state && 'error' in state && (
@@ -75,34 +78,40 @@ export function AddStaffSheet() {
 
 export function StaffRow({ member, isMe }: { member: Staff; isMe: boolean }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border p-3 text-sm">
-      <div className="min-w-44">
-        <div className="font-medium">
+    <Item variant="outline">
+      <ItemContent className="min-w-44">
+        <ItemTitle>
           {member.name || '—'}
-          {isMe && <span className="ml-2 text-xs text-muted-foreground">you</span>}
-        </div>
-        <div className="text-xs text-muted-foreground">{member.email}</div>
-      </div>
+          {isMe && <span className="font-normal text-muted-foreground">you</span>}
+          <Badge variant={member.role === 'admin' ? 'default' : 'secondary'}>{member.role === 'admin' ? 'Admin' : 'Staff'}</Badge>
+          {member.banned && <Badge variant="destructive">Access revoked</Badge>}
+        </ItemTitle>
+        <ItemDescription>
+          {member.email}{member.createdAt && ` · since ${day(member.createdAt)}`}
+        </ItemDescription>
+      </ItemContent>
 
-      <Badge variant={member.role === 'admin' ? 'default' : 'outline'}>{member.role}</Badge>
-      {member.banned && <Badge variant="destructive">access revoked</Badge>}
-      {member.createdAt && (
-        <span className="text-xs text-muted-foreground">since {member.createdAt}</span>
-      )}
-
-      <div className="ml-auto flex items-center gap-2">
+      <ItemActions>
         <ResetPasswordSheet member={member} />
         {!isMe && (
-          <form action={setStaffAccessAction}>
-            <input type="hidden" name="userId" value={member.id} />
-            <input type="hidden" name="ban" value={member.banned ? '' : '1'} />
-            <Button type="submit" size="sm" variant={member.banned ? 'outline' : 'ghost'}>
-              {member.banned ? 'Restore access' : 'Revoke access'}
-            </Button>
-          </form>
+          member.banned ? (
+            <form action={setStaffAccessAction}>
+              <input type="hidden" name="userId" value={member.id} />
+              <input type="hidden" name="ban" value="" />
+              <Button type="submit" size="sm" variant="outline">Restore access</Button>
+            </form>
+          ) : (
+            <ConfirmAction
+              action={setStaffAccessAction} fields={{ userId: member.id, ban: '1' }}
+              trigger={<Button size="sm" variant="ghost">Revoke access</Button>}
+              title={`Revoke access for ${member.name || member.email}?`}
+              description="They are signed out and can't sign in again until you restore access. Nothing they entered is removed."
+              confirm="Revoke access"
+            />
+          )
         )}
-      </div>
-    </div>
+      </ItemActions>
+    </Item>
   );
 }
 
@@ -171,9 +180,6 @@ export function ChangeMyPassword({
 
       {state && 'error' in state && (
         <FieldError className="sm:col-span-3">{state.error}</FieldError>
-      )}
-      {state && 'ok' in state && (
-        <p role="status" className="text-sm text-positive sm:col-span-3">{state.ok}</p>
       )}
     </form>
   );

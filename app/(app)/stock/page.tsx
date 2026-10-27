@@ -1,8 +1,8 @@
-import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SectionTabs } from '@/components/layout/section-tabs';
 import { FilterBar } from '@/components/layout/filter-bar';
 import { resolveTab } from '@/lib/tabs';
-import { getOwnedUnits, getMemoStock, getStockTotals } from '@/features/stock/queries';
+import { getOwnedUnits, getMemoStock } from '@/features/stock/queries';
 import { getMovements } from '@/features/stock/register';
 import { OwnedTable } from '@/features/stock/components/owned-table';
 import { MemoTable } from '@/features/stock/components/memo-table';
@@ -12,7 +12,6 @@ import { MemoList } from '@/features/memos/components/memo-list';
 import { getMemos, getAgents } from '@/features/memos/queries';
 import { getPartyOptions } from '@/features/parties/queries';
 import { getDiamondPicklists, getSieveShapes } from '@/features/masters/diamonds/queries';
-import { inr, ct } from '@/lib/format';
 import { PageHeader } from '@/components/layout/page-header';
 
 export const dynamic = 'force-dynamic';
@@ -45,8 +44,8 @@ export default async function StockPage({
   const sp = await searchParams;
   const tab = resolveTab(sp.tab, TABS);
 
-  const [totals, suppliers, picklists, agents, sieveShapes] = await Promise.all([
-    getStockTotals(), getPartyOptions('supplier'), getDiamondPicklists(), getAgents(), getSieveShapes(),
+  const [suppliers, picklists, agents, sieveShapes] = await Promise.all([
+    getPartyOptions('supplier'), getDiamondPicklists(), getAgents(), getSieveShapes(),
   ]);
 
   // A tab link keeps the current search but always resets paging.
@@ -55,48 +54,34 @@ export default async function StockPage({
       Object.entries({ ...sp, tab: t, page: undefined }).filter(([, v]) => v) as [string, string][])}`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
-        eyebrow="Inventory"
-        title="Stock desk"
-        description="See what is available, held on supplier approval, or already moving through the business."
+        title="Stock"
         actions={<AddStockSheet
           suppliers={suppliers} agents={agents} picklists={picklists} sieveShapes={sieveShapes}
           defaultOpen={sp.new === '1'}
         />}
+        tabs={<SectionTabs items={TABS.map((t) => ({ href: href(t), label: LABELS[t], active: t === tab }))} />}
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="My stock" value={ct(totals.carats)} sub={`${totals.units} units`} />
-        <Stat label="Value at cost" value={inr(totals.value)} />
-        <Stat label="Held on memo" value={ct(totals.memoCarats)} sub="not yours yet" />
-        <Stat label="Out with clients" value={ct(totals.exposure)} sub="on approval" />
-      </div>
-
-      <SectionTabs items={TABS.map((t) => ({ href: href(t), label: LABELS[t], active: t === tab }))} />
-
       {tab !== 'movements' && (
-        <Card size="sm">
-          <CardContent>
-            <FilterBar
-              /* Without this the filters would throw you back to the first tab. */
-              hidden={{ tab }}
-              fields={[
-                { type: 'text', name: 'q', label: 'Search', value: sp.q,
-                  placeholder: 'Size, shape, colour, lot or supplier' },
-                { type: 'select', name: 'type', label: 'Diamond type', value: sp.type, options: [
-                  { value: '', label: 'All types' },
-                  ...(picklists.stone_type ?? []).map((v) => ({ value: v, label: v })),
-                ] },
-                { type: 'select', name: 'cert', label: 'Certified', value: sp.cert, options: [
-                  { value: '', label: 'Certified & not' },
-                  ...(picklists.certified ?? []).map((v) => ({ value: v, label: v })),
-                  ...(picklists.lab ?? []).map((v) => ({ value: v, label: `${v} certified` })),
-                ] },
-              ]}
-            />
-          </CardContent>
-        </Card>
+        <FilterBar
+          /* Without this the filters would throw you back to the first tab. */
+          hidden={{ tab }}
+          fields={[
+            { type: 'text', name: 'q', label: 'Search', value: sp.q,
+              placeholder: 'Size, shape, colour, lot or supplier' },
+            { type: 'select', name: 'type', label: 'Diamond type', value: sp.type, options: [
+              { value: '', label: 'All types' },
+              ...(picklists.stone_type ?? []).map((v) => ({ value: v, label: v })),
+            ] },
+            { type: 'select', name: 'cert', label: 'Certified', value: sp.cert, options: [
+              { value: '', label: 'Certified & not' },
+              ...(picklists.certified ?? []).map((v) => ({ value: v, label: v })),
+              ...(picklists.lab ?? []).map((v) => ({ value: v, label: `${v} certified` })),
+            ] },
+          ]}
+        />
       )}
 
       {tab === 'owned' && (
@@ -105,33 +90,31 @@ export default async function StockPage({
         })} />
       )}
 
+      {/* The same goods two ways: what is here by parcel, and what to settle by
+          memo. One at a time, so neither reads as a repeat of the other. */}
       {tab === 'memo' && (
-        <div className="space-y-6">
-          <MemoTable rows={await getMemoStock({
-            search: sp.q, stoneType: sp.type, certified: sp.cert,
-          })} />
-          <MemoList
-            memos={await getMemos('in', {
-              q: sp.q, status: sp.status as 'all' | 'open' | 'overdue' | undefined,
-            })}
-            direction="in"
-          />
-        </div>
+        <Tabs defaultValue="parcels">
+          <TabsList>
+            <TabsTrigger value="parcels">By parcel</TabsTrigger>
+            <TabsTrigger value="memos">By memo</TabsTrigger>
+          </TabsList>
+          <TabsContent value="parcels">
+            <MemoTable rows={await getMemoStock({
+              search: sp.q, stoneType: sp.type, certified: sp.cert,
+            })} />
+          </TabsContent>
+          <TabsContent value="memos">
+            <MemoList
+              memos={await getMemos('in', {
+                q: sp.q, status: sp.status as 'all' | 'open' | 'overdue' | undefined,
+              })}
+              direction="in"
+            />
+          </TabsContent>
+        </Tabs>
       )}
 
       {tab === 'movements' && <MovementsTable {...await loadMovements(sp)} />}
     </div>
-  );
-}
-
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <Card className="shadow-xs">
-      <CardContent className="pt-4">
-        <div className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</div>
-        <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
-        {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
-      </CardContent>
-    </Card>
   );
 }

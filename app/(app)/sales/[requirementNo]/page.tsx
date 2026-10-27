@@ -1,5 +1,9 @@
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { StickyNote } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from '@/components/ui/item';
+import { StatStrip } from '@/components/layout/stat';
+import { PageHeader } from '@/components/layout/page-header';
 import { notFound } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,8 +13,7 @@ import { FulfilSheet } from '@/features/sales/components/fulfil-sheet';
 import { closeRequirementLineAction, setRequirementStatusAction } from '@/features/sales/actions';
 import { getPartyOptions } from '@/features/parties/queries';
 import { getAgents } from '@/features/memos/queries';
-import { ct, inr, specLabel } from '@/lib/format';
-import { ArrowLeft, CircleAlert, PackageCheck, PackageSearch } from 'lucide-react';
+import { ct, inr, specLabel, day } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,23 +38,18 @@ export default async function RequirementPage({
   const outstanding = openLines.reduce((sum, line) => sum + line.outstanding, 0);
 
   return (
-    <div className="space-y-6">
-      <div className="border-b border-border/80 pb-5">
-        <Link href="/sales" className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
-          <ArrowLeft className="size-3.5" /> All customer orders
-        </Link>
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Fulfilment workspace</div>
-            <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight sm:text-3xl">
-            <span className="font-mono">{req.requirementNo}</span>
-            <Badge variant={req.status === 'open' ? 'default' : 'secondary'}>{req.status}</Badge>
-            </h1>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              <Link href={`/parties/${req.partyId}`} className="font-medium underline underline-offset-4 hover:text-foreground">{req.partyName}</Link>
-              {' · '}{req.raisedOn}{req.agent && ` · ${req.agent}`}
-            </p>
-          </div>
+    <div className="space-y-4">
+      <PageHeader
+        parent={{ href: '/sales', label: 'Sales' }}
+        title={req.requirementNo}
+        badges={<Badge variant={req.status === 'open' ? 'outline' : 'secondary'}>{req.status === 'open' ? 'Open' : 'Closed'}</Badge>}
+        detail={
+          <>
+            <Link href={`/parties/${req.partyId}`} className="font-medium text-foreground hover:underline">{req.partyName}</Link>
+            {' · '}{day(req.raisedOn)}{req.agent && ` · ${req.agent}`}
+          </>
+        }
+        actions={
           <form action={setRequirementStatusAction}>
             <input type="hidden" name="requirementId" value={req.id} />
             <input type="hidden" name="status" value={req.status === 'open' ? 'closed' : 'open'} />
@@ -59,15 +57,21 @@ export default async function RequirementPage({
               {req.status === 'open' ? 'Close requirement' : 'Reopen'}
             </Button>
           </form>
-        </div>
-        {req.notes && <p className="mt-3 rounded-lg bg-muted/55 px-3 py-2 text-sm">{req.notes}</p>}
-      </div>
+        }
+      />
+      {req.notes && (
+        <Alert>
+          <StickyNote />
+          <AlertTitle>Note</AlertTitle>
+          <AlertDescription>{req.notes}</AlertDescription>
+        </Alert>
+      )}
 
-      <section className="grid gap-3 sm:grid-cols-3">
-        <Metric label="Still to fulfil" value={ct(outstanding)} icon={<PackageSearch className="size-4" />} />
-        <Metric label="Ready to act" value={`${readyLines.length} of ${openLines.length} lines`} icon={<PackageCheck className="size-4" />} tone="text-positive" />
-        <Metric label="Order value" value={inr(req.lines.reduce((sum, line) => sum + line.wanted * (line.quotedRate ?? 0), 0))} icon={<CircleAlert className="size-4" />} />
-      </section>
+      <StatStrip items={[
+        { label: 'Still to fulfil', value: ct(outstanding) },
+        { label: 'Ready to act', value: `${readyLines.length} of ${openLines.length} lines` },
+        { label: 'Order value', value: inr(req.lines.reduce((sum, line) => sum + line.wanted * (line.quotedRate ?? 0), 0)) },
+      ]} />
 
       <div className="flex items-center gap-2">
         <span className="text-sm font-semibold">Order lines</span>
@@ -82,7 +86,7 @@ export default async function RequirementPage({
             <CardHeader className="border-b bg-muted/20">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Line {i + 1}</div>
+                  <div className="mb-1 text-xs font-medium text-muted-foreground">Line {i + 1}</div>
                   <CardTitle className="text-base">{specLabel(line)}</CardTitle>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
@@ -137,19 +141,20 @@ export default async function RequirementPage({
         </CardHeader>
         <CardContent className="space-y-2">
           {docs.length ? docs.map((d, i) => (
-            <div
-              key={`${d.kind}-${d.ref}-${i}`}
-              className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border p-3 text-sm"
-            >
-              <Badge variant={DOC_TONE[d.kind]}>{DOC_LABEL[d.kind]}</Badge>
-              <span className="font-mono text-xs">{d.ref}</span>
-              <span className="text-muted-foreground">{d.partyName}</span>
-              <span className="text-xs text-muted-foreground">{d.datedOn}</span>
-              {d.note && <span className="text-xs text-muted-foreground">{d.note}</span>}
-              <span className="ml-auto tabular-nums">
+            <Item key={`${d.kind}-${d.ref}-${i}`} variant="outline" size="sm">
+              <ItemContent>
+                <ItemTitle>
+                  <Badge variant={DOC_TONE[d.kind]}>{DOC_LABEL[d.kind]}</Badge>
+                  {d.ref}
+                </ItemTitle>
+                <ItemDescription>
+                  {[d.partyName, day(d.datedOn), d.note].filter(Boolean).join(' · ')}
+                </ItemDescription>
+              </ItemContent>
+              <ItemActions className="tabular-nums">
                 {d.carats !== null ? ct(d.carats) : d.amount !== null ? inr(d.amount) : '—'}
-              </span>
-            </div>
+              </ItemActions>
+            </Item>
           )) : (
             <p className="text-sm text-muted-foreground">
               Nothing issued against this requirement yet — no memo, no invoice, no payment.
@@ -167,14 +172,3 @@ const DOC_LABEL: Record<string, string> = {
 const DOC_TONE: Record<string, 'default' | 'secondary' | 'outline'> = {
   memo: 'outline', invoice: 'default', purchase: 'secondary', payment: 'secondary',
 };
-
-function Metric({ label, value, icon, tone }: { label: string; value: string; icon: ReactNode; tone?: string }) {
-  return (
-    <Card className="shadow-xs">
-      <CardContent className="pt-4">
-        <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{icon}{label}</div>
-        <div className={`mt-1 text-xl font-semibold tabular-nums ${tone ?? ''}`}>{value}</div>
-      </CardContent>
-    </Card>
-  );
-}

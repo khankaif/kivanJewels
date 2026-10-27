@@ -1,5 +1,7 @@
 'use client';
 
+import { DateField } from '@/components/forms/date-field';
+import { Choice } from '@/components/forms/choice';
 import { useState } from 'react';
 import { useFormAction } from '@/lib/use-form-action';
 import { Button } from '@/components/ui/button';
@@ -9,15 +11,16 @@ import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
 import { recordPaymentAction } from '../actions';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { todayIso } from '@/lib/dates';
 
 export function PaymentDialog({
-  partyId, partyName, direction, billNo, outstanding, label, size = 'default',
+  partyId, partyName, direction, billNo, outstanding, label, size = 'default', variant,
 }: {
   partyId: string; partyName: string; direction: 'in' | 'out';
   billNo?: string | null; outstanding?: number; label?: string;
   size?: 'default' | 'sm';
+  /** Lists pass 'outline': a column of filled buttons is noise, not emphasis. */
+  variant?: 'default' | 'outline';
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, isPending] = useFormAction(recordPaymentAction, () => setOpen(false));
@@ -26,7 +29,7 @@ export function PaymentDialog({
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger render={<Button size={size} variant={received ? 'default' : 'outline'} />}>
+      <SheetTrigger render={<Button size={size} variant={variant ?? (received ? 'default' : 'outline')} />}>
         {label ?? (received ? 'Record receipt' : 'Record payment')}
       </SheetTrigger>
       <SheetContent side="right" className="sm:max-w-md">
@@ -57,26 +60,20 @@ export function PaymentDialog({
             </Field>
             <Field>
               <FieldLabel htmlFor={`on-${partyId}-${direction}`}>Date</FieldLabel>
-              <Input
-                id={`on-${partyId}-${direction}`} name="on" type="date"
-                defaultValue={today} required
-              />
+              <DateField id={`on-${partyId}-${direction}`} name="on" defaultValue={today} required />
             </Field>
           </div>
 
           <Field>
             <FieldLabel htmlFor={`mode-${partyId}-${direction}`}>Mode</FieldLabel>
-            <NativeSelect
+            <Choice
               id={`mode-${partyId}-${direction}`} name="mode" defaultValue="bank"
-              className="w-full"
-            >
-              <NativeSelectOption value="bank">Bank transfer</NativeSelectOption>
-              <NativeSelectOption value="cash">Cash</NativeSelectOption>
-              <NativeSelectOption value="upi">UPI</NativeSelectOption>
-              <NativeSelectOption value="cheque">Cheque</NativeSelectOption>
-              <NativeSelectOption value="adjustment">Adjustment / set-off</NativeSelectOption>
-              <NativeSelectOption value="other">Other</NativeSelectOption>
-            </NativeSelect>
+              options={[
+                { value: 'bank', label: 'Bank transfer' }, { value: 'cash', label: 'Cash' },
+                { value: 'upi', label: 'UPI' }, { value: 'cheque', label: 'Cheque' },
+                { value: 'adjustment', label: 'Adjustment / set-off' }, { value: 'other', label: 'Other' },
+              ]}
+            />
           </Field>
 
           <Field>

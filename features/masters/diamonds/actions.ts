@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { sql, withTx } from '@/db/client';
 import { requireUser } from '@/lib/auth/server';
 import { BUCKET_FOR } from '@/lib/spec-rules';
+import { parseShorthand } from './shorthand';
 
 export type MasterState = { error: string } | { ok: string } | null;
 
@@ -153,4 +154,10 @@ export async function aliasValueAction(_prev: MasterState, form: FormData): Prom
   }
   for (const p of ['/masters/diamonds', '/stock', '/sales']) revalidatePath(p);
   return { ok: `"${alias}" now reads as ${target}.` };
+}
+
+/** Shorthand entry for the stock and sale forms. Reads only; saves nothing. */
+export async function parseShorthandAction(line: string) {
+  await requireUser();
+  return parseShorthand(line.slice(0, 200));
 }

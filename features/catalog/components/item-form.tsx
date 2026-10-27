@@ -1,5 +1,6 @@
 'use client';
 
+import { Choice } from '@/components/forms/choice';
 import { useActionState, useState } from 'react';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
@@ -10,7 +11,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { saveItemAction, uploadUrlAction, type CatalogState } from '../actions';
 import type { CatalogItem } from '../queries';
 
@@ -48,10 +48,10 @@ export function ItemForm({
         <div className="grid gap-3 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="ci-category">Category</FieldLabel>
-            <NativeSelect id="ci-category" name="category" required defaultValue={item?.category ?? ''} className="w-full">
-              <NativeSelectOption value="">Select…</NativeSelectOption>
-              {categories.map((c) => <NativeSelectOption key={c} value={c}>{c}</NativeSelectOption>)}
-            </NativeSelect>
+            <Choice
+              id="ci-category" name="category" required defaultValue={item?.category ?? ''}
+              options={categories.map((c) => ({ value: c, label: c }))}
+            />
             <FieldDescription>Add categories in Masters → Diamonds.</FieldDescription>
           </Field>
           <Field>
@@ -64,10 +64,10 @@ export function ItemForm({
           </Field>
           <Field>
             <FieldLabel htmlFor="ci-stone">Diamond type</FieldLabel>
-            <NativeSelect id="ci-stone" name="stoneType" defaultValue={item?.stoneType ?? ''} className="w-full">
-              <NativeSelectOption value="">None</NativeSelectOption>
-              {stoneTypes.map((s) => <NativeSelectOption key={s} value={s}>{s}</NativeSelectOption>)}
-            </NativeSelect>
+            <Choice
+              id="ci-stone" name="stoneType" defaultValue={item?.stoneType ?? ''}
+              options={[{ value: '', label: 'None' }, ...stoneTypes.map((s) => ({ value: s, label: s }))]}
+            />
           </Field>
           <Field>
             <FieldLabel htmlFor="ci-dwt">Diamond wt (ct)</FieldLabel>

@@ -1,5 +1,9 @@
 'use client';
 
+import { AgentField } from '@/components/forms/agent-field';
+import { DateField } from '@/components/forms/date-field';
+import { Choice } from '@/components/forms/choice';
+import { toast } from 'sonner';
 import { useActionState, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +18,6 @@ import { specLabel } from '@/lib/format';
 import { CaratsRate } from '@/components/forms/carats-rate';
 import { deliverAction, sourceAction, type ActionState } from '../actions';
 import type { RequirementLine, SpecLot } from '../queries';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { addDays, todayIso } from '@/lib/dates';
 
 type Party = { id: string; name: string; defaultTermsDays: number };
@@ -40,7 +43,10 @@ export function FulfilSheet({
       fd.set('lineId', line.lineId);
       fd.set('channel', channel);
       const res = await run(prev, fd);
-      if (res && 'ok' in res) setOpen(false);
+      if (res && 'ok' in res) {
+        toast.success(res.ok);
+        setOpen(false);
+      }
       return res;
     },
     null,
@@ -73,18 +79,13 @@ export function FulfilSheet({
             <>
               <Field>
                 <FieldLabel htmlFor="ff-lot">Lot</FieldLabel>
-                <NativeSelect
-                  id="ff-lot" name="lotId" required
-                  className="w-full"
-                >
-                  <NativeSelectOption value="">Select…</NativeSelectOption>
-                  {lots.map((l) => (
-                    <NativeSelectOption key={l.lotId} value={l.lotId}>
-                      {l.lotNo} — {l.balance.toFixed(3)} ct{l.onMemo ? ' (on memo)' : ''}
-                      {l.partyName ? ` · ${l.partyName}` : ''}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
+                <Choice
+                  id="ff-lot" name="lotId" required searchable placeholder="Search lots…"
+                  options={lots.map((l) => ({
+                    value: l.lotId,
+                    label: `${l.lotNo} — ${l.balance.toFixed(3)} ct${l.onMemo ? ' (on memo)' : ''}${l.partyName ? ` · ${l.partyName}` : ''}`,
+                  }))}
+                />
                 {stock.others.length > 0 && (
                   <Label className="text-xs text-muted-foreground">
                     <Checkbox checked={showAll} onCheckedChange={setShowAll} />
@@ -102,17 +103,14 @@ export function FulfilSheet({
             <>
               <Field>
                 <FieldLabel htmlFor="ff-supplier">Supplier</FieldLabel>
-                <NativeSelect
-                  id="ff-supplier" name="supplierId" required
-                  className="w-full"
-                  onChange={(e) => {
-                    const p = suppliers.find((s) => s.id === e.target.value);
+                <Choice
+                  id="ff-supplier" name="supplierId" required searchable placeholder="Search suppliers…"
+                  onValueChange={(v) => {
+                    const p = suppliers.find((s) => s.id === v);
                     if (p) setTerms(p.defaultTermsDays);
                   }}
-                >
-                  <NativeSelectOption value="">Select…</NativeSelectOption>
-                  {suppliers.map((p) => <NativeSelectOption key={p.id} value={p.id}>{p.name}</NativeSelectOption>)}
-                </NativeSelect>
+                  options={suppliers.map((p) => ({ value: p.id, label: p.name }))}
+                />
               </Field>
 
               <Segmented
@@ -131,7 +129,7 @@ export function FulfilSheet({
 
           <Field>
             <FieldLabel htmlFor="ff-on">Date</FieldLabel>
-            <Input id="ff-on" name="on" type="date" defaultValue={today} required />
+            <DateField id="ff-on" name="on" defaultValue={today} required />
           </Field>
 
           {channel === 'memo' ? (
@@ -143,7 +141,7 @@ export function FulfilSheet({
               {mode === 'deliver' ? (
                 <Field>
                   <FieldLabel htmlFor="ff-due">Due back</FieldLabel>
-                  <Input id="ff-due" name="dueOn" type="date" defaultValue={due} />
+                  <DateField id="ff-due" name="dueOn" defaultValue={due} />
                 </Field>
               ) : (
                 <Field>
@@ -155,8 +153,7 @@ export function FulfilSheet({
               {mode === 'deliver' && (
                 <Field className="col-span-2">
                   <FieldLabel htmlFor="ff-agent">Placed by</FieldLabel>
-                  <Input id="ff-agent" name="agent" list="ff-agents" placeholder="Rushabh" />
-                  <datalist id="ff-agents">{agents.map((a) => <option key={a} value={a} />)}</datalist>
+                  <AgentField id="ff-agent" agents={agents} />
                 </Field>
               )}
             </div>

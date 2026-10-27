@@ -1,5 +1,9 @@
 'use client';
 
+import { Card, CardContent } from '@/components/ui/card';
+import { DateField } from '@/components/forms/date-field';
+import { Choice } from '@/components/forms/choice';
+import { toast } from 'sonner';
 import { useActionState, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +22,6 @@ import { useLastUsed } from '@/lib/use-last-used';
 import { inr } from '@/lib/format';
 import { addDays, todayIso } from '@/lib/dates';
 import { addBillAction, type BillState } from '../actions';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
 type Party = { id: string; name: string; defaultTermsDays: number };
 type Unit = { lotId: string; lotNo: string; label: string; balance: number };
@@ -65,6 +68,7 @@ export function AddBillSheet({
       }))));
       const res = await addBillAction(prev, fd);
       if (res && 'ok' in res) {
+        toast.success(res.ok);
         setOpen(false);
         setLines([blankLine()]);
       }
@@ -121,19 +125,16 @@ export function AddBillSheet({
 
           <Field>
             <FieldLabel htmlFor="ab-party">{direction === 'sale' ? 'Customer' : 'Supplier'}</FieldLabel>
-            <NativeSelect
-              id="ab-party" name="partyId" required autoFocus
-              className="w-full"
+            <Choice
+              id="ab-party" name="partyId" required searchable placeholder="Search parties…"
               value={party}
-              onChange={(e) => {
-                setParty(e.target.value);
-                const p = parties.find((x) => x.id === e.target.value);
+              onValueChange={(v) => {
+                setParty(v);
+                const p = parties.find((x) => x.id === v);
                 if (p) applyTerms(p.defaultTermsDays);
               }}
-            >
-              <NativeSelectOption value="">Select…</NativeSelectOption>
-              {parties.map((p) => <NativeSelectOption key={p.id} value={p.id}>{p.name}</NativeSelectOption>)}
-            </NativeSelect>
+              options={parties.map((p) => ({ value: p.id, label: p.name }))}
+            />
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
@@ -146,9 +147,9 @@ export function AddBillSheet({
             </Field>
             <Field>
               <FieldLabel htmlFor="ab-on">Bill date</FieldLabel>
-              <Input
-                id="ab-on" name="on" type="date" required
-                value={on} onChange={(e) => { setOn(e.target.value); setDueOn(addDays(e.target.value, terms)); }}
+              <DateField
+                id="ab-on" name="on" required
+                value={on} onChange={(v) => { setOn(v); setDueOn(addDays(v, terms)); }}
               />
             </Field>
           </div>
@@ -163,10 +164,7 @@ export function AddBillSheet({
             </Field>
             <Field>
               <FieldLabel htmlFor="ab-dueOn">Payment due</FieldLabel>
-              <Input
-                id="ab-dueOn" name="dueOn" type="date"
-                value={dueOn} onChange={(e) => setDueOn(e.target.value)}
-              />
+              <DateField id="ab-dueOn" name="dueOn" value={dueOn} onChange={setDueOn} />
             </Field>
           </div>
 
@@ -184,7 +182,7 @@ export function AddBillSheet({
             </div>
 
             {lines.map((l, i) => (
-              <div key={i} className="space-y-3 rounded-lg border p-3">
+              <Card key={i} size="sm"><CardContent className="space-y-3">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Line {i + 1}</span>
                   {lines.length > 1 && (
@@ -198,18 +196,11 @@ export function AddBillSheet({
                 </div>
 
                 {withGoods && direction === 'sale' && (
-                  <NativeSelect
-                    value={l.lotId} onChange={(e) => set(i, { lotId: e.target.value })}
-                    required
-                    className="w-full"
-                  >
-                    <NativeSelectOption value="">Select stock…</NativeSelectOption>
-                    {units.map((u) => (
-                      <NativeSelectOption key={u.lotId} value={u.lotId}>
-                        {u.label} — {u.balance.toFixed(2)} ct
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
+                  <Choice
+                    value={l.lotId} onValueChange={(v) => set(i, { lotId: v })}
+                    required searchable placeholder="Search stock…"
+                    options={units.map((u) => ({ value: u.lotId, label: `${u.label} — ${u.balance.toFixed(2)} ct` }))}
+                  />
                 )}
 
                 {withGoods && direction === 'purchase' && (
@@ -257,7 +248,7 @@ export function AddBillSheet({
                     </Field>
                   </div>
                 )}
-              </div>
+              </CardContent></Card>
             ))}
           </div>
 

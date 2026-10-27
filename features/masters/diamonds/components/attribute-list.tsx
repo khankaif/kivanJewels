@@ -1,8 +1,10 @@
 'use client';
 
+import { Card, CardContent } from '@/components/ui/card';
 import { useRef } from 'react';
 import { useFormAction } from '@/lib/use-form-action';
 import { Button } from '@/components/ui/button';
+import { ConfirmAction } from '@/components/forms/confirm-action';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { FieldError } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -19,7 +21,7 @@ export function AttributeList({ bucket, values }: { bucket: Bucket; values: Diam
   const [state, formAction, isPending] = useFormAction(addDiamondAttributeAction, () => formRef.current?.reset());
 
   return (
-    <div className="space-y-3 rounded-lg border p-4">
+    <Card size="sm"><CardContent className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <h3 className="font-medium">
           {bucket.label}
@@ -30,12 +32,13 @@ export function AttributeList({ bucket, values }: { bucket: Bucket; values: Diam
           )}
         </h3>
         {!bucket.isPreset && (
-          <form action={removeBucketAction}>
-            <input type="hidden" name="key" value={bucket.key} />
-            <Button type="submit" variant="ghost" size="xs" className="text-muted-foreground hover:text-destructive">
-              delete list
-            </Button>
-          </form>
+          <ConfirmAction
+            action={removeBucketAction} fields={{ key: bucket.key }}
+            trigger={<Button variant="ghost" size="xs" className="text-muted-foreground hover:text-destructive">Delete list</Button>}
+            title={`Delete the ${bucket.label} list?`}
+            description={`Its ${values.length} value${values.length === 1 ? '' : 's'} stop being offered on new entries. Existing stock keeps what it already has.`}
+            confirm="Delete list"
+          />
         )}
       </div>
 
@@ -101,7 +104,7 @@ export function AttributeList({ bucket, values }: { bucket: Bucket; values: Diam
         <Button type="submit" size="sm" variant="outline" disabled={isPending}>Add</Button>
       </form>
       {state && 'error' in state && <FieldError>{state.error}</FieldError>}
-    </div>
+    </CardContent></Card>
   );
 }
 

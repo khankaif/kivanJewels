@@ -1,22 +1,33 @@
 import Link from 'next/link';
+import { Figure } from '@/components/layout/stat';
+import { PageHeader } from '@/components/layout/page-header';
+import { AccountsNav } from '@/features/accounts/components/accounts-nav';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { FilterBar, type FieldDef } from '@/components/layout/filter-bar';
-import { getBills } from '@/features/accounts/money';
+import { BILL_SORTS, getBills, type BillSort } from '@/features/accounts/money';
+import { SortHead } from '@/components/layout/sort-head';
+import { parseSort } from '@/lib/sort';
 import { getPartyOptions } from '@/features/parties/queries';
 import { getOwnedUnits } from '@/features/stock/queries';
 import { getDiamondPicklists, getSieveShapes } from '@/features/masters/diamonds/queries';
 import { AddBillSheet } from '@/features/accounts/components/add-bill-sheet';
 import { PaymentDialog } from '@/features/accounts/components/payment-dialog';
-import { inr, specLabel } from '@/lib/format';
+import { inr, specLabel, day } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
+
+const VIEWS: { label: string; params: Record<string, string> }[] = [
+  { label: 'All bills', params: {} },
+  { label: 'To collect', params: { direction: 'sale', status: 'unpaid' } },
+  { label: 'To pay', params: { direction: 'purchase', status: 'unpaid' } },
+  { label: 'Overdue', params: { status: 'overdue' } },
+];
 
 /**
  * Every invoice as a document: what you billed, to whom, and what is unpaid.
@@ -39,7 +50,9 @@ export default async function MoneyPage({
     getPartyOptions(), getPartyOptions('client'), getPartyOptions('supplier'),
     getOwnedUnits({ limit: 300 }), getDiamondPicklists(), getSieveShapes(),
   ]);
+  const sort = parseSort(sp.sort, BILL_SORTS, { col: 'date', dir: 'desc' });
   const bills = await getBills({
+    sort,
     partyId: sp.party, from: sp.from, to: sp.to, q: sp.q,
     limit: perPage, offset: (page - 1) * perPage,
     direction: sp.direction === 'purchase' ? 'purchase' : sp.direction === 'sale' ? 'sale' : undefined,
@@ -82,38 +95,54 @@ export default async function MoneyPage({
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          Every invoice as a document: what you billed, to whom, when, and what is still unpaid.
-        </p>
-        <AddBillSheet
-          clients={clients} suppliers={suppliers}
-          units={units.map((u) => ({
-            lotId: u.lotId, lotNo: u.lotNo, balance: u.balance,
-            label: specLabel(u) === '—' ? u.lotNo : specLabel(u),
-          }))}
-          picklists={picklists} sieveShapes={sieveShapes}
-          defaultOpen={sp.new === '1'}
-        />
-      </div>
+    <div className="space-y-4">
+      <PageHeader
+        detail={`${total.toLocaleString('en-IN')} bills`}
+        title="Accounts"
+        actions={
+          <AddBillSheet
+            clients={clients} suppliers={suppliers}
+            units={units.map((u) => ({
+              lotId: u.lotId, lotNo: u.lotNo, balance: u.balance,
+              label: specLabel(u) === '—' ? u.lotNo : specLabel(u),
+            }))}
+            picklists={picklists} sieveShapes={sieveShapes}
+            defaultOpen={sp.new === '1'}
+          />
+        }
+        tabs={<AccountsNav />}
+      />
+
+      {/* Saved views: the four questions this page is opened to answer. */}
+      <nav className="flex flex-wrap gap-1">
+        {VIEWS.map((v) => {
+          const active = Object.entries(v.params).every(([k, val]) => (sp[k] ?? '') === val)
+            && ['direction', 'status'].every((k) => (sp[k] ?? '') === (v.params[k] ?? ''));
+          return (
+            <Button
+              key={v.label} size="xs" variant={active ? 'secondary' : 'ghost'} aria-current={active ? 'true' : undefined}
+              nativeButton={false} render={<Link href={`/accounts/bills?${new URLSearchParams(v.params)}`} />}
+            >
+              {v.label}
+            </Button>
+          );
+        })}
+      </nav>
+
+      <FilterBar exportHref="/api/export?view=bills" fields={fields} />
 
       <Card>
-        <CardContent className="space-y-4 pt-6">
-          <FilterBar
-            exportHref="/api/export?view=bills"
-            fields={fields}
-          />
+        <CardContent className="space-y-4">
 
           <div className="flex flex-wrap gap-6 border-y py-3 text-sm">
-            <Sum label="Bills" value={total.toLocaleString('en-IN')} />
-            <Sum label="Gross" value={inr(bills.totals.gross)} />
-            <Sum label="Settled" value={inr(bills.totals.paid)} />
-            <Sum label="Outstanding" value={inr(bills.totals.balance)} tone="text-warning" />
+            <Figure label="Bills" value={total.toLocaleString('en-IN')} />
+            <Figure label="Gross" value={inr(bills.totals.gross)} />
+            <Figure label="Settled" value={inr(bills.totals.paid)} />
+            <Figure label="Outstanding" value={inr(bills.totals.balance)} />
           </div>
 
           <div className="overflow-x-auto">
-            <BillTable rows={bills.rows} />
+            <BillTable rows={bills.rows} sort={sort} sp={sp} />
           </div>
 
           {pages > 1 && (
@@ -145,21 +174,21 @@ export default async function MoneyPage({
   );
 }
 
-function BillTable({ rows }: { rows: NonNullable<Awaited<ReturnType<typeof getBills>>>['rows'] }) {
+function BillTable({ rows, sort, sp }: {
+  rows: NonNullable<Awaited<ReturnType<typeof getBills>>>['rows'];
+  sort: BillSort; sp: Record<string, string | undefined>;
+}) {
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>Bill no.</TableHead>
-          <TableHead>Date</TableHead>
-          <TableHead>Party</TableHead>
+          <SortHead col="date" label="Date" sort={sort} sp={sp} path="/accounts/bills" first="desc" />
+          <SortHead col="party" label="Party" sort={sort} sp={sp} path="/accounts/bills" />
           <TableHead>Type</TableHead>
-          <TableHead className="text-right">Lines</TableHead>
-          <TableHead className="text-right">Amount</TableHead>
-          <TableHead className="text-right">Settled</TableHead>
-          <TableHead className="text-right">Balance</TableHead>
-          <TableHead>Due</TableHead>
-          <TableHead>Status</TableHead>
+          <SortHead col="amount" label="Amount" sort={sort} sp={sp} path="/accounts/bills" first="desc" className="text-right" />
+          <SortHead col="balance" label="Balance" sort={sort} sp={sp} path="/accounts/bills" first="desc" className="text-right" />
+          <SortHead col="due" label="Due" sort={sort} sp={sp} path="/accounts/bills" />
           <TableHead />
         </TableRow>
       </TableHeader>
@@ -169,77 +198,56 @@ function BillTable({ rows }: { rows: NonNullable<Awaited<ReturnType<typeof getBi
             <TableCell>
               <Link
                 href={`/accounts/bills/${encodeURIComponent(b.billKey)}?direction=${b.direction}`}
-                className="font-mono text-xs underline underline-offset-4"
+                className="font-mono text-xs hover:underline"
               >
                 {b.billNo ?? (b.isCash ? 'Cash' : 'Unnumbered')}
               </Link>
             </TableCell>
-            <TableCell className="tabular-nums">{b.billedOn ?? '—'}</TableCell>
+            <TableCell className="tabular-nums">{day(b.billedOn)}</TableCell>
             <TableCell>
-              <Link href={`/parties/${b.partyId}`} className="underline underline-offset-4">
+              <Link href={`/parties/${b.partyId}`} className="font-medium hover:underline">
                 {b.partyName}
               </Link>
             </TableCell>
-            <TableCell>
-              <Badge variant={b.direction === 'sale' ? 'default' : 'outline'}>{b.direction}</Badge>
-            </TableCell>
-            <TableCell className="text-right tabular-nums">{b.lines}</TableCell>
-            <TableCell className="text-right tabular-nums">{inr(b.gross)}</TableCell>
-            <TableCell className="text-right tabular-nums text-muted-foreground">{inr(b.paid)}</TableCell>
+            <TableCell className="text-muted-foreground">{b.direction === 'sale' ? 'Sale' : 'Purchase'}</TableCell>
+            <TableCell className="text-right tabular-nums text-muted-foreground">{inr(b.gross)}</TableCell>
             <TableCell
               className={`text-right tabular-nums font-semibold ${
-                b.balance > 0.005 ? 'text-warning' : 'text-positive'
+                b.balance > 0.005 ? '' : 'text-positive'
               }`}
             >
-              {b.balance > 0.005 ? inr(b.balance) : 'settled'}
+              {b.balance > 0.005 ? inr(b.balance) : 'Settled'}
             </TableCell>
-            <TableCell className="tabular-nums text-xs">{b.dueOn ?? '—'}</TableCell>
-            <TableCell><BillStatus bill={b} /></TableCell>
+            {/* One column says when it was due and, if it matters, by how much it is late. */}
+            <TableCell className={b.status === 'overdue' ? 'text-negative' : 'text-muted-foreground'}>
+              {b.balance > 0.005 ? day(b.dueOn) : '—'}
+              {b.status === 'overdue' && b.daysOverdue ? (
+                <span className="block text-xs">{b.daysOverdue} days late</span>
+              ) : null}
+            </TableCell>
             <TableCell className="text-right">
               {b.balance > 0.005 && (
                 <PaymentDialog
                   partyId={b.partyId} partyName={b.partyName}
                   direction={b.direction === 'sale' ? 'in' : 'out'}
                   billNo={b.billNo} outstanding={b.balance}
-                  label="Record payment" size="sm"
+                  label={b.direction === 'sale' ? 'Receive' : 'Pay'} size="sm" variant="outline"
                 />
               )}
             </TableCell>
           </TableRow>
         ))}
-        {!rows.length && <Empty cols={11} what="No bills match these filters." />}
+        {!rows.length && <Empty cols={8} what="No bills match these filters." />}
       </TableBody>
     </Table>
   );
 }
 
-/** Derived in SQL from the payments already recorded -- never typed by hand. */
-function BillStatus({ bill }: { bill: { status: string; daysOverdue: number | null; balance: number } }) {
-  if (bill.status === 'paid') return <Badge variant="secondary">paid</Badge>;
-  if (bill.status === 'overdue') {
-    return (
-      <Badge variant="destructive">
-        overdue{bill.daysOverdue ? ` ${bill.daysOverdue}d` : ''}
-      </Badge>
-    );
-  }
-  if (bill.status === 'part') return <Badge variant="outline">part paid</Badge>;
-  return <Badge variant="outline">due</Badge>;
-}
 
 function Empty({ cols, what }: { cols: number; what: string }) {
   return (
     <TableRow>
       <TableCell colSpan={cols} className="py-10 text-center text-muted-foreground">{what}</TableCell>
     </TableRow>
-  );
-}
-
-function Sum({ label, value, tone }: { label: string; value: string; tone?: string }) {
-  return (
-    <div>
-      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className={`font-bold tabular-nums ${tone ?? ''}`}>{value}</div>
-    </div>
   );
 }

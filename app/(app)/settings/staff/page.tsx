@@ -16,15 +16,12 @@ export default async function StaffPage() {
   const staff = list.ok ? list.staff : [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
-        eyebrow="Access"
-        title="Staff & access"
-        description="Who can sign in, what they can do, and who posted what. Accounts are issued here — there is no sign-up page."
+        title="Masters"
         actions={list.ok ? <AddStaffSheet /> : null}
+        tabs={<MastersNav />}
       />
-
-      <MastersNav />
 
       {list.ok ? (
         <Card>

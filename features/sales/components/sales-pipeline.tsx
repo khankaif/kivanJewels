@@ -2,8 +2,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Empty, EmptyDescription } from '@/components/ui/empty';
-import { ct } from '@/lib/format';
+import { ct, day } from '@/lib/format';
 import {
   STAGES, STAGE_LABEL, type AdhocApproval, type PipelineRow, type Stage,
 } from '../queries';
@@ -47,19 +46,27 @@ export function SalesPipeline({
   const buckets = new Map<Stage, PipelineRow[]>(STAGES.map((s) => [s, []]));
   rows.forEach((r) => buckets.get(r.stage)!.push(r));
 
+  const count = (s: Stage) => buckets.get(s)!.length + (s === 'approval' ? adhoc.length : 0);
+  // An empty stage keeps its place in the flow but gives its width to the busy ones.
+  const columns = STAGES.map((s) => (count(s) ? 'minmax(0,1fr)' : 'minmax(9rem,0.45fr)')).join(' ');
+
   return (
-    <div className="grid gap-3 xl:grid-cols-5">
+    <div
+      className="grid gap-3 xl:[grid-template-columns:var(--cols)]"
+      style={{ '--cols': columns } as React.CSSProperties}
+    >
       {STAGES.map((stage) => {
         const cards = buckets.get(stage)!;
         const extra = stage === 'approval' ? adhoc : [];
+        const empty = !count(stage);
         return (
-          <section key={stage} className="min-w-0 rounded-xl border bg-muted/25 p-3">
-            <div className="mb-3 flex items-start justify-between gap-2">
+          <section key={stage} className={`min-w-0 rounded-xl p-3 ${empty ? 'self-start bg-muted/40' : 'border bg-muted/25'}`}>
+            <div className={`flex items-start justify-between gap-2 ${empty ? '' : 'mb-3'}`}>
               <div>
-                <h2 className="text-sm font-semibold">{STAGE_LABEL[stage]}</h2>
-                <p className="text-xs text-muted-foreground">{DESCRIPTION[stage]}</p>
+                <h2 className={`text-sm font-semibold ${empty ? 'text-muted-foreground' : ''}`}>{STAGE_LABEL[stage]}</h2>
+                <p className="text-xs text-muted-foreground">{empty ? 'Nothing here' : DESCRIPTION[stage]}</p>
               </div>
-              <Badge variant="outline" className="bg-background tabular-nums">{cards.length + extra.length}</Badge>
+              {!empty && <Badge variant="outline" className="bg-background tabular-nums">{count(stage)}</Badge>}
             </div>
 
             <div className="space-y-2">
@@ -117,8 +124,8 @@ export function SalesPipeline({
                   </CardHeader>
                   <CardContent className="mt-2 space-y-2 px-3">
                     <div className="flex items-center justify-between text-xs">
-                      <span className={m.overdue ? 'text-destructive' : 'text-muted-foreground'}>
-                        {m.overdue ? `due back ${m.dueOn}` : m.dueOn ? `back by ${m.dueOn}` : 'no due date'}
+                      <span className={m.overdue ? 'text-negative' : 'text-muted-foreground'}>
+                        {m.overdue ? `was due ${day(m.dueOn)}` : m.dueOn ? `back by ${day(m.dueOn)}` : 'no due date'}
                       </span>
                       <span className="font-medium tabular-nums">{ct(m.outstanding)} out</span>
                     </div>
@@ -129,11 +136,6 @@ export function SalesPipeline({
                 </Card>
               ))}
 
-              {!cards.length && !extra.length && (
-                <Empty className="border bg-background/55 px-2 py-5">
-                  <EmptyDescription className="text-xs">None</EmptyDescription>
-                </Empty>
-              )}
             </div>
           </section>
         );
