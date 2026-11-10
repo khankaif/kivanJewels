@@ -19,9 +19,9 @@ import {
 import { Segmented } from '@/components/forms/segmented';
 import { Amount } from '@/components/forms/carats-rate';
 import {
-  SpecFields, blankSpec, type Picklists, type SpecValue,
-} from '@/features/masters/diamonds/components/spec-fields';
-import type { SieveShapes } from '@/lib/spec-rules';
+  SpecFields, blankSpec, type SpecValue,
+} from '@/features/spec/components/spec-fields';
+import type { SizeOption } from '@/features/masters/sizes/queries';
 import { useLastUsed } from '@/lib/use-last-used';
 import { addDays, todayIso } from '@/lib/dates';
 import { ct, inr } from '@/lib/format';
@@ -53,10 +53,10 @@ const blankLine = (): Line => ({
 const num = (v: string) => Number(v) || 0;
 
 export function NewSaleSheet({
-  customers, suppliers, agents, picklists, sieveShapes, units, defaultOpen = false, defaultLot,
+  customers, suppliers, agents, sizes, units, defaultOpen = false, defaultLot,
 }: {
   customers: Party[]; suppliers: Party[]; agents: string[];
-  picklists: Picklists; sieveShapes: SieveShapes; units: SellableUnit[];
+  sizes: SizeOption[]; units: SellableUnit[];
   defaultOpen?: boolean;
   /** Opened from search on a parcel: the first line starts with it picked. */
   defaultLot?: string;
@@ -178,7 +178,7 @@ export function NewSaleSheet({
 
             {lines.map((l, i) => (
               <LineCard
-                key={i} index={i} line={l} picklists={picklists} sieveShapes={sieveShapes}
+                key={i} index={i} line={l} sizes={sizes}
                 units={units} sourceNow={sourceNow}
                 onChange={(patch) => set(i, patch)}
                 onRemove={lines.length > 1 ? () => setLines((ls) => ls.filter((_, j) => j !== i)) : undefined}
@@ -319,20 +319,20 @@ const unitBalance = (units: SellableUnit[], lotId: string) =>
  * the shelf while you type, in case you are about to buy what you already own.
  */
 function LineCard({
-  index, line, picklists, sieveShapes, units, sourceNow, onChange, onRemove,
+  index, line, sizes, units, sourceNow, onChange, onRemove,
 }: {
-  index: number; line: Line; picklists: Picklists; sieveShapes: SieveShapes;
+  index: number; line: Line; sizes: SizeOption[];
   units: SellableUnit[]; sourceNow: boolean;
   onChange: (patch: Partial<Line>) => void; onRemove?: () => void;
 }) {
   const { spec, carats } = line;
   const fromStock = line.from === 'stock';
   const picked = units.find((u) => u.lotId === line.lotId);
-  const key = [spec.shape, spec.sieveSize, spec.mmSize, spec.colour, spec.clarity].join('|');
+  const key = [spec.stoneType, spec.sizeId, spec.colour, spec.clarity, spec.certified, spec.lab].join('|');
 
   // Sourced lines ask the shelf what it holds, a beat after typing stops.
   useEffect(() => {
-    if (fromStock || (!spec.sieveSize && !spec.mmSize)) {
+    if (fromStock || !spec.sizeId) {
       onChange({ inStock: null });
       return;
     }
@@ -396,7 +396,7 @@ function LineCard({
           </>
         ) : (
           <SpecFields
-            id={`ns-${index}`} picklists={picklists} sieveShapes={sieveShapes}
+            id={`ns-${index}`} sizes={sizes}
             value={spec} onChange={(v) => onChange({ spec: v })}
           />
         )}

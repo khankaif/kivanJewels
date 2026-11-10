@@ -52,7 +52,7 @@ export function ItemForm({
               id="ci-category" name="category" required defaultValue={item?.category ?? ''}
               options={categories.map((c) => ({ value: c, label: c }))}
             />
-            <FieldDescription>Add categories in Masters → Diamonds.</FieldDescription>
+            
           </Field>
           <Field>
             <FieldLabel htmlFor="ci-mrp">MRP (₹)</FieldLabel>

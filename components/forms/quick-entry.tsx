@@ -4,11 +4,11 @@ import { useState, useTransition } from 'react';
 import { Wand2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
-import { parseShorthandAction } from '@/features/masters/diamonds/actions';
-import type { Shorthand } from '@/features/masters/diamonds/shorthand';
+import { parseShorthandAction } from '@/features/spec/actions';
+import type { Shorthand } from '@/features/spec/shorthand';
 
 /**
- * One line the way a trader says it -- "9-9.5 rd e vvs1 2.35 @4200" -- turned
+ * One line the way a trader says it -- "RD-100 ef vvs 2.35 @4200" -- turned
  * into the form's fields. It fills, it never saves: the fields stay editable
  * and the usual checks run on save.
  */
@@ -40,7 +40,7 @@ export function QuickEntry({ id, onParsed }: { id: string; onParsed: (r: Shortha
       <FieldDescription>
         {unknown?.length
           ? <>Filled what it knew. Not recognised: <span className="font-medium text-foreground">{unknown.join(', ')}</span></>
-          : unknown ? 'Filled. Check the fields below before saving.' : 'Size, shape, colour, clarity, carats and @rate, in any order.'}
+          : unknown ? 'Filled. Check the fields below before saving.' : 'Size ID, type, colour, clarity, carats and @rate, in any order.'}
       </FieldDescription>
     </Field>
   );

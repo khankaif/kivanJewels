@@ -19,32 +19,30 @@ const LIMIT = 6;
  */
 const SEARCH_SQL = `
   (SELECT 'stock' AS kind, 1 AS ord,
-          COALESCE(NULLIF(concat_ws(' · ', spec_sieve(sieve_size),
-                                    NULLIF(spec_mm(mm_size),'') || 'mm', shape), ''), lot_no) AS label,
+          COALESCE(NULLIF(concat_ws(' · ', size_id, shape), ''), lot_no) AS label,
           concat_ws(' · ', NULLIF(concat_ws(' ', colour, clarity), ''),
                     round(balance, 3)::text || ' ct ' ||
                       CASE WHEN source = 'memo_in' THEN 'on supplier memo' ELSE 'in vault' END,
                     CASE WHEN exposure > 0.0005 THEN round(exposure, 3)::text || ' ct with clients' END) AS sub,
           '/stock/' || lot_no AS href,
           lot_id::text AS lot_id,
-          concat_ws(' ', stone_type, spec_sieve(sieve_size), NULLIF(spec_mm(mm_size),'') || 'mm',
+          concat_ws(' ', stone_type, size_id,
                     shape, colour, clarity, CASE WHEN lab IS NOT NULL THEN lab || ' cert' END) AS spec,
           round(balance, 3)::text AS carats
      FROM lot_balances
-     -- Every word must match some part of the parcel, so "9-9.5 rd def vvs"
-     -- narrows the way a trader's request does. Shapes and clarities resolve
-     -- through the master's aliases ("rd", "rbc"); a run of colour letters
-     -- ("def") matches any colour inside it.
+     -- Every word must match some part of the parcel, so "rd-100 def vvs"
+     -- narrows the way a trader's request does. A size's prefix ("rd") finds
+     -- its sizes; a run of colour letters ("def") matches any colour inside it.
     WHERE balance > 0.0005
       AND NOT EXISTS (
         SELECT 1 FROM unnest($2::text[]) t
          -- COALESCE: a blank field compares as NULL, and NOT (NULL) would let
          -- every word "match" a parcel that has no colour.
          WHERE NOT COALESCE((
-           sieve_size ILIKE t || '%' OR mm_size ILIKE t || '%' OR lot_no ILIKE '%' || t || '%'
-           OR shape ILIKE t || '%' OR shape = master_value('shape', t)
-           OR clarity ILIKE t || '%' OR clarity = master_value('clarity', t)
-           OR stone_type ILIKE t || '%' OR stone_type = master_value('stone_type', t)
+           size_id ILIKE t || '%' OR lot_no ILIKE '%' || t || '%'
+           OR shape ILIKE t || '%'
+           OR clarity ILIKE t || '%'
+           OR stone_type ILIKE t || '%'
            OR colour ILIKE t
            OR (t ~* '^[d-z]{2,5}$' AND colour <> '' AND strpos(lower(t), lower(colour)) > 0)
            OR party_name ILIKE t || '%'), false))

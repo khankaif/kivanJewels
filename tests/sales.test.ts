@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { inRollback } from './helpers';
+import { inRollback, testSize } from './helpers';
 import {
   recordDirectSale, recordPurchase, issueOutwardMemo, receiveInwardMemo,
   returnFromMemo, lotBalance, OverdrawError,
@@ -21,13 +21,13 @@ async function supplier(c: any): Promise<string> {
 
 /** A requirement with one line for a spec no real row collides with. */
 async function requirement(c: any, partyId: string, want: number, over: Record<string, string> = {}) {
-  const spec = { shape: 'Round', sieveSize: `ZZ-${uniq()}`, mmSize: '2.20', colour: 'EF', clarity: 'VVS-VS', ...over };
+  const spec: Record<string, string> = { ...(await testSize()), colour: 'EF', clarity: 'VVS-VS', ...over };
   const { rows: [r] } = await c.query(
     `INSERT INTO requirements (party_id, raised_on) VALUES ($1,'2024-06-01') RETURNING id`, [partyId]);
   const { rows: [l] } = await c.query(
-    `INSERT INTO requirement_lines (requirement_id, shape, sieve_size, mm_size, colour, clarity, carats, quoted_rate)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-    [r.id, spec.shape, spec.sieveSize, spec.mmSize, spec.colour, spec.clarity, want, 6000],
+    `INSERT INTO requirement_lines (requirement_id, shape, size_id, colour, clarity, carats, quoted_rate)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+    [r.id, spec.shape, spec.sizeId, spec.colour, spec.clarity, want, 6000],
   );
   return { reqId: r.id as string, lineId: l.id as string, spec };
 }
@@ -38,7 +38,7 @@ const status = async (c: any, lineId: string) =>
 /** Owned stock of a spec, so a delivery has something to come from. */
 async function stockLot(c: any, spec: Record<string, string>, carats: number): Promise<string> {
   return recordPurchase({
-    spec: { stoneType: 'Lab Grown', ...spec, sieveSize: spec.sieveSize, mmSize: spec.mmSize },
+    spec: { stoneType: 'Lab Grown', ...spec },
     carats, rate: 4000, on: '2024-05-01',
   }, c);
 }

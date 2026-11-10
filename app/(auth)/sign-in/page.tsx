@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CredentialsForm } from '@/features/auth/components/credentials-form';
 import { signInWithEmail } from '@/features/auth/actions';
+import { Logo } from '@/components/ui/logo';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +9,9 @@ export default function SignInPage() {
   return (
     <Card>
       <CardHeader>
+        <div className="mb-2 grid size-10 place-items-center rounded-lg bg-primary text-primary-foreground shadow-2xs">
+          <Logo className="size-5" />
+        </div>
         <CardTitle>Sign in</CardTitle>
         <CardDescription>Kaivan Jewels — diamond trading &amp; jewellery</CardDescription>
       </CardHeader>

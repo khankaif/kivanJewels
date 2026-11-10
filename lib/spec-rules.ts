@@ -1,77 +1,78 @@
 /**
- * Which fields name a stone, and which of them a given shape actually uses.
+ * Which fields name a stone, and the values each may hold.
  *
- * The only shape-dependent field is the sieve: it is a Round measurement, and
- * an Oval is measured in mm. That one fact is a flag on the shape in the
- * master (`diamond_attributes.uses_sieve`); everything else below is fixed,
- * because a stone always has a type, a grade and a certification answer.
+ * A parcel is its type, its size from the chart (Masters -> Diamonds; the size
+ * fixes the shape), its grades and its certification. Grades are fixed lists
+ * here rather than an editable master: they are industry vocabulary that
+ * changes once in years, and a list anyone can edit is how the old book grew
+ * 'VVV-VS' beside 'VVS-VS'. A new grade is a one-line change to this file.
  */
 
-export const SPEC_FIELDS = [
-  'stoneType', 'colour', 'clarity', 'shape', 'sieveSize', 'mmSize',
-  'certified', 'lab',
-] as const;
+export const SPEC_FIELDS = ['stoneType', 'sizeId', 'colour', 'clarity', 'certified', 'lab'] as const;
 export type SpecField = (typeof SPEC_FIELDS)[number];
 
-export type Spec = Partial<Record<SpecField, string | null>>;
+/** A spec as forms and JSON carry it. `shape` is never typed: the size decides it. */
+export type Spec = Partial<Record<SpecField | 'shape', string | null>>;
 
-/** Shape values whose stones are sieved, from the master. */
-export type SieveShapes = string[];
+/** The fixed value lists, in the order pickers show them. */
+export const GRADES = {
+  stoneType: ['Lab Grown', 'Natural', 'Gemstone'],
+  colour: ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'DE', 'EF', 'FG', 'GH', 'HI'],
+  clarity: ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'I1',
+            'VVS', 'VVS-VS', 'VS', 'VS-SI', 'SI'],
+  certified: ['Certified', 'Non-certified'],
+  lab: ['IGI', 'GIA', 'HRD', 'SGL'],
+} as const satisfies Partial<Record<SpecField, readonly string[]>>;
+export type GradeField = keyof typeof GRADES;
+
+/** Storefront categories for the jewellery catalog. */
+export const JEWELLERY_CATEGORIES = ['Gold Vermeil Jewelry'] as const;
+
+/** What people type for a grade, mapped to its value. Used by shorthand and imports. */
+const ALIASES: Partial<Record<GradeField, Record<string, string>>> = {
+  stoneType: { lgd: 'Lab Grown', 'lab grown diamond': 'Lab Grown', lab: 'Lab Grown', 'natural diamond': 'Natural' },
+  certified: { cert: 'Certified', yes: 'Certified', 'non cert': 'Non-certified', 'non-cert': 'Non-certified', no: 'Non-certified' },
+};
 
 export const FIELD_LABELS: Record<SpecField, string> = {
-  stoneType: 'stone type', shape: 'shape', sieveSize: 'sieve size',
-  mmSize: 'MM size', colour: 'colour', clarity: 'clarity',
-  certified: 'certification', lab: 'lab',
+  stoneType: 'stone type', sizeId: 'size', colour: 'colour',
+  clarity: 'clarity', certified: 'certification', lab: 'lab',
 };
 
-/**
- * Which master list backs each field. Sieve and MM are absent on purpose:
- * 507 and 427 distinct values in the book -- those are measurements, and
- * lot_unit_key() normalizes them on write. Each list key is also the column
- * name the value is stored under.
- */
-export const BUCKET_FOR: Partial<Record<SpecField, string>> = {
-  stoneType: 'stone_type', shape: 'shape', colour: 'colour',
-  clarity: 'clarity', lab: 'lab', certified: 'certified',
-};
-
-/** Always asked for. The rest depend on the shape or on certification. */
-export const REQUIRED: SpecField[] = ['stoneType', 'shape', 'certified'];
+/** Always asked for. The lab is asked once the stone is certified. */
+export const REQUIRED: SpecField[] = ['stoneType', 'sizeId', 'certified'];
 
 /** True when this value of `certified` means the stone carries a certificate. */
 export const isCertified = (v: string | null | undefined) =>
   ['certified', 'cert', 'yes', 'y', 'true'].includes(String(v ?? '').trim().toLowerCase());
 
-export const usesSieve = (shapes: SieveShapes, shape: string | null | undefined) =>
-  shapes.some((s) => s.toLowerCase() === String(shape ?? '').trim().toLowerCase());
-
-/** Fields this stone does not have: a sieve on an Oval, a lab on an uncertified stone. */
-export function hides(shapes: SieveShapes, spec: Spec, field: SpecField): boolean {
-  if (field === 'sieveSize') return !usesSieve(shapes, spec.shape);
-  if (field === 'lab') return !isCertified(spec.certified);
-  return false;
+/**
+ * A grade as typed -> its list value, case-insensitively or by alias; null when
+ * it is not a value of that list. Blank in, blank out (as '').
+ */
+export function gradeValue(field: GradeField, raw: string | null | undefined): string | null {
+  const t = String(raw ?? '').trim().toLowerCase();
+  if (!t) return '';
+  return (GRADES[field] as readonly string[]).find((v) => v.toLowerCase() === t) ?? ALIASES[field]?.[t] ?? null;
 }
 
+/** Fields this stone does not have: a lab on an uncertified stone. */
+export const hides = (spec: Spec, field: SpecField) => field === 'lab' && !isCertified(spec.certified);
+
 /** Drops values for fields the stone does not have, so they never reach the key. */
-export function cleanSpec<T extends Spec>(spec: T, shapes: SieveShapes): T {
+export function cleanSpec<T extends Spec>(spec: T): T {
   const out = { ...spec };
-  for (const f of SPEC_FIELDS) if (hides(shapes, spec, f)) out[f] = null as T[SpecField];
+  for (const f of SPEC_FIELDS) if (hides(spec, f)) out[f] = null as T[SpecField];
   return out;
 }
 
 /** Returns the first problem with a spec, or null. Call it on a cleaned spec. */
-export function validateSpec(spec: Spec, shapes: SieveShapes): string | null {
+export function validateSpec(spec: Spec): string | null {
   for (const f of REQUIRED) {
     if (!String(spec[f] ?? '').trim()) return `Enter the ${FIELD_LABELS[f]}.`;
   }
   if (isCertified(spec.certified) && !String(spec.lab ?? '').trim()) {
     return 'Enter the lab that certified it.';
-  }
-  // A lot with neither a sieve nor an mm has no identity, whatever the shape.
-  if (!String(spec.sieveSize ?? '').trim() && !String(spec.mmSize ?? '').trim()) {
-    return usesSieve(shapes, spec.shape)
-      ? 'Enter the sieve size — that is what identifies the stock.'
-      : `Enter the MM size — ${spec.shape ?? 'this shape'} is measured in mm.`;
   }
   return null;
 }

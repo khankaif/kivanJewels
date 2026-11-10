@@ -30,7 +30,7 @@ export default async function LotPage({ params }: { params: Promise<{ lotNo: str
         parent={{ href: '/stock?tab=movements', label: 'Movements' }}
         title={first.lotNo}
         badges={<Badge variant={balance > 0.0005 ? 'outline' : 'secondary'}>{balance > 0.0005 ? `${ct(balance)} in vault` : 'Depleted'}</Badge>}
-        detail={[first.stoneType, first.shape, first.sieveSize, first.partyName && `from ${first.partyName}`].filter(Boolean).join(' · ')}
+        detail={[first.stoneType, first.shape, first.sizeId, first.partyName && `from ${first.partyName}`].filter(Boolean).join(' · ')}
       />
 
       <StatStrip items={[

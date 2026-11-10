@@ -15,9 +15,9 @@ import {
 import { Segmented } from '@/components/forms/segmented';
 import { Amount } from '@/components/forms/carats-rate';
 import {
-  SpecFields, blankSpec, type Picklists, type SpecValue,
-} from '@/features/masters/diamonds/components/spec-fields';
-import type { SieveShapes } from '@/lib/spec-rules';
+  SpecFields, blankSpec, type SpecValue,
+} from '@/features/spec/components/spec-fields';
+import type { SizeOption } from '@/features/masters/sizes/queries';
 import { useLastUsed } from '@/lib/use-last-used';
 import { inr } from '@/lib/format';
 import { addDays, todayIso } from '@/lib/dates';
@@ -40,10 +40,10 @@ const lineTotal = (l: Line, withGoods: boolean) =>
   withGoods ? (Number(l.carats) || 0) * (Number(l.rate) || 0) : Number(l.amount) || 0;
 
 export function AddBillSheet({
-  clients, suppliers, units, picklists, sieveShapes, defaultOpen = false,
+  clients, suppliers, units, sizes, defaultOpen = false,
 }: {
   clients: Party[]; suppliers: Party[]; units: Unit[];
-  picklists: Picklists; sieveShapes: SieveShapes;
+  sizes: SizeOption[];
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -205,7 +205,7 @@ export function AddBillSheet({
 
                 {withGoods && direction === 'purchase' && (
                   <SpecFields
-                    id={`ab-${i}`} picklists={picklists} sieveShapes={sieveShapes}
+                    id={`ab-${i}`} sizes={sizes}
                     value={l.spec} onChange={(spec) => set(i, { spec })}
                   />
                 )}

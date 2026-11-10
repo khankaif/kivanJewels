@@ -3,8 +3,7 @@ import { specLabel } from '@/lib/format';
 
 export type RequirementLine = {
   lineId: string; lineStatus: 'open' | 'closed';
-  stoneType: string; shape: string | null; sieveSize: string | null;
-  mmSize: string | null; colour: string | null; clarity: string | null; unitKey: string;
+  stoneType: string; shape: string | null; sizeId: string | null; colour: string | null; clarity: string | null; unitKey: string;
   wanted: number; quotedRate: number | null;
   deliveredMemo: number; deliveredDirect: number; delivered: number;
   sourcedPending: number; outstanding: number;
@@ -22,7 +21,7 @@ export type Requirement = {
 
 const mapLine = (r: any): RequirementLine => ({
   lineId: r.line_id, lineStatus: r.line_status,
-  stoneType: r.stone_type, shape: r.shape, sieveSize: r.sieve_size, mmSize: r.mm_size,
+  stoneType: r.stone_type, shape: r.shape, sizeId: r.size_id,
   colour: r.colour, clarity: r.clarity, unitKey: r.unit_key,
   wanted: Number(r.wanted), quotedRate: r.quoted_rate === null ? null : Number(r.quoted_rate),
   deliveredMemo: Number(r.delivered_memo), deliveredDirect: Number(r.delivered_direct),
@@ -126,11 +125,11 @@ export async function getPipeline(f: PipelineFilters = {}): Promise<PipelineRow[
   const agent = f.agent || null;
   const q = f.q ? `%${f.q}%` : null;
   const rows = await sql`
-    SELECT rp.*, hl.line_id, hl.sieve_size, hl.mm_size, hl.shape, hl.colour, hl.clarity,
+    SELECT rp.*, hl.line_id, hl.size_id, hl.shape, hl.colour, hl.clarity,
            hl.lab, hl.certified
     FROM requirement_pipeline rp
     LEFT JOIN LATERAL (
-      SELECT line_id, sieve_size, mm_size, shape, colour, clarity, lab, certified
+      SELECT line_id, size_id, shape, colour, clarity, lab, certified
       FROM requirement_line_status
       WHERE requirement_id = rp.id AND line_status = 'open'
       ORDER BY outstanding DESC LIMIT 1
@@ -139,7 +138,7 @@ export async function getPipeline(f: PipelineFilters = {}): Promise<PipelineRow[
       AND (${agent}::text IS NULL OR rp.agent = ${agent})
       AND (${q}::text IS NULL
            OR rp.requirement_no ILIKE ${q} OR rp.party_name ILIKE ${q}
-           OR hl.sieve_size ILIKE ${q} OR hl.mm_size ILIKE ${q}
+           OR hl.size_id ILIKE ${q}
            OR hl.shape ILIKE ${q} OR hl.colour ILIKE ${q} OR hl.clarity ILIKE ${q})
     ORDER BY rp.raised_on DESC, rp.requirement_no DESC`;
 
@@ -155,7 +154,7 @@ export async function getPipeline(f: PipelineFilters = {}): Promise<PipelineRow[
 }
 
 const mapSpec = (r: any) => ({
-  sieveSize: r.sieve_size, mmSize: r.mm_size, shape: r.shape,
+  sizeId: r.size_id, shape: r.shape,
   colour: r.colour, clarity: r.clarity, lab: r.lab, certified: r.certified,
 });
 
@@ -178,7 +177,7 @@ export async function getAdhocApprovals(f: PipelineFilters = {}): Promise<AdhocA
            m.issued_on::text AS issued_on, m.due_on::text AS due_on,
            (m.due_on IS NOT NULL AND m.due_on < CURRENT_DATE) AS overdue,
            SUM(s.outstanding) AS outstanding,
-           MAX(l.sieve_size) AS sieve_size, MAX(l.mm_size) AS mm_size, MAX(l.shape) AS shape,
+           MAX(l.size_id) AS size_id, MAX(l.shape) AS shape,
            MAX(l.colour) AS colour, MAX(l.clarity) AS clarity,
            MAX(l.lab) AS lab, MAX(l.certified) AS certified
     FROM memo_line_status s
@@ -214,7 +213,7 @@ export type SellableUnit = {
 export async function getSellableUnits(limit = 400): Promise<SellableUnit[]> {
   const rows = await sql`
     SELECT lot_id, lot_no, source, party_name, balance, COALESCE(cost_rate, 0) AS cost_rate,
-           stone_type, spec_sieve(sieve_size) AS sieve_size, spec_mm(mm_size) AS mm_size,
+           stone_type, size_id,
            shape, colour, clarity, lab, certified
     FROM lot_balances
     WHERE balance > 0.0005

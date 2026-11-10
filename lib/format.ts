@@ -16,14 +16,14 @@ export const pct = (v: unknown) => `${Number(v ?? 0).toFixed(1)}%`;
  * apart; certification is identity now, so it has to appear everywhere.
  */
 export const specLabel = (s: {
-  shape?: string | null; sieveSize?: string | null; mmSize?: string | null;
+  shape?: string | null; sizeId?: string | null;
   colour?: string | null; clarity?: string | null;
   lab?: string | null; certified?: string | null;
 }) => {
   const cert = s.lab
     ? `${s.lab} cert`
     : s.certified && s.certified.toLowerCase().startsWith('cert') ? 'certified' : null;
-  return [s.sieveSize, s.mmSize && `${s.mmSize}mm`, s.shape, s.colour, s.clarity, cert]
+  return [s.sizeId, s.shape, s.colour, s.clarity, cert]
     .filter(Boolean).join(' · ') || '—';
 };
 

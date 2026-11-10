@@ -7,7 +7,7 @@ import {
   issueOutwardMemo, receiveInwardMemo, recordDirectSale, recordPurchase,
   SettlementError, OverdrawError,
 } from '@/lib/ledger/movements';
-import { checkSpec, type StoredSpec } from '@/features/masters/diamonds/spec';
+import { checkSpec, type StoredSpec } from '@/features/spec/spec';
 import { allocate } from './allocate';
 import { docNoOr } from '@/lib/doc-numbers';
 
@@ -31,7 +31,7 @@ function toMessage(e: unknown): string | null {
 type SaleLineInput = {
   /** Set when the operator picked a parcel off the shelf instead of typing a spec. */
   lotId?: string;
-  stoneType?: string; shape?: string; sieveSize?: string; mmSize?: string;
+  stoneType?: string; sizeId?: string;
   colour?: string; clarity?: string; lab?: string; certified?: string;
   carats: number; quotedRate?: number | null;
   planStock?: number | null; planSource?: number | null;
@@ -41,7 +41,7 @@ type SaleLineInput = {
 /** The spec a chosen parcel already carries, so a sale off the shelf types nothing. */
 async function specOfLotById(lotId: string) {
   const [row] = await sql`
-    SELECT stone_type AS "stoneType", shape, sieve_size AS "sieveSize", mm_size AS "mmSize",
+    SELECT stone_type AS "stoneType", size_id AS "sizeId",
            colour, clarity, lab, certified
     FROM lots WHERE id = ${lotId}`;
   return (row ?? {}) as Record<string, string | null>;
@@ -151,10 +151,10 @@ export async function createSaleAction(_p: ActionState, form: FormData): Promise
       for (const { line, spec } of checked) {
         const { rows: [row] } = await c.query(
           `INSERT INTO requirement_lines
-             (requirement_id, stone_type, shape, sieve_size, mm_size, colour, clarity,
+             (requirement_id, stone_type, shape, size_id, colour, clarity,
               lab, certified, carats, quoted_rate, plan_stock, plan_source)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
-          [r.id, spec.stoneType, spec.shape, spec.sieveSize, spec.mmSize, spec.colour, spec.clarity,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
+          [r.id, spec.stoneType, spec.shape, spec.sizeId, spec.colour, spec.clarity,
            spec.lab, spec.certified,
            Number(line.carats), line.quotedRate ? Number(line.quotedRate) : null,
            line.planStock ?? null, line.planSource ?? null],
@@ -171,8 +171,8 @@ export async function createSaleAction(_p: ActionState, form: FormData): Promise
         const picks: { lotId: string; carats: number; rate: number; requirementLineId: string }[] = [];
         for (const { line, spec } of deliverLines) {
           const { rows: [k] } = await c.query(
-            'SELECT lot_unit_key($1,$2,$3,$4,$5,$6,$7,$8) AS key',
-            [spec.stoneType, spec.shape, spec.sieveSize, spec.mmSize, spec.colour, spec.clarity,
+            'SELECT lot_unit_key($1,$2,$3,$4,$5,$6,$7) AS key',
+            [spec.stoneType, spec.shape, spec.sizeId, spec.colour, spec.clarity,
              spec.lab, spec.certified]);
           const want = Number(line.planStock);
           const lots = (await lotsForSpec(c, k.key))
@@ -248,7 +248,7 @@ export async function createSaleAction(_p: ActionState, form: FormData): Promise
 
 /** How much of a spec is on the shelf right now. Drives the live match as you type. */
 export async function stockForSpecAction(spec: {
-  stoneType?: string; shape?: string; sieveSize?: string; mmSize?: string;
+  stoneType?: string; sizeId?: string;
   colour?: string; clarity?: string; lab?: string; certified?: string;
 }): Promise<{ inStock: number; lots: number }> {
   await requireUser();
@@ -256,9 +256,10 @@ export async function stockForSpecAction(spec: {
     SELECT COALESCE(SUM(b.balance), 0) AS in_stock, count(*)::int AS lots
     FROM lot_balances b JOIN lots l ON l.id = b.lot_id
     WHERE b.balance > 0.0005
+      -- The browser sends the size; the shape is the size's, read here.
       AND l.unit_key = lot_unit_key(
-        ${spec.stoneType || null}, ${spec.shape || null}, ${spec.sieveSize || null},
-        ${spec.mmSize || null}, ${spec.colour || null}, ${spec.clarity || null},
+        ${spec.stoneType || null}, (SELECT shape FROM diamond_sizes WHERE id = ${spec.sizeId || null}),
+        ${spec.sizeId || null}, ${spec.colour || null}, ${spec.clarity || null},
         ${spec.lab || null}, ${spec.certified || null})`;
   return { inStock: Number(row.in_stock), lots: Number(row.lots) };
 }
@@ -266,7 +267,7 @@ export async function stockForSpecAction(spec: {
 async function lineContext(lineId: string) {
   const [row] = await sql`
     SELECT rls.requirement_id, rls.party_id AS customer_id,
-           rls.stone_type, rls.shape, rls.sieve_size, rls.mm_size, rls.colour, rls.clarity,
+           rls.stone_type, rls.shape, rls.size_id, rls.colour, rls.clarity,
            rls.lab, rls.certified,
            rls.quoted_rate, rls.outstanding
     FROM requirement_line_status rls WHERE rls.line_id = ${lineId}`;
@@ -348,7 +349,7 @@ export async function sourceAction(_p: ActionState, form: FormData): Promise<Act
   if (!ctx) return { error: 'Requirement line not found.' };
   const spec = {
     stoneType: ctx.stone_type || 'Lab Grown',
-    shape: ctx.shape, sieveSize: ctx.sieve_size, mmSize: ctx.mm_size,
+    shape: ctx.shape, sizeId: ctx.size_id,
     colour: ctx.colour, clarity: ctx.clarity,
     lab: ctx.lab, certified: ctx.certified,
   };

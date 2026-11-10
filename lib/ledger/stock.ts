@@ -9,14 +9,15 @@ import {
 
 // ------------------------------------------------------------- owned stock
 //
-// Owned stock is fungible by spec: one lot per shape/sieve/mm, so buying 2.20mm
+// Owned stock is fungible by spec: one lot per size and grade, so buying RD-100
 // twice adds carats to the unit you already have instead of minting a second
 // row. Memo stock is deliberately NOT consolidated -- that parcel goes back to
 // that supplier, so it keeps its own lot. See db/migrations/014_stock_units.sql.
 
 export type Spec = {
   stoneType: string;
-  shape?: string | null; sieveSize?: string | null; mmSize?: string | null;
+  // The size's shape: the (size_id, shape) foreign key refuses any other.
+  shape?: string | null; sizeId?: string | null;
   clarity?: string | null; colour?: string | null;
   // Identity too: a certified parcel is not the same goods as an uncertified
   // one of the same spec, and IGI is not HRD. See db/migrations/023.
@@ -26,11 +27,11 @@ export type Spec = {
 /** The one owned lot for a spec, created on first purchase. */
 export async function unitLot(spec: Spec, c: PoolClientLike): Promise<string> {
   const run = q(c);
-  const key = [spec.stoneType, spec.shape ?? null, spec.sieveSize ?? null, spec.mmSize ?? null,
+  const key = [spec.stoneType, spec.shape ?? null, spec.sizeId ?? null,
                spec.colour ?? null, spec.clarity ?? null, spec.lab ?? null, spec.certified ?? null];
   const find = () =>
     run(`SELECT id FROM lots WHERE source = 'unit'
-          AND unit_key = lot_unit_key($1,$2,$3,$4,$5,$6,$7,$8)`, key);
+          AND unit_key = lot_unit_key($1,$2,$3,$4,$5,$6,$7)`, key);
 
   const [found] = await find();
   if (found) return found.id as string;
@@ -39,12 +40,12 @@ export async function unitLot(spec: Spec, c: PoolClientLike): Promise<string> {
   // unit_key is what makes consolidation true, so losing the race must reuse
   // the winner's unit, not fail the purchase.
   const [made] = await run(
-    `INSERT INTO lots (lot_no, stone_type, shape, sieve_size, mm_size, clarity, colour,
+    `INSERT INTO lots (lot_no, stone_type, shape, size_id, clarity, colour,
                        lab, certified, cost_rate, source, opened_on)
-     VALUES ('U-' || nextval('lot_unit_seq'), $1,$2,$3,$4,$5,$6,$7,$8, 0, 'unit', CURRENT_DATE)
+     VALUES ('U-' || nextval('lot_unit_seq'), $1,$2,$3,$4,$5,$6,$7, 0, 'unit', CURRENT_DATE)
      ON CONFLICT (unit_key) WHERE source = 'unit' DO NOTHING
      RETURNING id`,
-    [spec.stoneType, spec.shape ?? null, spec.sieveSize ?? null, spec.mmSize ?? null,
+    [spec.stoneType, spec.shape ?? null, spec.sizeId ?? null,
      spec.clarity ?? null, spec.colour ?? null, spec.lab ?? null, spec.certified ?? null],
   );
   if (made) return made.id as string;

@@ -8,9 +8,7 @@ import { getBills } from '@/features/accounts/money';
 import { getParties, getPartyOptions } from '@/features/parties/queries';
 import { getPipeline, getAdhocApprovals } from '@/features/sales/queries';
 import { getMemos, getAgents } from '@/features/memos/queries';
-import {
-  getAttributeBuckets, getDiamondPicklists, getMasterMismatches, getSieveShapes,
-} from '@/features/masters/diamonds/queries';
+import { getShapes, getSizes, getSizeOptions } from '@/features/masters/sizes/queries';
 import { search } from '@/features/search/queries';
 
 /**
@@ -30,7 +28,7 @@ test('every page query runs against the live schema', async () => {
     getBills({ limit: 5 }), getParties(), getPartyOptions('client'),
     getPipeline(), getAdhocApprovals(),
     getMemos('out'), getAgents(),
-    getAttributeBuckets(), getDiamondPicklists(), getSieveShapes(), getMasterMismatches(),
+    getShapes(), getSizes(), getSizeOptions(),
     search('a'),
   ]);
   assert.equal(results.filter((r: unknown) => r === undefined).length, 0);

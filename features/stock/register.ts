@@ -4,7 +4,7 @@ export type MovementRow = {
   id: string; movedOn: string; kind: string; carats: number;
   rate: number | null; amount: number | null; notes: string | null;
   lotId: string; lotNo: string; stoneType: string; shape: string | null;
-  sieveSize: string | null; partyName: string | null;
+  sizeId: string | null; partyName: string | null;
   memoNo: string | null; memoDirection: 'in' | 'out' | null;
   isInward: boolean; runningBalance: number;
 };
@@ -45,7 +45,7 @@ export async function getMovements(f: MovementFilters = {}) {
       AND (${dir}::text   IS NULL
            OR (${dir} = 'in' AND is_inward) OR (${dir} = 'out' AND NOT is_inward))
       AND (${q}::text     IS NULL OR lot_no ILIKE ${q} OR party_name ILIKE ${q}
-           OR stone_type ILIKE ${q} OR sieve_size ILIKE ${q} OR memo_no ILIKE ${q})`;
+           OR stone_type ILIKE ${q} OR size_id ILIKE ${q} OR memo_no ILIKE ${q})`;
 
   const rows = await sql`
     SELECT * FROM movement_entries ${where}
@@ -81,7 +81,7 @@ const map = (r: any): MovementRow => ({
   rate: r.rate === null ? null : Number(r.rate),
   amount: r.amount === null ? null : Number(r.amount),
   notes: r.notes, lotId: r.lot_id, lotNo: r.lot_no, stoneType: r.stone_type,
-  shape: r.shape, sieveSize: r.sieve_size, partyName: r.party_name,
+  shape: r.shape, sizeId: r.size_id, partyName: r.party_name,
   memoNo: r.memo_no, memoDirection: r.memo_direction,
   isInward: !!r.is_inward, runningBalance: Number(r.running_balance),
 });

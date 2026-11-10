@@ -1,16 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { inRollback } from './helpers';
+import { inRollback, testSize } from './helpers';
 import { issueOutwardMemo, recordPurchase, billMemoLine } from '@/lib/ledger/movements';
 
 const uniq = () => `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
-const spec = () => ({
-  stoneType: 'Lab Grown', shape: 'Round', sieveSize: `ZZ-${uniq()}`, mmSize: '2.20',
+const spec = async () => ({
+  stoneType: 'Lab Grown', ...(await testSize()),
   colour: 'EF', clarity: 'VVS-VS',
 });
 
-async function requirement(c: any, want: number, s: ReturnType<typeof spec>) {
+async function requirement(c: any, want: number, s: Awaited<ReturnType<typeof spec>>) {
   const { rows: [p] } = await c.query(
     `INSERT INTO parties (name) VALUES ($1) RETURNING id`, [`ZZ Pipe ${uniq()}`]);
   const { rows: [r] } = await c.query(
@@ -18,9 +18,9 @@ async function requirement(c: any, want: number, s: ReturnType<typeof spec>) {
     [p.id]);
   const { rows: [l] } = await c.query(
     `INSERT INTO requirement_lines
-       (requirement_id, stone_type, shape, sieve_size, mm_size, colour, clarity, carats, quoted_rate)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,6000) RETURNING id`,
-    [r.id, s.stoneType, s.shape, s.sieveSize, s.mmSize, s.colour, s.clarity, want]);
+       (requirement_id, stone_type, shape, size_id, colour, clarity, carats, quoted_rate)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,6000) RETURNING id`,
+    [r.id, s.stoneType, s.shape, s.sizeId, s.colour, s.clarity, want]);
   return { partyId: p.id as string, reqId: r.id as string, lineId: l.id as string };
 }
 
@@ -30,7 +30,7 @@ const stageOf = async (c: any, reqId: string) =>
 
 test('a requirement with no matching stock is new, and ready once stock exists', async () => {
   await inRollback(async (c) => {
-    const s = spec();
+    const s = await spec();
     const { reqId } = await requirement(c, 5, s);
     assert.equal((await stageOf(c, reqId)).stage, 'new');
 
@@ -41,7 +41,7 @@ test('a requirement with no matching stock is new, and ready once stock exists',
 
 test('carats with the customer read as on approval, and stop once they are billed', async () => {
   await inRollback(async (c) => {
-    const s = spec();
+    const s = await spec();
     const { reqId, partyId, lineId } = await requirement(c, 5, s);
     const lotId = await recordPurchase({ spec: s, carats: 5, rate: 4000, on: '2024-06-01' }, c);
 

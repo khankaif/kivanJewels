@@ -2,7 +2,7 @@ import { sql } from '@/db/client';
 
 export type MemoLine = {
   lineId: string; lotId: string; lotNo: string; stoneType: string;
-  shape: string | null; sieveSize: string | null; mmSize: string | null;
+  shape: string | null; sizeId: string | null;
   carats: number; rate: number; returned: number; billed: number;
   billedAmount: number; outstanding: number; status: string;
 };
@@ -36,7 +36,7 @@ export async function getMemos(
       AND (${memoId}::uuid IS NULL OR memo_id = ${memoId}::uuid)
       AND (${q}::text IS NULL
            OR memo_no ILIKE ${q} OR party_name ILIKE ${q} OR lot_no ILIKE ${q}
-           OR sieve_size ILIKE ${q} OR mm_size ILIKE ${q} OR shape ILIKE ${q})
+           OR size_id ILIKE ${q} OR shape ILIKE ${q})
       AND (${status} = 'all'
            OR (${status} = 'open'    AND memo_status = 'open')
            OR (${status} = 'overdue' AND overdue))
@@ -59,7 +59,7 @@ export async function getMemos(
     const outstanding = Number(r.outstanding);
     memo.lines.push({
       lineId: r.line_id, lotId: r.lot_id, lotNo: r.lot_no, stoneType: r.stone_type,
-      shape: r.shape, sieveSize: r.sieve_size, mmSize: r.mm_size,
+      shape: r.shape, sizeId: r.size_id,
       carats, rate, returned: Number(r.returned), billed: Number(r.billed),
       billedAmount: Number(r.billed_amount), outstanding, status: r.line_status,
     });

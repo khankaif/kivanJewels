@@ -88,7 +88,7 @@ export function MemoList({ memos, direction }: { memos: Memo[]; direction: 'in' 
                       <div className="text-xs text-muted-foreground">
                         {l.stoneType}
                         {l.shape ? ` · ${l.shape}` : ''}
-                        {l.sieveSize ? ` · ${l.sieveSize}` : ''}
+                        {l.sizeId ? ` · ${l.sizeId}` : ''}
                       </div>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{ct(l.carats)}</TableCell>

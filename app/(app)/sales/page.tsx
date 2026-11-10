@@ -7,7 +7,7 @@ import { NewSaleSheet } from '@/features/sales/components/new-sale-sheet';
 import { MemoList } from '@/features/memos/components/memo-list';
 import { getMemos, getAgents } from '@/features/memos/queries';
 import { getPartyOptions } from '@/features/parties/queries';
-import { getDiamondPicklists, getSieveShapes } from '@/features/masters/diamonds/queries';
+import { getSizeOptions } from '@/features/masters/sizes/queries';
 import { PageHeader } from '@/components/layout/page-header';
 
 export const dynamic = 'force-dynamic';
@@ -25,9 +25,9 @@ export default async function SalesPage({
   const sp = await searchParams;
   const tab = resolveTab(sp.tab, TABS);
 
-  const [customers, suppliers, picklists, agents, sieveShapes, units] = await Promise.all([
-    getPartyOptions('client'), getPartyOptions('supplier'), getDiamondPicklists(), getAgents(),
-    getSieveShapes(), getSellableUnits(),
+  const [customers, suppliers, sizes, agents, units] = await Promise.all([
+    getPartyOptions('client'), getPartyOptions('supplier'), getSizeOptions(), getAgents(),
+    getSellableUnits(),
   ]);
   // Stage is the board's own axis, so the filters here are the other three
   // questions: whose sale, whose deal, and which stone.
@@ -46,7 +46,7 @@ export default async function SalesPage({
         title="Sales"
         actions={<NewSaleSheet
           customers={customers} suppliers={suppliers} agents={agents}
-          picklists={picklists} sieveShapes={sieveShapes} units={units}
+          sizes={sizes} units={units}
           defaultOpen={sp.new === '1'} defaultLot={sp.lot}
         />}
         tabs={<SectionTabs

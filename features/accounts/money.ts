@@ -102,7 +102,7 @@ export type BillLine = {
   id: string; datedOn: string; kind: string; amount: number;
   refId: string | null; notes: string | null;
   lotNo: string | null; stoneType: string | null; shape: string | null;
-  sieveSize: string | null; carats: number | null; rate: number | null;
+  sizeId: string | null; carats: number | null; rate: number | null;
 };
 
 /**
@@ -122,7 +122,7 @@ export async function getBillLines(billKey: string, direction: 'sale' | 'purchas
       FROM ledger g
     )
     SELECT k.id, k.dated_on::text AS dated_on, k.kind, k.amount, k.ref_id, k.notes,
-           l.lot_no, l.stone_type, l.shape, l.sieve_size,
+           l.lot_no, l.stone_type, l.shape, l.size_id,
            COALESCE(mb.carats, mv.carats) AS carats, COALESCE(mb.rate, mv.rate) AS rate
     FROM keyed k
     -- Three ways a ledger row names its parcel: the import's 'DH-<id>' lot
@@ -150,7 +150,7 @@ export async function getBillLines(billKey: string, direction: 'sale' | 'purchas
   return (rows as any[]).map((r) => ({
     id: r.id, datedOn: r.dated_on, kind: r.kind, amount: Number(r.amount),
     refId: r.ref_id, notes: r.notes, lotNo: r.lot_no, stoneType: r.stone_type,
-    shape: r.shape, sieveSize: r.sieve_size,
+    shape: r.shape, sizeId: r.size_id,
     carats: r.carats === null ? null : Math.abs(Number(r.carats)),
     rate: r.rate === null ? null : Number(r.rate),
   }));

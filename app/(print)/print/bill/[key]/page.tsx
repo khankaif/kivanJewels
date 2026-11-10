@@ -34,7 +34,7 @@ export default async function PrintBillPage({ params, searchParams }: PageProps<
         head={['Item', 'Description', 'Carats', 'Rate (₹/ct)', 'Amount']}
         rows={items.map((l) => [
           l.lotNo ?? '—',
-          [l.stoneType, l.shape, l.sieveSize].filter(Boolean).join(' · ') || l.notes || '—',
+          [l.stoneType, l.shape, l.sizeId].filter(Boolean).join(' · ') || l.notes || '—',
           l.carats !== null ? ct(l.carats) : '—',
           l.rate !== null ? inr(l.rate) : '—',
           inr(Math.abs(l.amount)),

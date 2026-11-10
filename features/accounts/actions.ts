@@ -7,7 +7,7 @@ import {
   OverdrawError, recordBill, recordDirectSale, recordPayment, recordPurchase,
   SettlementError, type PaymentMode,
 } from '@/lib/ledger/movements';
-import { checkSpec, type StoredSpec } from '@/features/masters/diamonds/spec';
+import { checkSpec, type StoredSpec } from '@/features/spec/spec';
 import { docNoOr } from '@/lib/doc-numbers';
 
 export type PaymentState = { error: string } | { ok: string } | null;

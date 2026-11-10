@@ -10,6 +10,13 @@ const text = Inter({ variable: '--font-text', subsets: ['latin'], display: 'swap
 export const metadata: Metadata = {
   title: 'Kaivan Jewels',
   description: 'Kaivan Jewels — diamond trading, memos and accounts',
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+    apple: '/apple-icon.png',
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {

@@ -1,3 +1,4 @@
+import { testSize } from './helpers';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { setActorResolver, withTx } from '@/db/client';
@@ -23,7 +24,7 @@ test('a posting is stamped with whoever was signed in', async () => {
     const { rows: [p] } = await c.query(
       `INSERT INTO parties (name) VALUES ($1) RETURNING id`, [`ZZ Actor ${uniq()}`]);
     const lotId = await recordPurchase({
-      spec: { stoneType: 'Lab Grown', shape: 'Round', sieveSize: `ZZ-${uniq()}`, mmSize: '2.20' },
+      spec: { stoneType: 'Lab Grown', ...(await testSize()) },
       carats: 2, rate: 4000, on: '2024-06-01', partyId: p.id, billNo: `ZZ-A-${uniq()}`,
     }, c);
 
@@ -41,7 +42,7 @@ test('with nobody signed in the row is honestly unattributed', async () => {
     const { rows: [p] } = await c.query(
       `INSERT INTO parties (name) VALUES ($1) RETURNING id`, [`ZZ Anon ${uniq()}`]);
     const lotId = await recordPurchase({
-      spec: { stoneType: 'Lab Grown', shape: 'Round', sieveSize: `ZZ-${uniq()}`, mmSize: '2.20' },
+      spec: { stoneType: 'Lab Grown', ...(await testSize()) },
       carats: 1, rate: 4000, on: '2024-06-01', partyId: p.id, billNo: `ZZ-B-${uniq()}`,
     }, c);
     const { rows: [mv] } = await c.query(

@@ -4,27 +4,27 @@ import { sql } from '@/db/client';
  * Stock comes in two kinds and they are not the same asset.
  *
  *  - OWNED: bought outright, or bought off a supplier memo. Fungible by spec,
- *    so one row per shape/sieve/mm no matter how many times it was bought.
+ *    so one row per size and grade no matter how many times it was bought.
  *  - MEMO: held from a supplier on approval. Not yours, and not fungible --
  *    that parcel goes back to that supplier, so it stays a parcel.
  */
 
 export type StockUnit = {
   lotId: string; lotNo: string; stoneType: string; shape: string | null;
-  sieveSize: string | null; mmSize: string | null; colour: string | null; clarity: string | null;
+  sizeId: string | null; colour: string | null; clarity: string | null;
   lab: string | null; certified: string | null;
   costRate: number; balance: number; exposure: number; value: number;
 };
 
 export type MemoStock = {
   partyId: string; partyName: string; unitKey: string;
-  stoneType: string; shape: string | null; sieveSize: string | null; mmSize: string | null;
+  stoneType: string; shape: string | null; sizeId: string | null;
   colour: string | null; clarity: string | null; lab: string | null; certified: string | null;
   outstanding: number; inVault: number; rate: number;
   dueOn: string | null; overdue: boolean; memoNos: string[];
 };
 
-/** Owned stock, one row per spec (shape + sieve + mm + colour + clarity). */
+/** Owned stock, one row per spec (size + colour + clarity + certification). */
 export type StockFilters = {
   search?: string; limit?: number;
   stoneType?: string;
@@ -41,7 +41,7 @@ export async function getOwnedUnits(opts: StockFilters = {}): Promise<StockUnit[
     -- happened to carry: a list that reads '2.20 MM' on one row and '1.9' on
     -- the next is the noise this consolidation exists to remove.
     SELECT lot_id, lot_no, stone_type, shape,
-           spec_sieve(sieve_size) AS sieve_size, spec_mm(mm_size) AS mm_size,
+           size_id,
            colour, clarity, lab, certified,
            COALESCE(cost_rate, 0) AS cost_rate, balance, exposure
     FROM lot_balances
@@ -49,7 +49,7 @@ export async function getOwnedUnits(opts: StockFilters = {}): Promise<StockUnit[
       AND (balance > 0.0005 OR exposure > 0.0005)
       AND (${like}::text IS NULL
            OR lot_no ILIKE ${like} OR stone_type ILIKE ${like}
-           OR sieve_size ILIKE ${like} OR mm_size ILIKE ${like} OR shape ILIKE ${like}
+           OR size_id ILIKE ${like} OR shape ILIKE ${like}
            OR colour ILIKE ${like} OR clarity ILIKE ${like})
       AND (${type}::text IS NULL OR stone_type = ${type})
       AND (${cert}::text IS NULL OR certified = ${cert} OR lab = ${cert})
@@ -57,7 +57,7 @@ export async function getOwnedUnits(opts: StockFilters = {}): Promise<StockUnit[
     LIMIT ${opts.limit ?? 300}`;
   return rows.map((r: any) => ({
     lotId: r.lot_id, lotNo: r.lot_no, stoneType: r.stone_type, shape: r.shape,
-    sieveSize: r.sieve_size, mmSize: r.mm_size, colour: r.colour, clarity: r.clarity,
+    sizeId: r.size_id, colour: r.colour, clarity: r.clarity,
     lab: r.lab, certified: r.certified,
     costRate: Number(r.cost_rate), balance: Number(r.balance), exposure: Number(r.exposure),
     value: Number(r.balance) * Number(r.cost_rate),
@@ -78,7 +78,7 @@ export async function getMemoStock(opts: StockFilters = {}): Promise<MemoStock[]
   const rows = await sql`
     SELECT s.party_id, s.party_name, l.unit_key,
            MAX(s.stone_type) AS stone_type, MAX(s.shape) AS shape,
-           spec_sieve(MAX(s.sieve_size)) AS sieve_size, spec_mm(MAX(s.mm_size)) AS mm_size,
+           MAX(s.size_id) AS size_id,
            MAX(l.colour) AS colour, MAX(l.clarity) AS clarity,
            MAX(l.lab) AS lab, MAX(l.certified) AS certified,
            SUM(s.outstanding)                                   AS outstanding,
@@ -93,7 +93,7 @@ export async function getMemoStock(opts: StockFilters = {}): Promise<MemoStock[]
     WHERE s.direction = 'in' AND s.line_status = 'open'
       AND (${like}::text IS NULL
            OR s.party_name ILIKE ${like} OR s.memo_no ILIKE ${like}
-           OR s.sieve_size ILIKE ${like} OR s.mm_size ILIKE ${like} OR s.shape ILIKE ${like}
+           OR s.size_id ILIKE ${like} OR s.shape ILIKE ${like}
            OR l.colour ILIKE ${like} OR l.clarity ILIKE ${like})
       AND (${type}::text IS NULL OR l.stone_type = ${type})
       AND (${cert}::text IS NULL OR l.certified = ${cert} OR l.lab = ${cert})
@@ -102,7 +102,7 @@ export async function getMemoStock(opts: StockFilters = {}): Promise<MemoStock[]
     ORDER BY bool_or(s.overdue) DESC, MIN(s.due_on), SUM(s.outstanding) DESC`;
   return rows.map((r: any) => ({
     partyId: r.party_id, partyName: r.party_name, unitKey: r.unit_key,
-    stoneType: r.stone_type, shape: r.shape, sieveSize: r.sieve_size, mmSize: r.mm_size,
+    stoneType: r.stone_type, shape: r.shape, sizeId: r.size_id,
     colour: r.colour, clarity: r.clarity, lab: r.lab, certified: r.certified,
     outstanding: Number(r.outstanding), inVault: Number(r.in_vault), rate: Number(r.rate ?? 0),
     dueOn: r.due_on, overdue: !!r.overdue, memoNos: r.memo_nos ?? [],
