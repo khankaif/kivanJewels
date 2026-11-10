@@ -41,7 +41,7 @@ export function OwnedTable({ units }: { units: StockUnit[] }) {
           </TableHeader>
           <TableBody>
             {units.map((u) => {
-              const size = [u.sieveSize, u.mmSize && `${u.mmSize}mm`].filter(Boolean).join(' · ') || u.lotNo;
+              const size = u.sizeId || u.lotNo;
               const grade = [u.shape, u.colour, u.clarity, u.lab && `${u.lab} cert`].filter(Boolean).join(' · ');
               return (
                 <TableRow key={u.lotId}>

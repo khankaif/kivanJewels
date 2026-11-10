@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { inRollback } from './helpers';
+import { inRollback, testSize } from './helpers';
 import {
   billMemoLine, issueOutwardMemo, recordDirectSale, recordPayment, recordPurchase, recordBill,
 } from '@/lib/ledger/movements';
 
 const uniq = () => `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-const spec = () => ({
-  stoneType: 'Lab Grown', shape: 'Round', sieveSize: `ZZ-${uniq()}`, mmSize: '2.20',
+const spec = async () => ({
+  stoneType: 'Lab Grown', ...(await testSize()),
   colour: 'EF', clarity: 'VVS-VS',
 });
 
@@ -17,21 +17,21 @@ async function party(c: any) {
   return rows[0].id as string;
 }
 
-async function requirementLine(c: any, partyId: string, carats: number, s: ReturnType<typeof spec>) {
+async function requirementLine(c: any, partyId: string, carats: number, s: Awaited<ReturnType<typeof spec>>) {
   const { rows: [r] } = await c.query(
     `INSERT INTO requirements (party_id, raised_on) VALUES ($1, CURRENT_DATE) RETURNING id, requirement_no`,
     [partyId]);
   const { rows: [l] } = await c.query(
     `INSERT INTO requirement_lines
-       (requirement_id, stone_type, shape, sieve_size, mm_size, colour, clarity, carats, quoted_rate)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,6000) RETURNING id`,
-    [r.id, s.stoneType, s.shape, s.sieveSize, s.mmSize, s.colour, s.clarity, carats]);
+       (requirement_id, stone_type, shape, size_id, colour, clarity, carats, quoted_rate)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,6000) RETURNING id`,
+    [r.id, s.stoneType, s.shape, s.sizeId, s.colour, s.clarity, carats]);
   return { requirementId: r.id as string, requirementNo: r.requirement_no as string, lineId: l.id as string };
 }
 
 test('requirement to memo to invoice to payment is one linked chain', async () => {
   await inRollback(async (c) => {
-    const s = spec();
+    const s = await spec();
     const customer = await party(c);
     const { requirementNo, lineId } = await requirementLine(c, customer, 5, s);
     const lotId = await recordPurchase({ spec: s, carats: 5, rate: 4000, on: '2024-06-01' }, c);
@@ -70,7 +70,7 @@ test('requirement to memo to invoice to payment is one linked chain', async () =
 
 test('a direct sale carries its lot and its requirement line', async () => {
   await inRollback(async (c) => {
-    const s = spec();
+    const s = await spec();
     const customer = await party(c);
     const { lineId } = await requirementLine(c, customer, 2, s);
     const lotId = await recordPurchase({ spec: s, carats: 2, rate: 4000, on: '2024-06-01' }, c);
@@ -119,7 +119,7 @@ test('charges with nothing behind them stay legitimate -- they just say so', asy
 test('billing an inward memo keeps certification out of the wrong unit', async () => {
   await inRollback(async (c) => {
     const supplier = await party(c);
-    const s = spec();
+    const s = await spec();
     const { receiveInwardMemo } = await import('@/lib/ledger/movements');
     const memoNo = `ZZ-IN-${uniq()}`;
     await receiveInwardMemo({
@@ -132,7 +132,7 @@ test('billing an inward memo keeps certification out of the wrong unit', async (
     await billMemoLine({ memoLineId: ml.id, carats: 3, on: '2024-06-10', invoiceNo: `ZZ-PB-${uniq()}` }, c);
 
     const { rows: units } = await c.query(
-      `SELECT certified, lab FROM lots WHERE source = 'unit' AND sieve_size = $1`, [s.sieveSize]);
+      `SELECT certified, lab FROM lots WHERE source = 'unit' AND size_id = $1`, [s.sizeId]);
     assert.equal(units.length, 1);
     assert.equal(units[0].certified, 'Certified', 'owned unit keeps the certification');
     assert.equal(units[0].lab, 'IGI');

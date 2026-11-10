@@ -36,7 +36,7 @@ export default async function PrintMemoPage({ params }: PageProps<'/print/memo/[
         head={['Lot', 'Description', 'Carats', 'Rate (₹/ct)', 'Value']}
         rows={memo.lines.map((l) => [
           l.lotNo,
-          [l.stoneType, l.sieveSize, l.mmSize && `${l.mmSize}mm`, l.shape].filter(Boolean).join(' · '),
+          [l.stoneType, l.sizeId, l.shape].filter(Boolean).join(' · '),
           ct(l.carats),
           inr(l.rate),
           inr(l.carats * l.rate),

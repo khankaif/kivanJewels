@@ -11,7 +11,8 @@ import { AddStockSheet } from '@/features/stock/components/add-stock-sheet';
 import { MemoList } from '@/features/memos/components/memo-list';
 import { getMemos, getAgents } from '@/features/memos/queries';
 import { getPartyOptions } from '@/features/parties/queries';
-import { getDiamondPicklists, getSieveShapes } from '@/features/masters/diamonds/queries';
+import { getSizeOptions } from '@/features/masters/sizes/queries';
+import { GRADES } from '@/lib/spec-rules';
 import { PageHeader } from '@/components/layout/page-header';
 
 export const dynamic = 'force-dynamic';
@@ -44,8 +45,8 @@ export default async function StockPage({
   const sp = await searchParams;
   const tab = resolveTab(sp.tab, TABS);
 
-  const [suppliers, picklists, agents, sieveShapes] = await Promise.all([
-    getPartyOptions('supplier'), getDiamondPicklists(), getAgents(), getSieveShapes(),
+  const [suppliers, sizes, agents] = await Promise.all([
+    getPartyOptions('supplier'), getSizeOptions(), getAgents(),
   ]);
 
   // A tab link keeps the current search but always resets paging.
@@ -58,7 +59,7 @@ export default async function StockPage({
       <PageHeader
         title="Stock"
         actions={<AddStockSheet
-          suppliers={suppliers} agents={agents} picklists={picklists} sieveShapes={sieveShapes}
+          suppliers={suppliers} agents={agents} sizes={sizes}
           defaultOpen={sp.new === '1'}
         />}
         tabs={<SectionTabs items={TABS.map((t) => ({ href: href(t), label: LABELS[t], active: t === tab }))} />}
@@ -73,12 +74,12 @@ export default async function StockPage({
               placeholder: 'Size, shape, colour, lot or supplier' },
             { type: 'select', name: 'type', label: 'Diamond type', value: sp.type, options: [
               { value: '', label: 'All types' },
-              ...(picklists.stone_type ?? []).map((v) => ({ value: v, label: v })),
+              ...GRADES.stoneType.map((v) => ({ value: v, label: v })),
             ] },
             { type: 'select', name: 'cert', label: 'Certified', value: sp.cert, options: [
               { value: '', label: 'Certified & not' },
-              ...(picklists.certified ?? []).map((v) => ({ value: v, label: v })),
-              ...(picklists.lab ?? []).map((v) => ({ value: v, label: `${v} certified` })),
+              ...GRADES.certified.map((v) => ({ value: v, label: v })),
+              ...GRADES.lab.map((v) => ({ value: v, label: `${v} certified` })),
             ] },
           ]}
         />

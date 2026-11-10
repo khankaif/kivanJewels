@@ -32,7 +32,7 @@ export type MemoLineInput = {
 /** Inward lines describe goods arriving, so they carry the parcel's attributes. */
 export type InwardLineInput = {
   carats: number; rate: number; stoneType: string; requirementLineId?: string | null;
-  shape?: string | null; sieveSize?: string | null; mmSize?: string | null;
+  shape?: string | null; sizeId?: string | null;
   clarity?: string | null; colour?: string | null;
   lab?: string | null; certified?: string | null;
 };
@@ -82,11 +82,11 @@ export async function receiveInwardMemo(
     for (const l of a.lines) {
       i += 1;
       const [lot] = await run(
-        `INSERT INTO lots (lot_no, party_id, stone_type, shape, sieve_size, mm_size,
+        `INSERT INTO lots (lot_no, party_id, stone_type, shape, size_id,
                            clarity, colour, lab, certified, cost_rate, source, opened_on)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'memo_in',$12) RETURNING id`,
-        [`${a.memoNo}/${i}`, a.partyId, l.stoneType, l.shape ?? null, l.sieveSize ?? null,
-         l.mmSize ?? null, l.clarity ?? null, l.colour ?? null, l.lab ?? null,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'memo_in',$11) RETURNING id`,
+        [`${a.memoNo}/${i}`, a.partyId, l.stoneType, l.shape ?? null, l.sizeId ?? null,
+         l.clarity ?? null, l.colour ?? null, l.lab ?? null,
          l.certified ?? null, l.rate, a.issuedOn],
       );
       const [line] = await run(
@@ -291,7 +291,7 @@ export async function billMemoLine(
       const held = Math.min(a.carats, await lotBalance(st.lotId, c));
       if (held > EPS) {
         const [spec] = await run(
-          `SELECT stone_type, shape, sieve_size, mm_size, clarity, colour, lab, certified
+          `SELECT stone_type, shape, size_id, clarity, colour, lab, certified
            FROM lots WHERE id = $1`,
           [st.lotId],
         );
@@ -302,8 +302,8 @@ export async function billMemoLine(
         // Certification is identity (023): billing an IGI parcel into the
         // uncertified unit would average two different goods into one price.
         const unitId = await unitLot({
-          stoneType: spec.stone_type, shape: spec.shape, sieveSize: spec.sieve_size,
-          mmSize: spec.mm_size, clarity: spec.clarity, colour: spec.colour,
+          stoneType: spec.stone_type, shape: spec.shape, sizeId: spec.size_id,
+          clarity: spec.clarity, colour: spec.colour,
           lab: spec.lab, certified: spec.certified,
         }, c);
         await addToUnit({

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Cormorant_Garamond } from 'next/font/google';
 import { ADDRESS, BRAND, EMAIL, HEADLINE, HOURS, INSTAGRAM, enquire } from '@/features/catalog/store';
+import { Logo } from '@/components/ui/logo';
 
 /**
  * The public storefront. Served on its own host: proxy.ts rewrites
@@ -21,8 +22,9 @@ export default function StoreLayout({ children }: LayoutProps<'/store'>) {
       <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur">
         <div className="mx-auto grid h-16 max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-4 sm:px-8">
           <span />
-          <Link href="/" className="font-display text-2xl font-medium tracking-[0.04em] sm:text-3xl">
-            {BRAND}
+          <Link href="/" className="flex items-center gap-2.5 font-display text-2xl font-medium tracking-[0.04em] sm:text-3xl">
+            <Logo className="size-5.5 text-foreground sm:size-6" />
+            <span>{BRAND}</span>
           </Link>
           <a href="#contact" className="justify-self-end text-sm underline-offset-4 hover:underline">
             Contact
@@ -34,7 +36,10 @@ export default function StoreLayout({ children }: LayoutProps<'/store'>) {
 
       <footer id="contact" className="mt-24 border-t bg-muted">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:grid-cols-[2fr_1fr_1fr] sm:px-8">
-          <div className="font-display text-3xl font-medium">{BRAND}</div>
+          <div className="flex items-center gap-2.5 font-display text-3xl font-medium">
+            <Logo className="size-6 text-foreground" />
+            <span>{BRAND}</span>
+          </div>
           <FooterColumn title="Visit">
             {ADDRESS.map((l) => <li key={l}>{l}</li>)}
             <li>{HOURS}</li>

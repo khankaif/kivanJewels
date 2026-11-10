@@ -1,48 +1,27 @@
-import { strict as assert } from 'node:assert';
-import { test } from 'node:test';
-import { cleanSpec, hides, usesSieve, validateSpec } from '@/lib/spec-rules';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { cleanSpec, gradeValue, hides, validateSpec } from '@/lib/spec-rules';
 
-const sieved = ['Round', 'Round-Single Cut'];
-const base = {
-  stoneType: 'Lab Grown', colour: 'EF', clarity: 'VVS-VS', shape: 'Round',
-  sieveSize: '8.5-9', mmSize: '', certified: 'Non-certified', lab: '',
-};
-
-test('only the shapes flagged in the master are sieved', () => {
-  assert.equal(usesSieve(sieved, 'Round'), true);
-  assert.equal(usesSieve(sieved, 'round'), true, 'the flag is not case-sensitive');
-  assert.equal(usesSieve(sieved, 'Oval'), false);
-  assert.equal(usesSieve(sieved, null), false);
+test('grades resolve case-insensitively and by alias; anything else is refused', () => {
+  assert.equal(gradeValue('colour', 'ef'), 'EF');
+  assert.equal(gradeValue('clarity', 'vvs-vs'), 'VVS-VS');
+  assert.equal(gradeValue('stoneType', 'LGD'), 'Lab Grown');
+  assert.equal(gradeValue('certified', 'yes'), 'Certified');
+  assert.equal(gradeValue('clarity', 'VVV-VS'), null, "the old book's typo is not a grade");
+  assert.equal(gradeValue('colour', '  '), '', 'blank stays blank');
 });
 
-test('a sieve on a shape measured in mm is dropped, not stored', () => {
-  const oval = cleanSpec({ ...base, shape: 'Oval', sieveSize: '8.5-9', mmSize: '4.00' }, sieved);
-  assert.equal(oval.sieveSize, null);
-  assert.equal(oval.mmSize, '4.00');
-  assert.equal(hides(sieved, oval, 'sieveSize'), true);
+test('a stone needs a type, a size and a certification answer', () => {
+  assert.match(validateSpec({ sizeId: 'RD-100', certified: 'Non-certified' })!, /stone type/);
+  assert.match(validateSpec({ stoneType: 'Natural', certified: 'Non-certified' })!, /size/);
+  assert.match(validateSpec({ stoneType: 'Natural', sizeId: 'RD-100' })!, /certification/);
+  assert.equal(validateSpec({ stoneType: 'Natural', sizeId: 'RD-100', certified: 'Non-certified' }), null);
 });
 
-test('the size a shape actually uses is the one demanded', () => {
-  assert.equal(validateSpec(base, sieved), null);
-  assert.match(String(validateSpec({ ...base, sieveSize: '' }, sieved)), /sieve size/);
-  assert.match(
-    String(validateSpec({ ...base, shape: 'Oval', sieveSize: '', mmSize: '' }, sieved)),
-    /MM size — Oval/,
-  );
-  assert.equal(validateSpec({ ...base, shape: 'Oval', sieveSize: '', mmSize: '4.00' }, sieved), null);
-});
-
-test('type, shape and a certification answer are always required', () => {
-  assert.match(String(validateSpec({ ...base, stoneType: '' }, sieved)), /stone type/);
-  assert.match(String(validateSpec({ ...base, shape: '' }, sieved)), /shape/);
-  assert.match(String(validateSpec({ ...base, certified: '' }, sieved)), /certification/);
-});
-
-test('the lab belongs to the certificate, not to the stone', () => {
-  const plain = cleanSpec({ ...base, certified: 'Non-certified', lab: 'IGI' }, sieved);
-  assert.equal(plain.lab, null);
-  assert.equal(validateSpec(plain, sieved), null);
-
-  assert.match(String(validateSpec({ ...base, certified: 'Certified' }, sieved)), /lab/);
-  assert.equal(validateSpec({ ...base, certified: 'Certified', lab: 'IGI' }, sieved), null);
+test('a lab only exists on a certified stone', () => {
+  const base = { stoneType: 'Natural', sizeId: 'RD-100' };
+  assert.match(validateSpec({ ...base, certified: 'Certified' })!, /lab/);
+  assert.equal(hides({ certified: 'Non-certified' }, 'lab'), true);
+  assert.equal(cleanSpec({ ...base, certified: 'Non-certified', lab: 'IGI' }).lab, null,
+    'a stale lab never reaches the unit key');
 });

@@ -23,7 +23,7 @@ test('receiving an inward memo adds carats WITHOUT creating a payable', async ()
     const supplier = await party(c, 'Supplier');
     const memoId = await receiveInwardMemo({
       memoNo: `ZZ-IN-${uniq()}`, partyId: supplier, issuedOn: '2024-05-01',
-      lines: [{ carats: 10, rate: 3800, stoneType: 'Lab Grown', sieveSize: '6.5-7' }],
+      lines: [{ carats: 10, rate: 3800, stoneType: 'Lab Grown' }],
     }, c);
     const line = await lineOf(c, memoId);
 
@@ -111,7 +111,7 @@ test('BACK-TO-BACK: supplier memo -> client memo before purchase -> both sides b
     // 1. goods arrive from supplier on memo, not yet bought
     const inMemo = await receiveInwardMemo({
       memoNo: `ZZ-IN-${uniq()}`, partyId: supplier, issuedOn: '2024-05-01', agent: 'Rushabh',
-      lines: [{ carats: 10, rate: 3800, stoneType: 'Lab Grown', sieveSize: '6.5-7' }],
+      lines: [{ carats: 10, rate: 3800, stoneType: 'Lab Grown' }],
     }, c);
     const inLine = await lineOf(c, inMemo);
     assert.equal(await lotBalance(inLine.lot_id, c), 10);

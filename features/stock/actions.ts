@@ -5,7 +5,7 @@ import { auth } from '@/lib/auth/server';
 import {
   recordPurchase, receiveInwardMemo, SettlementError, OverdrawError,
 } from '@/lib/ledger/movements';
-import { specFromForm } from '@/features/masters/diamonds/spec';
+import { specFromForm } from '@/features/spec/spec';
 import { docNoOr } from '@/lib/doc-numbers';
 
 export type ActionState = { error: string } | { ok: string } | null;

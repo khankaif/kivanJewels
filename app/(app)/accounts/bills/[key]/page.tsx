@@ -101,7 +101,7 @@ export default async function BillPage({
                   <TableCell className="text-xs">
                     {l.stoneType ?? '—'}{l.shape ? ` · ${l.shape}` : ''}
                   </TableCell>
-                  <TableCell className="text-xs">{l.sieveSize ?? '—'}</TableCell>
+                  <TableCell className="text-xs">{l.sizeId ?? '—'}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {l.carats !== null ? ct(l.carats) : '—'}
                   </TableCell>

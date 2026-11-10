@@ -9,6 +9,7 @@ import { getParties, PARTY_SORTS } from '@/features/parties/queries';
 import { SortHead } from '@/components/layout/sort-head';
 import { parseSort } from '@/lib/sort';
 import { PartyDialog } from '@/features/parties/components/party-dialog';
+import { ImportParties } from '@/features/parties/components/import-parties';
 import { MastersNav } from '@/features/masters/components/masters-nav';
 import { inr } from '@/lib/format';
 import { PageHeader } from '@/components/layout/page-header';
@@ -32,7 +33,7 @@ export default async function PartiesPage({
     <div className="space-y-4">
       <PageHeader
         title="Masters"
-        actions={<PartyDialog defaultOpen={openNew === '1'} />}
+        actions={<><ImportParties /><PartyDialog defaultOpen={openNew === '1'} /></>}
         tabs={<MastersNav />}
       />
 

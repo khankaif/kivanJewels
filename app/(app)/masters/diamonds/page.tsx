@@ -1,74 +1,128 @@
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
-  getAttributeBuckets, getDiamondAttributes, getMasterMismatches,
-} from '@/features/masters/diamonds/queries';
-import { AttributeList, AddBucket } from '@/features/masters/diamonds/components/attribute-list';
-import { MismatchList } from '@/features/masters/diamonds/components/mismatch-list';
-import { addBucketAction } from '@/features/masters/diamonds/actions';
-import { MastersNav } from '@/features/masters/components/masters-nav';
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
 import { PageHeader } from '@/components/layout/page-header';
+import { SectionTabs } from '@/components/layout/section-tabs';
+import { MastersNav } from '@/features/masters/components/masters-nav';
+import { getShapes, getSizes } from '@/features/masters/sizes/queries';
+import { bandLabel } from '@/features/masters/sizes/chart';
+import { GenerateSizes, ShapeSheet, SizeSheet } from '@/features/masters/sizes/components/size-forms';
 
 export const dynamic = 'force-dynamic';
 
-export default async function DiamondMasterPage() {
-  const [buckets, grouped, mismatches] = await Promise.all([
-    getAttributeBuckets(), getDiamondAttributes(), getMasterMismatches(),
-  ]);
-  const valuesByBucket = Object.fromEntries(
-    Object.entries(grouped).map(([k, v]) => [k, v.map((a) => a.value)]),
-  );
+const mm = (x: number | null) => (x === null ? '—' : x.toFixed(2));
+
+export default async function DiamondsPage({ searchParams }: { searchParams: Promise<{ shape?: string }> }) {
+  const [{ shape: filter }, shapes, sizes] = await Promise.all([searchParams, getShapes(), getSizes()]);
+  const rows = filter ? sizes.filter((s) => s.shape === filter) : sizes;
+  const used = shapes.filter((s) => s.sizes > 0);
 
   return (
     <div className="space-y-4">
       <PageHeader
         title="Masters"
+        actions={<><GenerateSizes shapes={shapes} /><SizeSheet shapes={shapes} /></>}
         tabs={<MastersNav />}
       />
 
-      {mismatches.length > 0 && (
-        <Card size="sm">
-          <Collapsible className="flex flex-col gap-3">
-            <CardHeader>
-              <CardTitle>
-                {mismatches.length} stored value{mismatches.length === 1 ? '' : 's'} don&apos;t match the master
-              </CardTitle>
-              <CardDescription>
-                Adopt each one, or map it onto the value it really means, so the book keeps one
-                spelling of every grade.
-              </CardDescription>
-              <CardAction>
-                <CollapsibleTrigger render={<Button variant="outline" size="sm" />}>Review</CollapsibleTrigger>
-              </CardAction>
-            </CardHeader>
-            <CollapsibleContent>
-              <CardContent>
-                <MismatchList mismatches={mismatches} valuesByBucket={valuesByBucket} />
-              </CardContent>
-            </CollapsibleContent>
-          </Collapsible>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle>Size chart</CardTitle>
+          <CardDescription>
+            {sizes.length
+              ? `${sizes.length} sizes across ${used.length} shapes. Carat bands never overlap within a shape.`
+              : 'Carat-per-stone bands per shape: what every parcel is identified by. Start with Generate standard sizes, then add melee bands.'}
+          </CardDescription>
+          {used.length > 1 && (
+            <SectionTabs items={[
+              { href: '/masters/diamonds', label: 'All', active: !filter },
+              ...used.map((s) => ({
+                href: `/masters/diamonds?shape=${encodeURIComponent(s.shape)}`, label: s.shape, active: filter === s.shape,
+              })),
+            ]} />
+          )}
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Size</TableHead>
+                <TableHead className="text-right">Nominal</TableHead>
+                <TableHead>Fits stones of</TableHead>
+                <TableHead className="text-right">Est. size</TableHead>
+                <TableHead className="text-right">L / W</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((s) => (
+                <TableRow key={s.id}>
+                  <TableCell>
+                    <div className="font-medium">{s.id}</div>
+                    <div className="text-xs text-muted-foreground">{s.shape}</div>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{s.nominal_ct.toFixed(2)} ct</TableCell>
+                  <TableCell className="tabular-nums">{bandLabel(s)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {s.lengthMm === s.widthMm ? `⌀ ${mm(s.lengthMm)}` : `${mm(s.lengthMm)} × ${mm(s.widthMm)}`} mm
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{(s.lengthMm / s.widthMm).toFixed(2)}</TableCell>
+                  <TableCell className="text-right"><SizeSheet size={s} shapes={shapes} /></TableCell>
+                </TableRow>
+              ))}
+              {!rows.length && (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">No sizes yet.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Attribute values</CardTitle>
+          <CardTitle>Shapes</CardTitle>
           <CardDescription>
-            Removing a value only stops it being offered next time — it doesn&apos;t touch existing
-            stock. New lists you add are managed here; the preset ones are wired to form fields
-            and can&apos;t be deleted.
+            Each shape&apos;s Size ID prefix and the 1 ct size its estimated mm scale from.
           </CardDescription>
+          <CardAction><ShapeSheet /></CardAction>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Columns, not a grid: lists differ wildly in length, and a grid row
-              would stretch every short list to match the longest one. */}
-          <div className="gap-3 sm:columns-2 [&>*]:mb-3 [&>*]:break-inside-avoid">
-            {buckets.map((b) => (
-              <AttributeList key={b.key} bucket={b} values={grouped[b.key] ?? []} />
-            ))}
-          </div>
-          <AddBucket action={addBucketAction} />
+        <CardContent className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Shape</TableHead>
+                <TableHead>Prefix</TableHead>
+                <TableHead className="text-right">1 ct length mm</TableHead>
+                <TableHead className="text-right">1 ct width mm</TableHead>
+                <TableHead className="text-right">L / W</TableHead>
+                <TableHead className="text-right">Sizes</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {shapes.map((s) => (
+                <TableRow key={s.shape}>
+                  <TableCell className="font-medium">{s.shape}</TableCell>
+                  <TableCell className="font-mono">{s.prefix}</TableCell>
+                  <TableCell className="text-right tabular-nums">{mm(s.lengthMm)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{mm(s.widthMm)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{mm(s.ratio)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{s.sizes || '—'}</TableCell>
+                  <TableCell className="text-right"><ShapeSheet shape={s} /></TableCell>
+                </TableRow>
+              ))}
+              {!shapes.length && (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                    No shapes yet.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

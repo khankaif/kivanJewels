@@ -35,7 +35,7 @@ export function MemoTable({ rows }: { rows: MemoStock[] }) {
           </TableHeader>
           <TableBody>
             {rows.map((m) => {
-              const size = [m.sieveSize, m.mmSize && `${m.mmSize}mm`].filter(Boolean).join(' · ') || '—';
+              const size = m.sizeId || '—';
               const grade = [m.shape, m.colour, m.clarity, m.lab && `${m.lab} cert`].filter(Boolean).join(' · ');
               return (
                 <TableRow key={`${m.partyId}-${m.unitKey}`}>

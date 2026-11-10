@@ -39,7 +39,7 @@ export function MovementsTable({
         hidden={{ tab: 'movements' }}
         exportHref="/api/export?view=movement_entries"
         fields={[
-          { type: 'text', name: 'q', label: 'Search', placeholder: 'Lot, party, sieve, memo', value: sp.q },
+          { type: 'text', name: 'q', label: 'Search', placeholder: 'Lot, party, size, memo', value: sp.q },
           { type: 'select', name: 'kind', label: 'Movement', value: sp.kind, options: [
             { value: '', label: 'All movements' },
             ...Object.entries(MOVEMENT_LABEL).map(([value, label]) => ({ value, label })),
@@ -93,7 +93,7 @@ export function MovementsTable({
                     </TableCell>
                     <TableCell className="text-xs">
                       {m.stoneType}
-                      {m.sieveSize ? ` · ${m.sieveSize}` : ''}
+                      {m.sizeId ? ` · ${m.sizeId}` : ''}
                     </TableCell>
                     <TableCell>
                       <Badge variant={m.isInward ? 'default' : 'outline'}>

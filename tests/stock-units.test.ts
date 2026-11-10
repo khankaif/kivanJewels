@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { inRollback } from './helpers';
+import { inRollback, testSize } from './helpers';
 import {
   recordPurchase, receiveInwardMemo, billMemoLine, lotBalance,
 } from '@/lib/ledger/movements';
@@ -8,8 +8,8 @@ import {
 const uniq = () => `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
 /** A spec no other test or real row can collide with. */
-const spec = (over: Record<string, unknown> = {}) => ({
-  stoneType: 'Lab Grown', shape: 'Round', sieveSize: `ZZ-${uniq()}`, mmSize: '2.20mm',
+const spec = async (over: Record<string, unknown> = {}) => ({
+  stoneType: 'Lab Grown', ...(await testSize()),
   ...over,
 });
 
@@ -18,11 +18,11 @@ const lotOf = async (c: any, id: string) =>
 
 test('the same spec bought twice is ONE unit, priced value / weight', async () => {
   await inRollback(async (c) => {
-    const s = spec();
+    const s = await spec();
     const first = await recordPurchase({ spec: s, carats: 2, rate: 4500, on: '2024-05-01' }, c);
-    // Same stone, spelled the way the source actually spells it.
+    // Same stone, the size typed in lower case.
     const second = await recordPurchase(
-      { spec: { ...s, shape: 'RBC', mmSize: '2.20 MM' }, carats: 2, rate: 5000, on: '2024-05-02' },
+      { spec: { ...s, sizeId: s.sizeId.toLowerCase() }, carats: 2, rate: 5000, on: '2024-05-02' },
       c,
     );
 
@@ -34,19 +34,18 @@ test('the same spec bought twice is ONE unit, priced value / weight', async () =
   });
 });
 
-test('a different shape is a different unit', async () => {
+test('a different size is a different unit', async () => {
   await inRollback(async (c) => {
-    const s = spec();
-    const round = await recordPurchase({ spec: s, carats: 1, rate: 4000, on: '2024-05-01' }, c);
-    const pear = await recordPurchase(
-      { spec: { ...s, shape: 'Pear' }, carats: 1, rate: 4000, on: '2024-05-01' }, c);
-    assert.notEqual(pear, round, 'Pear 2.20mm is not Round 2.20mm');
+    const s = await spec();
+    const one = await recordPurchase({ spec: s, carats: 1, rate: 4000, on: '2024-05-01' }, c);
+    const other = await recordPurchase({ spec: { ...s, ...(await testSize()) }, carats: 1, rate: 4000, on: '2024-05-01' }, c);
+    assert.notEqual(other, one, 'a stone of another size is not the same goods');
   });
 });
 
 test('a different colour or clarity is a different unit, priced on its own', async () => {
   await inRollback(async (c) => {
-    const s = spec();
+    const s = await spec();
     const ef = await recordPurchase(
       { spec: { ...s, colour: 'EF', clarity: 'VVS-VS' }, carats: 2, rate: 5000, on: '2024-05-01' }, c);
     const gh = await recordPurchase(
@@ -69,8 +68,8 @@ test('a purchase on a bill posts a payable; one without does not', async () => {
     const billNo = `ZZ-B-${uniq()}`;
 
     await recordPurchase(
-      { spec: spec(), carats: 2, rate: 5000, on: '2024-05-01', partyId: supplier.id, billNo }, c);
-    await recordPurchase({ spec: spec(), carats: 2, rate: 5000, on: '2024-05-01' }, c);
+      { spec: await spec(), carats: 2, rate: 5000, on: '2024-05-01', partyId: supplier.id, billNo }, c);
+    await recordPurchase({ spec: await spec(), carats: 2, rate: 5000, on: '2024-05-01' }, c);
 
     const { rows } = await c.query(
       `SELECT kind, amount FROM ledger WHERE party_id = $1`, [supplier.id]);
@@ -84,7 +83,7 @@ test('billing an inward memo moves the carats into the owned unit', async () => 
   await inRollback(async (c) => {
     const { rows: [supplier] } = await c.query(
       `INSERT INTO parties (name) VALUES ($1) RETURNING id`, [`ZZ Supplier ${uniq()}`]);
-    const s = spec();
+    const s = await spec();
     // Stock of this spec is already owned, bought earlier at a different rate.
     const unit = await recordPurchase({ spec: s, carats: 2, rate: 4000, on: '2024-05-01' }, c);
 
@@ -108,7 +107,7 @@ test('back-to-back: goods sold onward before purchase leave nothing to own', asy
   await inRollback(async (c) => {
     const { rows: [supplier] } = await c.query(
       `INSERT INTO parties (name) VALUES ($1) RETURNING id`, [`ZZ Supplier ${uniq()}`]);
-    const s = spec();
+    const s = await spec();
     const memoId = await receiveInwardMemo({
       memoNo: `ZZ-IN-${uniq()}`, partyId: supplier.id, issuedOn: '2024-05-02',
       lines: [{ carats: 6, rate: 5000, ...s }],
@@ -125,15 +124,15 @@ test('back-to-back: goods sold onward before purchase leave nothing to own', asy
 
     const { rows } = await c.query(
       `SELECT id FROM lots WHERE source = 'unit'
-         AND unit_key = lot_unit_key($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [s.stoneType, s.shape, s.sieveSize, s.mmSize, null, null, null, null]);
+         AND unit_key = lot_unit_key($1,$2,$3,$4,$5,$6,$7)`,
+      [s.stoneType, s.shape, s.sizeId, null, null, null, null]);
     assert.equal(rows.length, 0, 'nothing was left to move into stock');
   });
 });
 
 test('lab grown and natural of one spec are different units, never averaged', async () => {
   await inRollback(async (c) => {
-    const s = spec();
+    const s = await spec();
     const lab = await recordPurchase({ spec: s, carats: 2, rate: 4500, on: '2024-05-01' }, c);
     const nat = await recordPurchase(
       { spec: { ...s, stoneType: 'Natural' }, carats: 2, rate: 90000, on: '2024-05-02' }, c);
@@ -146,7 +145,7 @@ test('lab grown and natural of one spec are different units, never averaged', as
 
 test('certification is identity: certified, uncertified and each lab stand apart', async () => {
   await inRollback(async (c) => {
-    const s = spec();
+    const s = await spec();
     const plain = await recordPurchase(
       { spec: { ...s, certified: 'Non-certified' }, carats: 1, rate: 4000, on: '2024-05-01' }, c);
     const igi = await recordPurchase(

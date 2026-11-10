@@ -1,0 +1,4 @@
+name,business_name,kind,default_terms_days,phone,email,gstin,pan,contact_person,address,notes
+Naice Gems LLP,Naice Gems LLP,supplier,7,9820012345,accounts@naicegems.example,27AAAFN1234A1Z5,AAAFN1234A,Mehul Shah,"Opera House, Mumbai 400004",Lab grown supplier
+Sparkler Jewels,,client,15,9867054321,,,,Ritesh,"Zaveri Bazaar, Mumbai",
+Universal,,both,,,,,,,,
