@@ -1,5 +1,6 @@
 import { sql } from '@/db/client';
-import { GRADES, gradeValue, type GradeField, type SpecField } from '@/lib/spec-rules';
+import { gradeValue, type GradeField, type SpecField } from '@/lib/spec-rules';
+import { getGrades } from '@/features/masters/grades/queries';
 
 export type Shorthand = {
   spec: Partial<Record<SpecField, string>>;
@@ -28,21 +29,24 @@ export function tokenize(line: string) {
 /**
  * "RD-100 EF VVS 2.35 @4200" -> a spec, carats and a rate. A word that is a
  * saved Size ID becomes the size; every other word is tried against the grade
- * lists in order (type, colour, clarity, certified, lab), each field once.
+ * master in order (type, colour, clarity, lab, certified), each field once.
  */
 export async function parseShorthand(line: string): Promise<Shorthand> {
   const t = tokenize(line);
   const spec: Shorthand['spec'] = {};
   const unknown: string[] = [];
-  const sizes = t.words.length
-    ? await sql`SELECT id FROM diamond_sizes WHERE id = ANY(${t.words.map((w) => w.toUpperCase())}::text[])`
-    : [];
+  const [sizes, grades] = await Promise.all([
+    t.words.length
+      ? sql`SELECT id FROM diamond_sizes WHERE id = ANY(${t.words.map((w) => w.toUpperCase())}::text[])`
+      : [],
+    getGrades(),
+  ]);
   const sizeIds = new Set((sizes as { id: string }[]).map((r) => r.id));
 
   for (const w of t.words) {
     if (!spec.sizeId && sizeIds.has(w.toUpperCase())) { spec.sizeId = w.toUpperCase(); continue; }
-    const field = (Object.keys(GRADES) as GradeField[]).find((f) => !spec[f] && gradeValue(f, w));
-    if (field) spec[field] = gradeValue(field, w)!;
+    const field = (Object.keys(grades) as GradeField[]).find((f) => !spec[f] && gradeValue(grades, f, w));
+    if (field) spec[field] = gradeValue(grades, field, w)!;
     else unknown.push(w);
   }
   return { spec, carats: t.carats, rate: t.rate, unknown };

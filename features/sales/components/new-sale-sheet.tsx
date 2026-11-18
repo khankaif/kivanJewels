@@ -21,7 +21,7 @@ import { Amount } from '@/components/forms/carats-rate';
 import {
   SpecFields, blankSpec, type SpecValue,
 } from '@/features/spec/components/spec-fields';
-import type { SizeOption } from '@/features/masters/sizes/queries';
+import type { SpecOptions } from '@/features/spec/components/spec-fields';
 import { useLastUsed } from '@/lib/use-last-used';
 import { addDays, todayIso } from '@/lib/dates';
 import { ct, inr } from '@/lib/format';
@@ -53,10 +53,10 @@ const blankLine = (): Line => ({
 const num = (v: string) => Number(v) || 0;
 
 export function NewSaleSheet({
-  customers, suppliers, agents, sizes, units, defaultOpen = false, defaultLot,
+  customers, suppliers, agents, options, units, defaultOpen = false, defaultLot,
 }: {
   customers: Party[]; suppliers: Party[]; agents: string[];
-  sizes: SizeOption[]; units: SellableUnit[];
+  options: SpecOptions; units: SellableUnit[];
   defaultOpen?: boolean;
   /** Opened from search on a parcel: the first line starts with it picked. */
   defaultLot?: string;
@@ -178,7 +178,7 @@ export function NewSaleSheet({
 
             {lines.map((l, i) => (
               <LineCard
-                key={i} index={i} line={l} sizes={sizes}
+                key={i} index={i} line={l} options={options}
                 units={units} sourceNow={sourceNow}
                 onChange={(patch) => set(i, patch)}
                 onRemove={lines.length > 1 ? () => setLines((ls) => ls.filter((_, j) => j !== i)) : undefined}
@@ -319,9 +319,9 @@ const unitBalance = (units: SellableUnit[], lotId: string) =>
  * the shelf while you type, in case you are about to buy what you already own.
  */
 function LineCard({
-  index, line, sizes, units, sourceNow, onChange, onRemove,
+  index, line, options, units, sourceNow, onChange, onRemove,
 }: {
-  index: number; line: Line; sizes: SizeOption[];
+  index: number; line: Line; options: SpecOptions;
   units: SellableUnit[]; sourceNow: boolean;
   onChange: (patch: Partial<Line>) => void; onRemove?: () => void;
 }) {
@@ -396,7 +396,7 @@ function LineCard({
           </>
         ) : (
           <SpecFields
-            id={`ns-${index}`} sizes={sizes}
+            id={`ns-${index}`} options={options}
             value={spec} onChange={(v) => onChange({ spec: v })}
           />
         )}

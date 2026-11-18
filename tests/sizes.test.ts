@@ -1,54 +1,86 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bandProblem, estimateMm, sizeId, standardBands } from '../features/masters/sizes/chart';
+import { baseId, caratsLabel, newId, nominalCarats, parseCarats, planSizes, readSize } from '../features/masters/sizes/chart';
 import { parseCsv } from '../lib/csv';
 import { readParty } from '../features/parties/party-row';
 
-test('estimated mm scale with the cube root of carats (Medusa workbook values)', () => {
-  assert.deepEqual(estimateMm(1, { length_mm: 6.4, width_mm: 6.4 }), { est_length_mm: 6.4, est_width_mm: 6.4 });
-  // 0.5 ct round: 6.4 x 0.5^(1/3) = 5.0797 -> 5.08
-  assert.deepEqual(estimateMm(0.5, { length_mm: 6.4, width_mm: 6.4 }), { est_length_mm: 5.08, est_width_mm: 5.08 });
-  // Ratio is preserved: a pear stays 8.5 / 5.5 at any size.
-  const p = estimateMm(2, { length_mm: 8.5, width_mm: 5.5 });
-  assert.equal(Math.round((p.est_length_mm / p.est_width_mm) * 100) / 100, 1.55);
+const shapes = [{ shape: 'Round', code: 'RBC' }, { shape: 'Square Cushion', code: 'CMB' }, { shape: 'Tapered Baguette', code: 'TBAG' }];
+const row = (r: Record<string, string>) => readSize((c) => r[c], shapes);
+
+test('Size IDs: shape code + mm; a second weight at the same mm gets its carats', () => {
+  const round = { length_mm: 1.3, width_mm: 1.3, width2_mm: null };
+  assert.equal(baseId('RBC', round), 'RBC-1.3', 'a round shows one figure');
+  assert.equal(baseId('PS', { length_mm: 4, width_mm: 2.5, width2_mm: null }), 'PS-4X2.5');
+  assert.equal(baseId('TBAG', { length_mm: 6.3, width_mm: 3.15, width2_mm: 1.89 }), 'TBAG-6.3X3.15X1.89');
+  const cushion = { shape: 'Square Cushion', length_mm: 5.3, width_mm: 5.3, width2_mm: null, min_ct: 0.8, max_ct: 0.8, active: true };
+  assert.equal(newId('CMB', cushion, new Set(['CMB-5.3'])), 'CMB-5.3-0.8');
 });
 
-test('standard grid: 40 contiguous bands, 0.05 to 2.00 ct, top band closed', () => {
-  const b = standardBands();
-  assert.equal(b.length, 40);
-  assert.deepEqual(b[0], { min_ct: 0.05, max_ct: 0.075, nominal_ct: 0.05 });
-  assert.deepEqual(b[19], { min_ct: 0.975, max_ct: 1.025, nominal_ct: 1 });
-  assert.deepEqual(b[39], { min_ct: 1.975, max_ct: 2, nominal_ct: 2 });
-  for (let i = 1; i < b.length; i++) assert.equal(b[i].min_ct, b[i - 1].max_ct, 'no gap, no overlap');
-  assert.equal(sizeId('RD', 1), 'RD-100');
-  assert.equal(sizeId('PR', 0.05), 'PR-005');
-  assert.equal(sizeId('RD', 0.003), null, 'melee would collide with RD-000; it is typed instead');
-});
+  test('carats: single weight input (e.g. 0.014 or 0.0145), taking minimum if legacy range is passed', () => {
+    assert.deepEqual(parseCarats('0.1'), { min_ct: 0.1, max_ct: 0.1 });
+    assert.deepEqual(parseCarats('0.014'), { min_ct: 0.014, max_ct: 0.014 });
+    assert.deepEqual(parseCarats('0.0145'), { min_ct: 0.0145, max_ct: 0.0145 });
+    assert.deepEqual(parseCarats('0.014-0.015'), { min_ct: 0.014, max_ct: 0.014 }, 'legacy range takes the minimum');
+    assert.equal(parseCarats('+2'), null, 'a sieve is not a weight');
+    assert.equal(nominalCarats({ min_ct: 0.014, max_ct: 0.014 }), 0.014);
+    assert.equal(caratsLabel({ min_ct: 0.014, max_ct: 0.014 }), '0.014 ct');
+    assert.equal(caratsLabel({ min_ct: 0.0145, max_ct: 0.0145 }), '0.0145 ct');
+  });
 
-test('band validation', () => {
-  assert.equal(bandProblem({ min_ct: 0.975, max_ct: 1.025, nominal_ct: 1 }), null);
-  assert.match(bandProblem({ min_ct: 1, max_ct: 1, nominal_ct: 1 })!, /below/);
-  assert.equal(bandProblem({ min_ct: 0.001, max_ct: 0.002, nominal_ct: 0.0015 }), null, 'melee bands fit');
-  assert.match(bandProblem({ min_ct: 0.0005, max_ct: 0.1, nominal_ct: 0.05 })!, /0\.001 to 3/);
-  assert.match(bandProblem({ min_ct: 1, max_ct: 1.2, nominal_ct: 1.5 })!, /within/);
-});
+  test('size row: shape by name or code, mm required, bad values named', () => {
+    const ok = row({ shape: 'rbc', length_mm: '1.30', width_mm: '1.3', carats: '0.01' });
+    assert.ok('size' in ok);
+    assert.equal(ok.size.shape, 'Round');
+    assert.equal(ok.size.active, true, 'blank active = yes');
+    assert.match((row({ shape: 'Kite', length_mm: '1', width_mm: '1', carats: '1' }) as { error: string }).error, /not a shape/);
+    assert.match((row({ shape: 'Round', width_mm: '1', carats: '1' }) as { error: string }).error, /Length/);
+    assert.match((row({ shape: 'Round', length_mm: '1', width_mm: '1', carats: '+2' }) as { error: string }).error, /Carats/);
+  });
 
-test('CSV: Excel BOM, quoted commas and CRLF', () => {
-  assert.deepEqual(
-    parseCsv('﻿name,address\r\n"Naice, LLP","Opera ""House"""\r\n\r\n'),
-    [['name', 'address'], ['Naice, LLP', 'Opera "House"']],
-  );
-});
+  test('import plan: adds, edits by id, matches an identical row, keeps what the file leaves out', () => {
+    const saved = [
+      { id: 'RBC-1.3', shape: 'Round', length_mm: 1.3, width_mm: 1.3, width2_mm: null, min_ct: 0.01, max_ct: 0.01, active: true, used: 4 },
+      { id: 'RBC-6.4', shape: 'Round', length_mm: 6.4, width_mm: 6.4, width2_mm: null, min_ct: 1, max_ct: 1, active: true, used: 0 },
+    ];
+    const plan = planSizes([
+      { line: 2, read: row({ shape: 'Round', length_mm: '1.3', width_mm: '1.3', carats: '0.01' }) },          // same as saved, no id
+      { line: 3, read: row({ size_id: 'RBC-6.4', shape: 'Round', length_mm: '6.4', width_mm: '6.4', carats: '1.02' }) }, // edit
+      { line: 4, read: row({ shape: 'Square Cushion', length_mm: '5.3', width_mm: '5.3', carats: '0.75' }) },
+      { line: 5, read: row({ shape: 'Square Cushion', length_mm: '5.3', width_mm: '5.3', carats: '0.8' }) },
+    ], saved, shapes);
+    assert.deepEqual(plan.errors, []);
+    assert.equal(plan.unchanged, 1);
+    assert.deepEqual(plan.update.map((u) => [u.id, u.after.min_ct]), [['RBC-6.4', 1.02]]);
+    assert.deepEqual(plan.add.map((a) => a.id), ['CMB-5.3', 'CMB-5.3-0.8']);
 
-test('party row: same rules as the form, with the table defaults for blanks', () => {
-  const row = (r: Record<string, string>) => readParty((c) => r[c]);
-  const ok = row({ name: ' naice gems llp ', kind: 'Client', gstin: '27aaafn1234a1z5' });
-  assert.ok('party' in ok);
-  assert.equal(ok.party.name, 'Naice Gems LLP');
-  assert.equal(ok.party.kind, 'client');
-  assert.equal(ok.party.default_terms_days, 7);
-  assert.equal(ok.party.gstin, '27AAAFN1234A1Z5');
-  assert.ok('error' in row({ name: '' }));
-  assert.ok('error' in row({ name: 'X', kind: 'vendor' }));
-  assert.ok('error' in row({ name: 'X', default_terms_days: '7.5' }));
-});
+    const bad = planSizes([
+      { line: 2, read: row({ size_id: 'RBC-9', shape: 'Round', length_mm: '9', width_mm: '9', carats: '3' }) },
+      { line: 3, read: row({ size_id: 'RBC-1.3', shape: 'Square Cushion', length_mm: '1.3', width_mm: '1.3', carats: '0.01' }) },
+      { line: 4, read: row({ shape: 'Round', length_mm: '2', width_mm: '2', carats: '0.03' }) },
+      { line: 5, read: row({ shape: 'Round', length_mm: '2', width_mm: '2', carats: '0.03' }) },
+    ], saved, shapes);
+    assert.equal(bad.errors.length, 3);
+    assert.match(bad.errors[0], /Row 2: no saved size RBC-9/);
+    assert.match(bad.errors[1], /Row 3: .*can't change shape/);
+    assert.match(bad.errors[2], /Row 5: same size as row 4/);
+  });
+
+  test('CSV: Excel BOM, quoted commas and CRLF', () => {
+    assert.deepEqual(
+      parseCsv('﻿name,address\r\n"Naice, LLP","Opera ""House"""\r\n\r\n'),
+      [['name', 'address'], ['Naice, LLP', 'Opera "House"']],
+    );
+  });
+
+  test('party row: same rules as the form, with the table defaults for blanks', () => {
+    const row = (r: Record<string, string>) => readParty((c) => r[c]);
+    const ok = row({ name: ' naice gems llp ', kind: 'Client', gstin: '27aaafn1234a1z5' });
+    assert.ok('party' in ok);
+    assert.equal(ok.party.name, 'Naice Gems LLP');
+    assert.equal(ok.party.kind, 'client');
+    assert.equal(ok.party.default_terms_days, 7);
+    assert.equal(ok.party.gstin, '27AAAFN1234A1Z5');
+    assert.ok('error' in row({ name: '' }));
+    assert.ok('error' in row({ name: 'X', kind: 'vendor' }));
+    assert.ok('error' in row({ name: 'X', default_terms_days: '7.5' }));
+  });

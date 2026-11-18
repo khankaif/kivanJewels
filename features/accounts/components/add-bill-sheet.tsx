@@ -17,7 +17,7 @@ import { Amount } from '@/components/forms/carats-rate';
 import {
   SpecFields, blankSpec, type SpecValue,
 } from '@/features/spec/components/spec-fields';
-import type { SizeOption } from '@/features/masters/sizes/queries';
+import type { SpecOptions } from '@/features/spec/components/spec-fields';
 import { useLastUsed } from '@/lib/use-last-used';
 import { inr } from '@/lib/format';
 import { addDays, todayIso } from '@/lib/dates';
@@ -40,10 +40,10 @@ const lineTotal = (l: Line, withGoods: boolean) =>
   withGoods ? (Number(l.carats) || 0) * (Number(l.rate) || 0) : Number(l.amount) || 0;
 
 export function AddBillSheet({
-  clients, suppliers, units, sizes, defaultOpen = false,
+  clients, suppliers, units, options, defaultOpen = false,
 }: {
   clients: Party[]; suppliers: Party[]; units: Unit[];
-  sizes: SizeOption[];
+  options: SpecOptions;
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -205,7 +205,7 @@ export function AddBillSheet({
 
                 {withGoods && direction === 'purchase' && (
                   <SpecFields
-                    id={`ab-${i}`} sizes={sizes}
+                    id={`ab-${i}`} options={options}
                     value={l.spec} onChange={(spec) => set(i, { spec })}
                   />
                 )}

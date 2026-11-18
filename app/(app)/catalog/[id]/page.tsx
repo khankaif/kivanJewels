@@ -7,7 +7,8 @@ import { getCatalogItem, UUID } from '@/features/catalog/queries';
 import { ItemForm } from '@/features/catalog/components/item-form';
 import { ConfirmAction } from '@/components/forms/confirm-action';
 import { deleteItemAction } from '@/features/catalog/actions';
-import { GRADES, JEWELLERY_CATEGORIES } from '@/lib/spec-rules';
+import { JEWELLERY_CATEGORIES } from '@/lib/spec-rules';
+import { getGrades } from '@/features/masters/grades/queries';
 import { imageBase } from '@/lib/r2';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +19,7 @@ export default async function CatalogItemPage({ params }: PageProps<'/catalog/[i
   const isNew = id === 'new';
   if (!isNew && !UUID.test(id)) notFound();
 
-  const item = isNew ? null : await getCatalogItem(id);
+  const [item, grades] = await Promise.all([isNew ? null : getCatalogItem(id), getGrades()]);
   if (!isNew && !item) notFound();
 
   const store = process.env.STORE_HOST;
@@ -56,7 +57,7 @@ export default async function CatalogItemPage({ params }: PageProps<'/catalog/[i
           <ItemForm
             item={item}
             categories={[...JEWELLERY_CATEGORIES]}
-            stoneTypes={[...GRADES.stoneType]}
+            stoneTypes={grades.stoneType.map((v) => v.name)}
             imageBase={imageBase()}
           />
         </CardContent>

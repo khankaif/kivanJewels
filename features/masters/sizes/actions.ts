@@ -2,192 +2,177 @@
 
 import { revalidatePath } from 'next/cache';
 import { sql, withTx } from '@/db/client';
-import { requireUser } from '@/lib/auth/server';
-import { bandProblem, estimateMm, sizeId, standardBands } from './chart';
+import { requireAdmin } from '@/lib/auth/server';
+import { parseCsv } from '@/lib/csv';
+import type { FormState } from '@/components/forms/form-sheet';
+import type { ImportState } from '@/components/forms/csv-import';
+import { caratsLabel, mmLabel, planSizes, readSize, SIZE_COLUMNS, type SizeFields } from './chart';
+import { getShapes, getSizes } from './queries';
 
-export type SizeState = { error: string } | { ok: string } | null;
-
-const num = (v: FormDataEntryValue | null) => {
-  const s = String(v ?? '').trim();
-  return s ? Number(s) : null;
-};
-const pgCode = (e: unknown) => (e as { code?: string })?.code;
-const done = (ok: string): SizeState => {
+const pg = (e: unknown) => e as { code?: string; constraint?: string };
+const done = (ok: string): FormState => {
   for (const p of ['/masters/diamonds', '/stock', '/sales', '/accounts/bills']) revalidatePath(p);
   return { ok };
 };
+const WHO = 'change the size chart';
 
 /**
- * Adds a shape (no `original`) or edits one: prefix and 1 ct reference, and
- * optionally re-estimates its sizes' mm. A shape's prefix is fixed once sizes
- * use it, since Size IDs carry it (RD-100) and IDs are permanent.
+ * Adds a shape (no `original`) or edits one. A rename follows into its sizes
+ * and lots (ON UPDATE CASCADE). The code prefixes new Size IDs only: existing
+ * IDs keep theirs, since traders already know them by it.
  */
-export async function saveShapeAction(_prev: SizeState, form: FormData): Promise<SizeState> {
-  await requireUser();
+export async function saveShapeAction(_prev: FormState, form: FormData): Promise<FormState> {
+  await requireAdmin(WHO);
   const original = String(form.get('original') ?? '');
-  const shape = original || String(form.get('shape') ?? '').trim().replace(/\s+/g, ' ');
-  const prefix = String(form.get('prefix') ?? '').trim().toUpperCase();
-  const length = num(form.get('lengthMm'));
-  const width = num(form.get('widthMm'));
-  const reestimate = form.get('reestimate') === 'on';
+  const shape = String(form.get('shape') ?? '').trim().replace(/\s+/g, ' ');
+  const code = String(form.get('code') ?? '').trim().toUpperCase();
+  const sort = Number(String(form.get('sortOrder') ?? '').trim() || 0);
+  const hasCut = form.get('hasCut') === 'on';
+  const active = form.get('active') === 'on';
 
   if (!/^\S(.{0,28}\S)?$/.test(shape)) return { error: 'Shape name: 1–30 characters.' };
-  if (!/^[A-Z]{2,3}$/.test(prefix)) return { error: 'Prefix: 2 or 3 letters, e.g. HM for HM-010.' };
-  if ((length === null) !== (width === null)) return { error: 'Enter both 1 ct length and width, or neither.' };
-  if (length !== null && !(length > 0 && width! > 0)) return { error: 'Length and width must be above 0 mm.' };
-  if (reestimate && length === null) return { error: 'Enter the 1 ct length and width to re-estimate sizes.' };
+  if (!/^[A-Z]{2,4}$/.test(code)) return { error: 'Code: 2 to 4 letters, e.g. PS for Pear.' };
+  if (!Number.isInteger(sort)) return { error: 'Order must be a whole number.' };
 
   try {
-    const reestimated = await withTx(async (tx) => {
-      if (!original) {
-        await tx.query(
-          `INSERT INTO diamond_shapes (shape, prefix, length_mm, width_mm, sort_order)
-           SELECT $1, $2, $3, $4, COALESCE(MAX(sort_order), 0) + 1 FROM diamond_shapes`,
-          [shape, prefix, length, width],
-        );
-        return 0;
-      }
-      const { rows: [old] } = await tx.query(
-        `SELECT prefix, (SELECT count(*)::int FROM diamond_sizes WHERE shape = $1) AS sizes
-         FROM diamond_shapes WHERE shape = $1`, [shape],
-      );
-      if (!old) throw new Refusal(`${shape} no longer exists.`);
-      if (old.sizes && old.prefix !== prefix) {
-        throw new Refusal(`${shape} has ${old.sizes} sizes named ${old.prefix}-…, so its prefix can't change.`);
-      }
-      await tx.query(
-        'UPDATE diamond_shapes SET prefix = $1, length_mm = $2, width_mm = $3 WHERE shape = $4',
-        [prefix, length, width, shape],
-      );
-      if (!reestimate) return 0;
-      const { rows } = await tx.query('SELECT id, nominal_ct FROM diamond_sizes WHERE shape = $1', [shape]);
-      const est = rows.map((r) => ({
-        id: r.id, ...estimateMm(Number(r.nominal_ct), { length_mm: length!, width_mm: width! }),
-      }));
-      await tx.query(
-        `UPDATE diamond_sizes s SET est_length_mm = e.est_length_mm, est_width_mm = e.est_width_mm
-         FROM jsonb_to_recordset($1::jsonb) AS e(id text, est_length_mm numeric, est_width_mm numeric)
-         WHERE s.id = e.id`,
-        [JSON.stringify(est)],
-      );
-      return est.length;
-    });
-    return done(reestimated ? `${shape} saved; ${reestimated} sizes re-estimated.` : `${shape} saved.`);
+    const rows = original
+      ? await sql`UPDATE diamond_shapes SET shape = ${shape}, code = ${code}, sort_order = ${sort},
+                    has_cut = ${hasCut}, active = ${active} WHERE shape = ${original} RETURNING shape`
+      : await sql`INSERT INTO diamond_shapes (shape, code, sort_order, has_cut, active)
+                  VALUES (${shape}, ${code}, ${sort}, ${hasCut}, ${active}) RETURNING shape`;
+    if (!rows.length) return { error: `${original} no longer exists.` };
   } catch (e) {
-    if (e instanceof Refusal) return { error: e.message };
-    if (pgCode(e) === '23505') {
-      return { error: /prefix/.test(String((e as Error).message)) ? `Prefix ${prefix} is already another shape's.` : `${shape} already exists.` };
+    if (pg(e).code === '23505') {
+      return { error: /prefix|code/.test(pg(e).constraint ?? '') ? `Code ${code} is another shape's.` : `${shape} already exists.` };
     }
     throw e;
   }
+  return done(original && original !== shape ? `Renamed ${original} to ${shape} everywhere.` : `${shape} saved.`);
 }
-class Refusal extends Error {}
 
-/** Removes a shape nothing uses. The sizes' foreign key refuses it otherwise. */
+/** Removes a shape with no sizes. The sizes' foreign key refuses it otherwise. */
 export async function deleteShapeAction(form: FormData): Promise<void> {
-  await requireUser();
+  await requireAdmin(WHO);
   await sql`DELETE FROM diamond_shapes d WHERE shape = ${String(form.get('shape') ?? '')}
             AND NOT EXISTS (SELECT 1 FROM diamond_sizes s WHERE s.shape = d.shape)`;
   done('');
 }
 
-/**
- * Creates a size, or edits one (`originalId`). Blank nominal = the band's
- * midpoint; blank mm = estimated from the shape's 1 ct reference; blank Size
- * ID = prefix + nominal (RD-100). Shape and ID are fixed once saved.
- */
-export async function saveSizeAction(_prev: SizeState, form: FormData): Promise<SizeState> {
-  await requireUser();
+/** Saves the given sizes in one transaction: new ones added, the rest updated by id. */
+async function writeSizes(add: (SizeFields & { id: string })[], update: (SizeFields & { id: string })[]) {
+  await withTx(async (tx) => {
+    const cols = `id text, shape text, length_mm numeric, width_mm numeric, width2_mm numeric,
+                  min_ct numeric, max_ct numeric, active boolean`;
+    if (update.length) {
+      await tx.query(
+        `UPDATE diamond_sizes s SET length_mm = u.length_mm, width_mm = u.width_mm, width2_mm = u.width2_mm,
+                min_ct = u.min_ct, max_ct = u.max_ct, active = u.active
+         FROM jsonb_to_recordset($1::jsonb) AS u(${cols}) WHERE s.id = u.id`,
+        [JSON.stringify(update)],
+      );
+    }
+    if (add.length) {
+      await tx.query(
+        `INSERT INTO diamond_sizes (id, shape, length_mm, width_mm, width2_mm, min_ct, max_ct, active)
+         SELECT id, shape, length_mm, width_mm, width2_mm, min_ct, max_ct, active
+         FROM jsonb_to_recordset($1::jsonb) AS a(${cols})`,
+        [JSON.stringify(add)],
+      );
+    }
+  });
+}
+
+const clash = (e: unknown) =>
+  pg(e).code === '23505'
+    ? (/pkey/.test(pg(e).constraint ?? '') ? 'That Size ID is taken.' : 'A size with that shape, mm and carats already exists.')
+    : null;
+
+/** Adds one size (no `originalId`) or edits one. Shape is fixed once saved. */
+export async function saveSizeAction(_prev: FormState, form: FormData): Promise<FormState> {
+  await requireAdmin(WHO);
   const editing = String(form.get('originalId') ?? '');
-  const [shape] = editing
-    ? await sql`SELECT d.* FROM diamond_sizes s JOIN diamond_shapes d ON d.shape = s.shape WHERE s.id = ${editing}`
-    : await sql`SELECT * FROM diamond_shapes WHERE shape = ${String(form.get('shape') ?? '')}`;
-  if (!shape) return { error: editing ? `${editing} no longer exists.` : 'Pick a shape.' };
+  const [shapes, saved] = await Promise.all([getShapes(), getSizes()]);
+  const read = readSize((c) => c === 'active'
+    ? (form.get('retired') === 'on' ? 'no' : 'yes')
+    : String(form.get(c) ?? ''), shapes);
+  if ('error' in read) return { error: read.error };
 
-  const min = num(form.get('minCt'));
-  const max = num(form.get('maxCt'));
-  const nominal = num(form.get('nominalCt')) ?? (min !== null && max !== null ? Math.round(((min + max) / 2) * 1e4) / 1e4 : null);
-  const problem = bandProblem({ min_ct: min ?? undefined, max_ct: max ?? undefined, nominal_ct: nominal ?? undefined });
-  if (problem) return { error: problem };
-
-  let length = num(form.get('lengthMm'));
-  let width = num(form.get('widthMm'));
-  if (length === null && width === null) {
-    if (shape.length_mm === null) {
-      return { error: `${shape.shape} has no 1 ct reference size: enter the mm, or add the reference under Shapes.` };
-    }
-    ({ est_length_mm: length, est_width_mm: width } = estimateMm(nominal!, {
-      length_mm: Number(shape.length_mm), width_mm: Number(shape.width_mm),
-    }));
-  }
-  if (!(length! > 0 && width! > 0)) return { error: 'Enter length and width above 0 mm, or leave both blank to estimate.' };
-
-  const id = editing || String(form.get('id') ?? '').trim().toUpperCase() || sizeId(shape.prefix, nominal!);
-  if (!id) return { error: `Enter a Size ID: ${nominal} ct isn't whole hundredths, so none can be made from it.` };
-  if (!/^[A-Z0-9][A-Z0-9-]{0,19}$/.test(id)) return { error: 'Size ID: letters, digits and dashes, e.g. RD-100.' };
-  const notes = String(form.get('notes') ?? '').trim() || null;
-
+  const plan = planSizes([{ line: 1, read: { ...read, id: editing || read.id } }], saved, shapes);
+  if (plan.errors.length) return { error: plan.errors[0].replace(/^Row 1: /, '') };
+  if (!editing && !read.id && !plan.add.length) return { error: 'That size is already in the chart.' };
   try {
-    if (editing) {
-      await sql`
-        UPDATE diamond_sizes SET min_ct = ${min}, max_ct = ${max}, nominal_ct = ${nominal},
-          est_length_mm = ${length}, est_width_mm = ${width}, notes = ${notes}
-        WHERE id = ${id}`;
-    } else {
-      await sql`
-        INSERT INTO diamond_sizes (id, shape, min_ct, max_ct, nominal_ct, est_length_mm, est_width_mm, notes)
-        VALUES (${id}, ${shape.shape}, ${min}, ${max}, ${nominal}, ${length}, ${width}, ${notes})`;
-    }
+    await writeSizes(plan.add, plan.update.map((u) => ({ ...u.after, id: u.id })));
   } catch (e) {
-    if (pgCode(e) === '23505') return { error: `${id} already exists.` };
-    if (pgCode(e) === '23P01') {
-      // The exclusion constraint refused it; name the band it hit.
-      const [clash] = await sql`
-        SELECT id FROM diamond_sizes
-        WHERE shape = ${shape.shape} AND id <> ${id}
-          AND numrange(min_ct, max_ct, CASE WHEN nominal_ct = max_ct THEN '[]' ELSE '[)' END)
-           && numrange(${min}, ${max}, CASE WHEN ${nominal}::numeric = ${max}::numeric THEN '[]' ELSE '[)' END)
-        LIMIT 1`;
-      return { error: `${id}: carat band overlaps ${clash?.id ?? 'another size'}.` };
-    }
+    const msg = clash(e);
+    if (msg) return { error: msg };
     throw e;
   }
-  return done(`${id} ${editing ? 'updated' : 'created'}.`);
+  const id = plan.add[0]?.id ?? editing;
+  return done(plan.add.length ? `${id} added.` : plan.update.length ? `${id} updated.` : 'No changes.');
 }
 
 /** Deletes a size no stock or sale uses; the lots' foreign key refuses it otherwise. */
 export async function deleteSizeAction(form: FormData): Promise<void> {
-  await requireUser();
+  await requireAdmin(WHO);
   await sql`DELETE FROM diamond_sizes s WHERE id = ${String(form.get('id') ?? '')}
             AND NOT EXISTS (SELECT 1 FROM lots l WHERE l.size_id = s.id)
-            AND NOT EXISTS (SELECT 1 FROM requirement_lines r WHERE r.size_id = s.id)`;
+            AND NOT EXISTS (SELECT 1 FROM requirement_lines r WHERE r.size_id = s.id)
+            AND NOT EXISTS (SELECT 1 FROM diamond_prices p WHERE p.size_id = s.id)`;
   done('');
 }
 
-/** The standard 0.05–2.00 ct grid for the chosen shapes. Existing or overlapping sizes are left alone. */
-export async function generateSizesAction(_prev: SizeState, form: FormData): Promise<SizeState> {
-  await requireUser();
-  const names = form.getAll('shape').map(String);
-  if (!names.length) return { error: 'Pick at least one shape.' };
+/**
+ * The size chart from a CSV, in two steps: `check` reports what would change
+ * and writes nothing; `apply` re-reads the same file and saves it, all of it
+ * or none. Stateless: nothing is staged on the server between the steps.
+ */
+export async function importSizesAction(_prev: ImportState, form: FormData): Promise<ImportState> {
+  await requireAdmin(WHO);
+  const file = form.get('file');
+  if (!(file instanceof File) || !file.size) return { error: 'Choose a CSV file.' };
+  if (file.size > 512 * 1024) return { error: 'That file is over 512 KB; a size chart is a few hundred rows.' };
 
-  const shapes = await sql`
-    SELECT shape, prefix, length_mm, width_mm FROM diamond_shapes
-    WHERE shape = ANY(${names}::text[]) AND length_mm IS NOT NULL`;
-  const rows = (shapes as any[]).flatMap((s) =>
-    standardBands().map((b) => ({
-      id: sizeId(s.prefix, b.nominal_ct), shape: s.shape, ...b,
-      ...estimateMm(b.nominal_ct, { length_mm: Number(s.length_mm), width_mm: Number(s.width_mm) }),
-    })),
-  );
-  // DO NOTHING with no target skips a row that hits ANY unique or exclusion
-  // constraint: a taken ID, or a band overlapping one the owner made by hand.
-  const created = await sql`
-    INSERT INTO diamond_sizes (id, shape, min_ct, max_ct, nominal_ct, est_length_mm, est_width_mm)
-    SELECT id, shape, min_ct, max_ct, nominal_ct, est_length_mm, est_width_mm
-    FROM jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) AS r(
-      id text, shape text, min_ct numeric, max_ct numeric, nominal_ct numeric,
-      est_length_mm numeric, est_width_mm numeric)
-    ON CONFLICT DO NOTHING
-    RETURNING id`;
-  return done(created.length ? `Created ${created.length} sizes.` : 'All standard sizes already exist.');
+  const [header = [], ...rows] = parseCsv(await file.text());
+  const cols = header.map((h) => h.trim().toLowerCase().replace(/\s+/g, '_'));
+  // Refused, not skipped: a misspelt "lenght_mm" would otherwise import every size without it.
+  const unknown = cols.filter((c) => c && !(SIZE_COLUMNS as readonly string[]).includes(c));
+  if (unknown.length) return { error: `Unknown column: ${unknown.join(', ')}. Use the columns of Export.` };
+  if (!rows.length) return { error: 'The file has no sizes.' };
+
+  const [shapes, saved] = await Promise.all([getShapes(), getSizes()]);
+  const plan = planSizes(rows.map((cells, i) => ({
+    line: i + 2, // the row number the owner sees in Excel
+    read: readSize((c) => cells[cols.indexOf(c)], shapes),
+  })), saved, shapes);
+
+  if (plan.errors.length) {
+    const more = plan.errors.length > 10 ? `\n…and ${plan.errors.length - 10} more.` : '';
+    return { error: `Nothing was imported. Fix these rows and upload again:\n${plan.errors.slice(0, 10).join('\n')}${more}` };
+  }
+  if (form.get('mode') !== 'apply') {
+    const changes = plan.update.map(({ id, before, after }) => {
+      const what = [
+        mmLabel(before) !== mmLabel(after) && `${mmLabel(before)} → ${mmLabel(after)}`,
+        caratsLabel(before) !== caratsLabel(after) && `${caratsLabel(before)} → ${caratsLabel(after)}`,
+        before.active !== after.active && (after.active ? 'reactivated' : 'retired'),
+      ].filter(Boolean).join(', ');
+      return `${id}: ${what}${before.used ? ` (used by ${before.used})` : ''}`;
+    });
+    return {
+      preview: {
+        summary: `${plan.add.length} to add, ${plan.update.length} to change, ${plan.unchanged} unchanged.`,
+        changes, canApply: plan.add.length + plan.update.length > 0,
+      },
+    };
+  }
+
+  try {
+    await writeSizes(plan.add, plan.update.map((u) => ({ ...u.after, id: u.id })));
+  } catch (e) {
+    const msg = clash(e);
+    if (msg) return { error: `Nothing was imported: ${msg}` };
+    throw e;
+  }
+  done('');
+  return { ok: `Imported: ${plan.add.length} added, ${plan.update.length} updated, ${plan.unchanged} unchanged.` };
 }

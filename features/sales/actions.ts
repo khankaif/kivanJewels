@@ -8,6 +8,7 @@ import {
   SettlementError, OverdrawError,
 } from '@/lib/ledger/movements';
 import { checkSpec, type StoredSpec } from '@/features/spec/spec';
+import { getGrades } from '@/features/masters/grades/queries';
 import { allocate } from './allocate';
 import { docNoOr } from '@/lib/doc-numbers';
 
@@ -96,12 +97,13 @@ export async function createSaleAction(_p: ActionState, form: FormData): Promise
 
   // Validate every line against the masters rules before anything is written.
   const checked: { line: SaleLineInput; spec: StoredSpec }[] = [];
+  const grades = await getGrades({ retired: true });
   for (const [i, l] of lines.entries()) {
     const at = lines.length > 1 ? ` on line ${i + 1}` : '';
     // A line off the shelf inherits the parcel's spec: it is already master
     // values, and retyping it is how two names for one stone get created.
     const input = l.lotId ? { ...l, ...(await specOfLotById(l.lotId)) } : l;
-    const res = await checkSpec(input);
+    const res = await checkSpec(input, grades);
     if (!res.ok) return { error: `${res.error.replace(/\.$/, '')}${at}.` };
     const stock = Number(l.planStock ?? 0);
     const source = Number(l.planSource ?? 0);

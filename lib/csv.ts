@@ -23,3 +23,18 @@ export function parseCsv(text: string): string[][] {
   if (field || row.length) { row.push(field); rows.push(row); }
   return rows.filter((r) => r.some((f) => f.trim() !== ''));
 }
+
+/** One cell. A leading = + - @ is quoted with ' so Excel never runs it as a formula (CSV injection). */
+export const csvCell = (v: unknown): string => {
+  if (v === null || v === undefined) return '';
+  const s = String(v);
+  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+};
+
+/**
+ * Rows to CSV text, headers first. Starts with a UTF-8 byte-order mark: without
+ * it Excel reads the file as ANSI and garbles anything past ASCII.
+ */
+export const toCsv = (cols: string[], rows: Record<string, unknown>[]) =>
+  '\uFEFF' + [cols.join(','), ...rows.map((r) => cols.map((c) => csvCell(r[c])).join(','))].join('\n');

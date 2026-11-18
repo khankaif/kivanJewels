@@ -1,11 +1,11 @@
 /**
- * Which fields name a stone, and the values each may hold.
+ * Which fields name a stone, and how a typed value becomes a master value.
  *
- * A parcel is its type, its size from the chart (Masters -> Diamonds; the size
- * fixes the shape), its grades and its certification. Grades are fixed lists
- * here rather than an editable master: they are industry vocabulary that
- * changes once in years, and a list anyone can edit is how the old book grew
- * 'VVV-VS' beside 'VVS-VS'. A new grade is a one-line change to this file.
+ * A parcel is its type, its size from the chart (Masters -> Sizes; the size
+ * fixes the shape), its grades and its certification. The FIELDS are fixed
+ * here; their VALUES are the client's grade master (Masters -> Grades), loaded
+ * from the database and passed in, so these rules stay pure and testable.
+ * Certification is the exception: a yes/no rule, not a list anyone edits.
  */
 
 export const SPEC_FIELDS = ['stoneType', 'sizeId', 'colour', 'clarity', 'certified', 'lab'] as const;
@@ -14,24 +14,22 @@ export type SpecField = (typeof SPEC_FIELDS)[number];
 /** A spec as forms and JSON carry it. `shape` is never typed: the size decides it. */
 export type Spec = Partial<Record<SpecField | 'shape', string | null>>;
 
-/** The fixed value lists, in the order pickers show them. */
-export const GRADES = {
-  stoneType: ['Lab Grown', 'Natural', 'Gemstone'],
-  colour: ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'DE', 'EF', 'FG', 'GH', 'HI'],
-  clarity: ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'I1',
-            'VVS', 'VVS-VS', 'VS', 'VS-SI', 'SI'],
-  certified: ['Certified', 'Non-certified'],
-  lab: ['IGI', 'GIA', 'HRD', 'SGL'],
-} as const satisfies Partial<Record<SpecField, readonly string[]>>;
-export type GradeField = keyof typeof GRADES;
+/** The fields whose values come from the grade master, and the table each lives in. */
+export const MASTER_TABLES = {
+  stoneType: 'stone_types', colour: 'colours', clarity: 'clarities', lab: 'labs',
+} as const;
+export type MasterField = keyof typeof MASTER_TABLES;
 
-/** Storefront categories for the jewellery catalog. */
-export const JEWELLERY_CATEGORIES = ['Gold Vermeil Jewelry'] as const;
+export type GradeOption = { name: string; code: string | null };
+/** Every picker's values, in the order pickers show them. */
+export type Grades = Record<MasterField | 'certified', GradeOption[]>;
+export type GradeField = keyof Grades;
 
-/** What people type for a grade, mapped to its value. Used by shorthand and imports. */
-const ALIASES: Partial<Record<GradeField, Record<string, string>>> = {
-  stoneType: { lgd: 'Lab Grown', 'lab grown diamond': 'Lab Grown', lab: 'Lab Grown', 'natural diamond': 'Natural' },
-  certified: { cert: 'Certified', yes: 'Certified', 'non cert': 'Non-certified', 'non-cert': 'Non-certified', no: 'Non-certified' },
+export const CERTIFIED: GradeOption[] = [
+  { name: 'Certified', code: null }, { name: 'Non-certified', code: null },
+];
+const CERTIFIED_ALIASES: Record<string, string> = {
+  cert: 'Certified', yes: 'Certified', 'non cert': 'Non-certified', 'non-cert': 'Non-certified', no: 'Non-certified',
 };
 
 export const FIELD_LABELS: Record<SpecField, string> = {
@@ -47,13 +45,15 @@ export const isCertified = (v: string | null | undefined) =>
   ['certified', 'cert', 'yes', 'y', 'true'].includes(String(v ?? '').trim().toLowerCase());
 
 /**
- * A grade as typed -> its list value, case-insensitively or by alias; null when
- * it is not a value of that list. Blank in, blank out (as '').
+ * A value as typed -> its master name, matched on name or code, ignoring case
+ * (so 'lgd' -> Lab Grown, 'fly' -> Fancy Light Yellow); null when the master
+ * has no such value. Blank in, blank out (as '').
  */
-export function gradeValue(field: GradeField, raw: string | null | undefined): string | null {
+export function gradeValue(grades: Grades, field: GradeField, raw: string | null | undefined): string | null {
   const t = String(raw ?? '').trim().toLowerCase();
   if (!t) return '';
-  return (GRADES[field] as readonly string[]).find((v) => v.toLowerCase() === t) ?? ALIASES[field]?.[t] ?? null;
+  const hit = grades[field].find((v) => v.name.toLowerCase() === t || v.code?.toLowerCase() === t);
+  return hit?.name ?? (field === 'certified' ? CERTIFIED_ALIASES[t] ?? null : null);
 }
 
 /** Fields this stone does not have: a lab on an uncertified stone. */
@@ -76,3 +76,6 @@ export function validateSpec(spec: Spec): string | null {
   }
   return null;
 }
+
+/** Storefront categories for the jewellery catalog. */
+export const JEWELLERY_CATEGORIES = ['Gold Vermeil Jewelry'] as const;

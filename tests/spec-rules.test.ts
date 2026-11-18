@@ -1,14 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanSpec, gradeValue, hides, validateSpec } from '@/lib/spec-rules';
+import { CERTIFIED, cleanSpec, gradeValue, hides, validateSpec, type Grades } from '@/lib/spec-rules';
 
-test('grades resolve case-insensitively and by alias; anything else is refused', () => {
-  assert.equal(gradeValue('colour', 'ef'), 'EF');
-  assert.equal(gradeValue('clarity', 'vvs-vs'), 'VVS-VS');
-  assert.equal(gradeValue('stoneType', 'LGD'), 'Lab Grown');
-  assert.equal(gradeValue('certified', 'yes'), 'Certified');
-  assert.equal(gradeValue('clarity', 'VVV-VS'), null, "the old book's typo is not a grade");
-  assert.equal(gradeValue('colour', '  '), '', 'blank stays blank');
+// A slice of the grade master, as getGrades() returns it.
+const grades: Grades = {
+  stoneType: [{ name: 'Lab Grown', code: 'LGD' }, { name: 'Natural', code: 'ND' }],
+  colour: [{ name: 'EF', code: 'EF' }, { name: 'Fancy Light Yellow', code: 'FLY' }],
+  clarity: [{ name: 'VVS-VS', code: 'VVS-VS' }],
+  lab: [{ name: 'IGI', code: 'IGI' }],
+  certified: CERTIFIED,
+};
+
+test('grades resolve on name or code, ignoring case; anything else is refused', () => {
+  assert.equal(gradeValue(grades, 'colour', 'ef'), 'EF');
+  assert.equal(gradeValue(grades, 'colour', 'fly'), 'Fancy Light Yellow', 'the code finds the name');
+  assert.equal(gradeValue(grades, 'clarity', 'vvs-vs'), 'VVS-VS');
+  assert.equal(gradeValue(grades, 'stoneType', 'LGD'), 'Lab Grown');
+  assert.equal(gradeValue(grades, 'certified', 'yes'), 'Certified');
+  assert.equal(gradeValue(grades, 'clarity', 'VVV-VS'), null, "the old book's typo is not a grade");
+  assert.equal(gradeValue(grades, 'colour', '  '), '', 'blank stays blank');
 });
 
 test('a stone needs a type, a size and a certification answer', () => {

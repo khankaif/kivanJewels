@@ -15,7 +15,7 @@ import { SortHead } from '@/components/layout/sort-head';
 import { parseSort } from '@/lib/sort';
 import { getPartyOptions } from '@/features/parties/queries';
 import { getOwnedUnits } from '@/features/stock/queries';
-import { getSizeOptions } from '@/features/masters/sizes/queries';
+import { getSpecOptions } from '@/features/spec/options';
 import { AddBillSheet } from '@/features/accounts/components/add-bill-sheet';
 import { PaymentDialog } from '@/features/accounts/components/payment-dialog';
 import { inr, specLabel, day } from '@/lib/format';
@@ -46,9 +46,9 @@ export default async function MoneyPage({
   const page = Math.max(1, Number(sp.page ?? 1) || 1);
   const perPage = 100;
 
-  const [parties, clients, suppliers, units, sizes] = await Promise.all([
+  const [parties, clients, suppliers, units, options] = await Promise.all([
     getPartyOptions(), getPartyOptions('client'), getPartyOptions('supplier'),
-    getOwnedUnits({ limit: 300 }), getSizeOptions(),
+    getOwnedUnits({ limit: 300 }), getSpecOptions(),
   ]);
   const sort = parseSort(sp.sort, BILL_SORTS, { col: 'date', dir: 'desc' });
   const bills = await getBills({
@@ -106,7 +106,7 @@ export default async function MoneyPage({
               lotId: u.lotId, lotNo: u.lotNo, balance: u.balance,
               label: specLabel(u) === '—' ? u.lotNo : specLabel(u),
             }))}
-            sizes={sizes}
+            options={options}
             defaultOpen={sp.new === '1'}
           />
         }

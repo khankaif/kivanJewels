@@ -5,10 +5,12 @@ import { useState } from 'react';
 import { Choice } from '@/components/forms/choice';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { cn } from '@/lib/utils';
-import { GRADES, hides, isCertified, REQUIRED, SPEC_FIELDS, type SpecField } from '@/lib/spec-rules';
+import { hides, isCertified, REQUIRED, SPEC_FIELDS, type Grades, type SpecField } from '@/lib/spec-rules';
 import type { SizeOption } from '@/features/masters/sizes/queries';
 
 export type SpecValue = Record<SpecField, string>;
+/** What the pickers offer, loaded on the server by getSpecOptions(). */
+export type SpecOptions = { sizes: SizeOption[]; grades: Grades };
 
 /**
  * Nothing is pre-selected. The lists used to open on their first value, which
@@ -26,14 +28,14 @@ const LABEL: Record<SpecField, string> = {
 
 /**
  * The fields that name a stone: type, size, colour, clarity, certification.
- * Every one is a picker, never free text. The size comes from the chart and
+ * Every one is a picker over the master, never free text. The size comes from the chart and
  * carries the shape with it; the lab appears once the stone is certified.
  *
  * Uncontrolled by default (drop it in a form and read FormData). Pass
  * `value`/`onChange` to drive it, which the multi-line sales form does.
  */
-export function SpecFields({ id, sizes, value, onChange, className }: {
-  id: string; sizes: SizeOption[];
+export function SpecFields({ id, options: { sizes, grades }, value, onChange, className }: {
+  id: string; options: SpecOptions;
   value?: SpecValue; onChange?: (v: SpecValue) => void; className?: string;
 }) {
   const [own, setOwn] = useState<SpecValue>(() => value ?? blankSpec());
@@ -52,7 +54,7 @@ export function SpecFields({ id, sizes, value, onChange, className }: {
         const required = REQUIRED.includes(f) || f === 'lab';
         const options = f === 'sizeId'
           ? sizes.map((s) => ({ value: s.id, label: s.label }))
-          : (GRADES[f] as readonly string[]).map((v) => ({ value: v, label: v }));
+          : grades[f].map((v) => ({ value: v.name, label: v.name }));
         return (
           <Field key={f}>
             <FieldLabel htmlFor={`${id}-${f}`}>
@@ -66,7 +68,7 @@ export function SpecFields({ id, sizes, value, onChange, className }: {
             />
             {f === 'sizeId' && !sizes.length && (
               <FieldDescription>
-                No sizes yet: add them in <Link href="/masters/diamonds" className="underline">Masters → Diamonds</Link>.
+                No sizes yet: add them in <Link href="/masters/diamonds" className="underline">Masters → Sizes</Link>.
               </FieldDescription>
             )}
           </Field>

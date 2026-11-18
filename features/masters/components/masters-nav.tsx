@@ -5,7 +5,9 @@ import { SectionTabs } from '@/components/layout/section-tabs';
 
 export const MASTERS_TABS = [
   { href: '/parties', label: 'Parties' },
-  { href: '/masters/diamonds', label: 'Diamonds' },
+  { href: '/masters/grades', label: 'Grades' },
+  { href: '/masters/diamonds', label: 'Sizes' },
+  { href: '/masters/prices', label: 'Prices' },
   { href: '/settings/staff', label: 'Staff & access' },
 ] as const;
 

@@ -40,11 +40,10 @@ export async function makeFixtures(c: PoolClientLike, carats = 10) {
 
 /**
  * A chart size of its own, so a test's spec is a stock unit no other test
- * shares. Stock is identified by size now (the lots' size_id foreign key), so
- * a spec needs a real size row; a fresh shape per call keeps the bands from
- * overlapping. Test shapes over an hour old that nothing uses are swept
- * first -- only old ones, since test files run in parallel and a fresh size
- * may belong to a test that is about to use it.
+ * shares. Stock is identified by size (the lots' size_id foreign key), so a
+ * spec needs a real size row; a fresh shape per call keeps tests apart. Test
+ * shapes over an hour old that nothing uses are swept first -- only old ones,
+ * since test files run in parallel and a fresh size may be about to be used.
  */
 export async function testSize(): Promise<{ shape: string; sizeId: string }> {
   await sql`
@@ -58,17 +57,17 @@ export async function testSize(): Promise<{ shape: string; sizeId: string }> {
               AND split_part(d.shape, ' ', 3)::bigint < extract(epoch FROM now()) * 1000 - 3600000
               AND NOT EXISTS (SELECT 1 FROM diamond_sizes s WHERE s.shape = d.shape)`;
   for (;;) {
-    const prefix = Array.from({ length: 3 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join('');
-    const shape = `ZZ ${prefix} ${Date.now()}`;
+    const code = Array.from({ length: 4 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join('');
+    const shape = `ZZ ${code} ${Date.now()}`;
     try {
-      await sql`INSERT INTO diamond_shapes (shape, prefix) VALUES (${shape}, ${prefix})`;
+      await sql`INSERT INTO diamond_shapes (shape, code) VALUES (${shape}, ${code})`;
     } catch (e) {
-      if ((e as { code?: string }).code === '23505') continue; // prefix taken: draw again
+      if ((e as { code?: string }).code === '23505') continue; // code taken: draw again
       throw e;
     }
     await sql`
-      INSERT INTO diamond_sizes (id, shape, min_ct, max_ct, nominal_ct, est_length_mm, est_width_mm)
-      VALUES (${`${prefix}-100`}, ${shape}, 0.975, 1.025, 1, 6.4, 6.4)`;
-    return { shape, sizeId: `${prefix}-100` };
+      INSERT INTO diamond_sizes (id, shape, length_mm, width_mm, min_ct, max_ct)
+      VALUES (${`${code}-6.4`}, ${shape}, 6.4, 6.4, 1, 1)`;
+    return { shape, sizeId: `${code}-6.4` };
   }
 }

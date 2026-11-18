@@ -10,6 +10,8 @@ import { getPipeline, getAdhocApprovals } from '@/features/sales/queries';
 import { getMemos, getAgents } from '@/features/memos/queries';
 import { getShapes, getSizes, getSizeOptions } from '@/features/masters/sizes/queries';
 import { search } from '@/features/search/queries';
+import { getGradeLists, getGrades } from '@/features/masters/grades/queries';
+import { getPriceCsv, getPricedTypes, getQualities } from '@/features/masters/prices/queries';
 
 /**
  * Every page's data path, run once.
@@ -29,6 +31,7 @@ test('every page query runs against the live schema', async () => {
     getPipeline(), getAdhocApprovals(),
     getMemos('out'), getAgents(),
     getShapes(), getSizes(), getSizeOptions(),
+    getGrades(), getGradeLists(), getQualities(), getPricedTypes(), getPriceCsv('Lab Grown'),
     search('a'),
   ]);
   assert.equal(results.filter((r: unknown) => r === undefined).length, 0);

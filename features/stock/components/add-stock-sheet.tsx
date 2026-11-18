@@ -13,9 +13,9 @@ import {
 } from '@/components/ui/sheet';
 import { Segmented } from '@/components/forms/segmented';
 import { CaratsRate } from '@/components/forms/carats-rate';
-import { SpecFields, blankSpec, type SpecValue } from '@/features/spec/components/spec-fields';
+import { SpecFields, blankSpec, type SpecOptions, type SpecValue } from '@/features/spec/components/spec-fields';
 import { QuickEntry } from '@/components/forms/quick-entry';
-import type { SizeOption } from '@/features/masters/sizes/queries';
+
 import { useLastUsed } from '@/lib/use-last-used';
 import { addStockAction } from '../actions';
 import { todayIso } from '@/lib/dates';
@@ -24,10 +24,10 @@ type Party = { id: string; name: string; defaultTermsDays: number };
 type Mode = 'bill' | 'memo';
 
 export function AddStockSheet({
-  suppliers, agents, sizes, defaultOpen = false,
+  suppliers, agents, options, defaultOpen = false,
 }: {
   suppliers: Party[]; agents: string[];
-  sizes: SizeOption[];
+  options: SpecOptions;
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -82,7 +82,7 @@ export function AddStockSheet({
             }}
           />
 
-          <SpecFields id="as" sizes={sizes} value={spec} onChange={setSpec} />
+          <SpecFields id="as" options={options} value={spec} onChange={setSpec} />
 
           {/* Remounted by a quick-entry fill so its defaults take the parsed values. */}
           <CaratsRate key={fill.n} id="as" defaultCarats={fill.carats} defaultRate={fill.rate} />

@@ -7,7 +7,7 @@ import { NewSaleSheet } from '@/features/sales/components/new-sale-sheet';
 import { MemoList } from '@/features/memos/components/memo-list';
 import { getMemos, getAgents } from '@/features/memos/queries';
 import { getPartyOptions } from '@/features/parties/queries';
-import { getSizeOptions } from '@/features/masters/sizes/queries';
+import { getSpecOptions } from '@/features/spec/options';
 import { PageHeader } from '@/components/layout/page-header';
 
 export const dynamic = 'force-dynamic';
@@ -25,8 +25,8 @@ export default async function SalesPage({
   const sp = await searchParams;
   const tab = resolveTab(sp.tab, TABS);
 
-  const [customers, suppliers, sizes, agents, units] = await Promise.all([
-    getPartyOptions('client'), getPartyOptions('supplier'), getSizeOptions(), getAgents(),
+  const [customers, suppliers, options, agents, units] = await Promise.all([
+    getPartyOptions('client'), getPartyOptions('supplier'), getSpecOptions(), getAgents(),
     getSellableUnits(),
   ]);
   // Stage is the board's own axis, so the filters here are the other three
@@ -46,7 +46,7 @@ export default async function SalesPage({
         title="Sales"
         actions={<NewSaleSheet
           customers={customers} suppliers={suppliers} agents={agents}
-          sizes={sizes} units={units}
+          options={options} units={units}
           defaultOpen={sp.new === '1'} defaultLot={sp.lot}
         />}
         tabs={<SectionTabs

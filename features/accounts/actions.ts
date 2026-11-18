@@ -8,6 +8,7 @@ import {
   SettlementError, type PaymentMode,
 } from '@/lib/ledger/movements';
 import { checkSpec, type StoredSpec } from '@/features/spec/spec';
+import { getGrades } from '@/features/masters/grades/queries';
 import { docNoOr } from '@/lib/doc-numbers';
 
 export type PaymentState = { error: string } | { ok: string } | null;
@@ -103,6 +104,7 @@ export async function addBillAction(_prev: BillState, form: FormData): Promise<B
   // Validate every line before writing any of them, so a bad third line does
   // not roll back two good ones after the fact.
   const prepared: { line: BillLineInput; spec?: StoredSpec }[] = [];
+  const grades = await getGrades({ retired: true });
   for (const [i, line] of lines.entries()) {
     const at = lines.length > 1 ? ` on line ${i + 1}` : '';
     if (withGoods) {
@@ -114,7 +116,7 @@ export async function addBillAction(_prev: BillState, form: FormData): Promise<B
         if (!line.lotId) return { error: `Pick the stock this sale comes out of${at}.` };
         prepared.push({ line });
       } else {
-        const checked = await checkSpec(line.spec ?? {});
+        const checked = await checkSpec(line.spec ?? {}, grades);
         if (!checked.ok) return { error: `${checked.error.replace(/\.$/, '')}${at}.` };
         prepared.push({ line, spec: checked.spec });
       }

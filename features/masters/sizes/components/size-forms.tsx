@@ -1,73 +1,43 @@
 'use client';
 
-import { useState, type ReactElement, type ReactNode } from 'react';
-import { useFormAction } from '@/lib/use-form-action';
+import { CsvImport, DownloadLink } from '@/components/forms/csv-import';
+import { FormSheet } from '@/components/forms/form-sheet';
 import { Choice } from '@/components/forms/choice';
 import { ConfirmAction } from '@/components/forms/confirm-action';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import {
-  Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
-} from '@/components/ui/sheet';
-import {
-  deleteShapeAction, deleteSizeAction, generateSizesAction, saveShapeAction, saveSizeAction, type SizeState,
+  deleteShapeAction, deleteSizeAction, importSizesAction, saveShapeAction, saveSizeAction,
 } from '../actions';
+import { trim } from '../chart';
 import type { DiamondSize, Shape } from '../queries';
 
-/** The sheet + form + inline error every editor here shares. */
-function FormSheet({ trigger, label, title, description, action, submit, children, footer }: {
-  trigger: ReactElement; label: string; title: string; description: string;
-  action: (p: SizeState, fd: FormData) => Promise<SizeState>;
-  submit: string; children: ReactNode; footer?: ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const [state, formAction, isPending] = useFormAction(action, () => setOpen(false));
-  return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger render={trigger}>{label}</SheetTrigger>
-      <SheetContent side="right" className="sm:max-w-lg">
-        <SheetHeader>
-          <SheetTitle>{title}</SheetTitle>
-          <SheetDescription>{description}</SheetDescription>
-        </SheetHeader>
-        <form action={formAction} className="space-y-4">
-          {children}
-          {state && 'error' in state && <FieldError>{state.error}</FieldError>}
-          <SheetFooter>
-            <Button type="submit" disabled={isPending}>{isPending ? 'Saving…' : submit}</Button>
-          </SheetFooter>
-        </form>
-        {/* Outside the form: a confirm's own form must not submit this one. */}
-        {footer && <div className="px-4 text-sm text-muted-foreground">{footer}</div>}
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-function NumberField({ name, label, unit, defaultValue, placeholder }: {
-  name: string; label: string; unit: string; defaultValue?: number | null; placeholder?: string;
+function NumberField({ name, label, defaultValue, placeholder, required }: {
+  name: string; label: string; defaultValue?: number | null; placeholder?: string; required?: boolean;
 }) {
   return (
     <Field>
-      <FieldLabel htmlFor={name}>{label} ({unit})</FieldLabel>
-      <Input id={name} name={name} type="number" step="any" min="0"
-             defaultValue={defaultValue ?? ''} placeholder={placeholder} />
+      <FieldLabel htmlFor={name}>{label}</FieldLabel>
+      <Input id={name} name={name} type="number" step="0.01" min="0.01" required={required}
+        defaultValue={defaultValue ?? ''} placeholder={placeholder} />
     </Field>
   );
 }
 
 /** Add a shape (no `shape`) or edit one. */
-export function ShapeSheet({ shape }: { shape?: Shape }) {
+export function ShapeSheet({ shape, nextOrder }: { shape?: Shape; nextOrder?: number }) {
   return (
     <FormSheet
       trigger={shape ? <Button variant="ghost" size="sm" /> : <Button variant="outline" size="sm" />}
       label={shape ? 'Edit' : 'Add shape'} title={shape?.shape ?? 'Add shape'} submit="Save"
-      description="Face-up size of a 1.00 ct stone of this shape. Every size's estimated mm = this × carat^(1/3); L/W is its ratio. Leave blank if you don't have it: sizes then need their mm typed."
+      description={shape?.sizes
+        ? `${shape.sizes} sizes use ${shape.shape}. A new name shows on them and their stock; a new code applies to sizes added from now on.`
+        : 'The code prefixes this shape’s Size IDs (PS-4X2.5).'}
       action={saveShapeAction}
-      footer={shape && (shape.sizes ? `Can't remove: ${shape.sizes} sizes use it.` : (
+      footer={shape && (shape.sizes ? `Can’t remove: ${shape.sizes} sizes use it. Untick Active to retire it.` : (
         <ConfirmAction
           action={deleteShapeAction} fields={{ shape: shape.shape }}
           trigger={<Button variant="ghost" className="text-destructive">Remove shape</Button>}
@@ -75,101 +45,101 @@ export function ShapeSheet({ shape }: { shape?: Shape }) {
         />
       ))}
     >
-      {shape
-        ? <input type="hidden" name="original" value={shape.shape} />
-        : (
-          <Field>
-            <FieldLabel htmlFor="shape">Name</FieldLabel>
-            <Input id="shape" name="shape" required placeholder="Half Moon" />
-          </Field>
-        )}
+      {shape && <input type="hidden" name="original" value={shape.shape} />}
       <Field>
-        <FieldLabel htmlFor="prefix">Size ID prefix</FieldLabel>
-        <Input id="prefix" name="prefix" defaultValue={shape?.prefix ?? ''} maxLength={3} required
-               readOnly={!!shape?.sizes} className="uppercase" />
-        <FieldDescription>
-          {shape?.sizes ? `Fixed: ${shape.sizes} sizes use it.` : '2–3 letters, e.g. HM for HM-010.'}
-        </FieldDescription>
+        <FieldLabel htmlFor="shape">Name</FieldLabel>
+        <Input id="shape" name="shape" required maxLength={30} defaultValue={shape?.shape} placeholder="Half Moon" />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <NumberField name="lengthMm" label="1 ct length" unit="mm" defaultValue={shape?.lengthMm} />
-        <NumberField name="widthMm" label="1 ct width" unit="mm" defaultValue={shape?.widthMm} />
+        <Field>
+          <FieldLabel htmlFor="code">Code</FieldLabel>
+          <Input id="code" name="code" required maxLength={4} defaultValue={shape?.code} className="uppercase" />
+          <FieldDescription>2–4 letters, e.g. HM.</FieldDescription>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="sortOrder">Order</FieldLabel>
+          <Input id="sortOrder" name="sortOrder" type="number" step="1" defaultValue={shape?.sort_order ?? nextOrder ?? 0} />
+        </Field>
       </div>
-      {!!shape?.sizes && (
-        <Label className="items-start font-normal">
-          <Checkbox name="reestimate" value="on" />
-          Also re-estimate the {shape.sizes} existing sizes (replaces their mm, including any
-          supplier-measured values).
-        </Label>
-      )}
+      <Label className="font-normal">
+        <Checkbox name="hasCut" value="on" defaultChecked={shape?.has_cut ?? false} />
+        Graded on cut (round). Fancy shapes: polish and symmetry only.
+      </Label>
+      <Label className="font-normal">
+        <Checkbox name="active" value="on" defaultChecked={shape?.active ?? true} />
+        Active: offered in pickers
+      </Label>
     </FormSheet>
   );
 }
 
-/** Create (no `size`) or edit one size. */
+/** Add one size (no `size`) or edit one. */
 export function SizeSheet({ size, shapes }: { size?: DiamondSize; shapes: Shape[] }) {
+  const carats = size ? trim(size.min_ct) : '';
   return (
     <FormSheet
       trigger={size ? <Button variant="ghost" size="sm" /> : <Button />}
-      label={size ? 'Edit' : 'New size'}
-      title={size ? `Edit ${size.id}` : 'New size'} submit={size ? 'Save' : 'Create'}
-      description="A carat-per-stone band for one shape. A stone fits when min ≤ ct < max (a band whose nominal is its max includes the max). Melee bands go down to 0.001 ct."
+      label={size ? 'Edit' : 'New size'} title={size ? `Edit ${size.id}` : 'New size'} submit="Save"
+      description={size?.used
+        ? `${size.used} lots, sale lines or prices are on ${size.id}. Changing its mm or carats changes what all of them say they are.`
+        : 'Face-up mm and the carats one stone of that size weighs. The Size ID is made from the shape code and mm.'}
       action={saveSizeAction}
-      footer={size && (size.used ? `Can't delete: ${size.used} lots or sale lines use it.` : (
+      footer={size && (size.used ? 'In use, so it can’t be deleted. Untick Active to retire it from pickers.' : (
         <ConfirmAction
           action={deleteSizeAction} fields={{ id: size.id }}
           trigger={<Button variant="ghost" className="text-destructive">Delete size</Button>}
-          title={`Delete ${size.id}?`} description="This cannot be undone." confirm="Delete"
+          title={`Delete ${size.id}?`} description="Nothing uses it. This cannot be undone." confirm="Delete"
         />
       ))}
     >
       {size && <input type="hidden" name="originalId" value={size.id} />}
-      <div className="grid grid-cols-2 gap-3">
-        <Field>
-          <FieldLabel htmlFor="shape">Shape</FieldLabel>
-          <Choice id="shape" name="shape" required disabled={!!size} defaultValue={size?.shape}
-                  options={shapes.map((s) => ({ value: s.shape, label: s.shape }))} />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="id">Size ID</FieldLabel>
-          <Input id="id" name="id" defaultValue={size?.id} disabled={!!size} placeholder="Blank = RD-100 style"
-                 className="uppercase" />
-        </Field>
-        <NumberField name="minCt" label="Min, inclusive" unit="ct" defaultValue={size?.min_ct} />
-        <NumberField name="maxCt" label="Max, exclusive" unit="ct" defaultValue={size?.max_ct} />
-        <NumberField name="nominalCt" label="Nominal" unit="ct" defaultValue={size?.nominal_ct} placeholder="Blank = midpoint" />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <NumberField name="lengthMm" label="Length" unit="mm" defaultValue={size?.lengthMm} placeholder="Blank = estimate" />
-        <NumberField name="widthMm" label="Width" unit="mm" defaultValue={size?.widthMm} placeholder="Blank = estimate" />
+      <Field>
+        <FieldLabel htmlFor="shape">Shape</FieldLabel>
+        {/* A disabled select is not submitted, so an edit sends the shape hidden. */}
+        {size && <input type="hidden" name="shape" value={size.shape} />}
+        <Choice id="shape" name={size ? undefined : 'shape'} required disabled={!!size} defaultValue={size?.shape}
+          options={shapes.filter((s) => s.active || s.shape === size?.shape).map((s) => ({ value: s.shape, label: s.shape }))} />
+      </Field>
+      <div className="grid grid-cols-3 gap-3">
+        <NumberField name="length_mm" label="Length mm" required defaultValue={size?.length_mm} />
+        <NumberField name="width_mm" label="Width mm" required defaultValue={size?.width_mm} />
+        <NumberField name="width2_mm" label="Narrow mm" defaultValue={size?.width2_mm} placeholder="Tapered only" />
       </div>
       <Field>
-        <FieldLabel htmlFor="notes">Notes</FieldLabel>
-        <Input id="notes" name="notes" defaultValue={size?.notes ?? ''} placeholder="e.g. sieve +2.5-3" />
+        <FieldLabel htmlFor="carats">Carats per stone</FieldLabel>
+        <Input
+          id="carats"
+          name="carats"
+          type="number"
+          step="any"
+          min="0.0001"
+          max="100"
+          required
+          defaultValue={carats}
+          placeholder="0.014 or 0.0145"
+        />
+        <FieldDescription>Single weight per stone (e.g. 0.014 or 0.0145 ct).</FieldDescription>
       </Field>
+      <Label className="font-normal">
+        <Checkbox name="retired" value="on" defaultChecked={size ? !size.active : false} />
+        Retired: kept on its stock, left out of pickers
+      </Label>
     </FormSheet>
   );
 }
 
-export function GenerateSizes({ shapes }: { shapes: Shape[] }) {
-  const offered = shapes.filter((s) => s.lengthMm !== null);
+/** The size chart as CSV: export, edit in Excel, import back. */
+export function ImportSizes() {
   return (
-    <FormSheet
-      trigger={<Button variant="outline" />} label="Generate standard sizes" title="Generate standard sizes" submit="Generate"
-      description="40 sizes per shape: 0.05 to 2.00 ct in 0.05 ct steps, each covering the carats halfway to its neighbours (RD-100 = 0.975 to under 1.025 ct). Sizes that already exist are not changed. Melee bands below 0.05 ct are added one by one."
-      action={generateSizesAction}
-    >
-      <div className="grid grid-cols-2 gap-2">
-        {offered.map((s) => (
-          <Label key={s.shape} className="font-normal">
-            <Checkbox name="shape" value={s.shape} defaultChecked />
-            {s.shape}
-          </Label>
-        ))}
-      </div>
-      {offered.length < shapes.length && (
-        <FieldDescription>Shapes without a 1 ct size are left out: set it under Shapes first.</FieldDescription>
-      )}
-    </FormSheet>
+    <CsvImport
+      action={importSizesAction} title="Import size chart"
+      description="Edit the Export (or the client chart) in Excel and upload it. A row with a size_id edits that size; a blank size_id adds one. Sizes left out of the file are kept."
+      links={<>
+        <DownloadLink href="/api/export?view=size_chart">Export current chart</DownloadLink>
+        <DownloadLink href="/samples/size-chart.csv">Client chart (sample)</DownloadLink>
+      </>}
+      columns={<>Columns: size_id, shape (name or code), length_mm, width_mm, width2_mm (tapered baguette
+        narrow end), carats (0.1 or 0.014-0.015), active (yes/no).</>}
+    />
   );
 }

@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth/server';
 import { sql } from '@/db/client';
+import { toCsv } from '@/lib/csv';
 
 /**
  * CSV export for the register views. Excel parity: whatever is on screen can
@@ -10,16 +11,9 @@ const VIEWS: Record<string, { sql: string; order: string }> = {
   bills: { sql: 'bills', order: 'billed_on DESC NULLS LAST' },
   ledger_entries: { sql: 'ledger_entries', order: 'dated_on DESC' },
   lot_balances: { sql: 'lot_balances', order: 'balance DESC' },
+  size_chart: { sql: 'size_chart', order: 'shape, length_mm, width_mm' },
   memo_line_status: { sql: 'memo_line_status', order: 'issued_on DESC' },
   movement_entries: { sql: 'movement_entries', order: 'moved_on DESC' },
-};
-
-const csvCell = (v: unknown): string => {
-  if (v === null || v === undefined) return '';
-  const s = String(v);
-  // Guard against CSV formula injection when the file is opened in Excel.
-  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
-  return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 };
 
 export async function GET(req: Request) {
@@ -36,9 +30,7 @@ export async function GET(req: Request) {
   )) as Record<string, unknown>[];
 
   if (!rows.length) return new Response('', { headers: csvHeaders(name) });
-  const cols = Object.keys(rows[0]);
-  const body = [cols.join(','), ...rows.map((r) => cols.map((c) => csvCell(r[c])).join(','))].join('\n');
-  return new Response(body, { headers: csvHeaders(name) });
+  return new Response(toCsv(Object.keys(rows[0]), rows), { headers: csvHeaders(name) });
 }
 
 const csvHeaders = (name: string) => ({
