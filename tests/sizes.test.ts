@@ -21,7 +21,11 @@ test('Size IDs: shape code + mm; a second weight at the same mm gets its carats'
     assert.deepEqual(parseCarats('0.014'), { min_ct: 0.014, max_ct: 0.014 });
     assert.deepEqual(parseCarats('0.0145'), { min_ct: 0.0145, max_ct: 0.0145 });
     assert.deepEqual(parseCarats('0.014-0.015'), { min_ct: 0.014, max_ct: 0.014 }, 'legacy range takes the minimum');
+    assert.deepEqual(parseCarats('0.01454'), { min_ct: 0.0145, max_ct: 0.0145 }, 'rounds to 4 decimals');
     assert.equal(parseCarats('+2'), null, 'a sieve is not a weight');
+    assert.equal(parseCarats('0'), null, 'zero is rejected');
+    assert.equal(parseCarats('-0.5'), null, 'negative is rejected');
+    assert.equal(parseCarats('150'), null, 'above 100 ct is rejected');
     assert.equal(nominalCarats({ min_ct: 0.014, max_ct: 0.014 }), 0.014);
     assert.equal(caratsLabel({ min_ct: 0.014, max_ct: 0.014 }), '0.014 ct');
     assert.equal(caratsLabel({ min_ct: 0.0145, max_ct: 0.0145 }), '0.0145 ct');
@@ -35,6 +39,10 @@ test('Size IDs: shape code + mm; a second weight at the same mm gets its carats'
     assert.match((row({ shape: 'Kite', length_mm: '1', width_mm: '1', carats: '1' }) as { error: string }).error, /not a shape/);
     assert.match((row({ shape: 'Round', width_mm: '1', carats: '1' }) as { error: string }).error, /Length/);
     assert.match((row({ shape: 'Round', length_mm: '1', width_mm: '1', carats: '+2' }) as { error: string }).error, /Carats/);
+    assert.match((row({ shape: 'Round', length_mm: '1000', width_mm: '1', carats: '1' }) as { error: string }).error, /between 0.01 and 999.99/);
+    assert.match((row({ shape: 'Round', length_mm: '1', width_mm: '1', width2_mm: '0.5', carats: '1' }) as { error: string }).error, /narrow width/);
+    assert.match((row({ shape: 'TBAG', length_mm: '6', width_mm: '3', carats: '0.5' }) as { error: string }).error, /requires a narrow width/);
+    assert.match((row({ shape: 'TBAG', length_mm: '6', width_mm: '3', width2_mm: '4', carats: '0.5' }) as { error: string }).error, /must be smaller than width/);
   });
 
   test('import plan: adds, edits by id, matches an identical row, keeps what the file leaves out', () => {

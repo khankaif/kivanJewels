@@ -2,7 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SectionTabs } from '@/components/layout/section-tabs';
 import { FilterBar } from '@/components/layout/filter-bar';
 import { resolveTab } from '@/lib/tabs';
-import { getOwnedUnits, getMemoStock } from '@/features/stock/queries';
+import { getOwnedUnitsPage, getMemoStock } from '@/features/stock/queries';
 import { getMovements } from '@/features/stock/register';
 import { OwnedTable } from '@/features/stock/components/owned-table';
 import { MemoTable } from '@/features/stock/components/memo-table';
@@ -18,6 +18,7 @@ export const dynamic = 'force-dynamic';
 
 const TABS = ['owned', 'memo', 'movements'] as const;
 const LABELS = { owned: 'My stock', memo: 'On memo', movements: 'Movements' } as const;
+const OWNED_PAGE = 50;
 const MOVEMENTS_PAGE = 200;
 
 type Params = Record<string, string | undefined>;
@@ -47,6 +48,12 @@ export default async function StockPage({
   const [suppliers, options, agents] = await Promise.all([
     getPartyOptions('supplier'), getSpecOptions(), getAgents(),
   ]);
+
+  const ownedPage = Math.max(1, Number(sp.page ?? 1) || 1);
+  const ownedData = tab === 'owned' ? await getOwnedUnitsPage({
+    search: sp.q, stoneType: sp.type, certified: sp.cert,
+    limit: OWNED_PAGE, offset: (ownedPage - 1) * OWNED_PAGE,
+  }) : null;
 
   // A tab link keeps the current search but always resets paging.
   const href = (t: string) =>
@@ -84,10 +91,17 @@ export default async function StockPage({
         />
       )}
 
-      {tab === 'owned' && (
-        <OwnedTable units={await getOwnedUnits({
-          search: sp.q, stoneType: sp.type, certified: sp.cert,
-        })} />
+      {tab === 'owned' && ownedData && (
+        <OwnedTable
+          units={ownedData.rows}
+          total={ownedData.total}
+          overallBalance={ownedData.overallBalance}
+          overallExposure={ownedData.overallExposure}
+          overallValue={ownedData.overallValue}
+          page={ownedPage}
+          pages={Math.max(1, Math.ceil(ownedData.total / OWNED_PAGE))}
+          sp={sp}
+        />
       )}
 
       {/* The same goods two ways: what is here by parcel, and what to settle by

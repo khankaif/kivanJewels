@@ -27,7 +27,23 @@ function partyOrder(s: PartySort | undefined) {
   }
 }
 
-export async function getParties(opts: { search?: string; includeInactive?: boolean; sort?: PartySort } = {}): Promise<Party[]> {
+const mapParty = (r: any): Party => ({
+  id: r.id, name: r.name, kind: r.kind, defaultTermsDays: r.default_terms_days,
+  phone: r.phone, email: r.email, gstin: r.gstin, notes: r.notes, isActive: r.is_active,
+  businessName: r.business_name, contactPerson: r.contact_person, address: r.address, pan: r.pan,
+  receivable: Number(r.receivable), payable: Number(r.payable), net: Number(r.net),
+  openMemosIn: r.open_in, openMemosOut: r.open_out,
+});
+
+export type PartyFilters = {
+  search?: string;
+  includeInactive?: boolean;
+  sort?: PartySort;
+  limit?: number;
+  offset?: number;
+};
+
+export async function getParties(opts: PartyFilters = {}): Promise<Party[]> {
   const like = opts.search ? `%${opts.search}%` : null;
   const rows = await sql`
     SELECT p.id, p.name, p.kind, p.default_terms_days, p.phone, p.email,
@@ -45,15 +61,46 @@ export async function getParties(opts: { search?: string; includeInactive?: bool
       AND (${like}::text IS NULL
            OR p.name ILIKE ${like} OR p.business_name ILIKE ${like}
            OR p.phone ILIKE ${like} OR p.gstin ILIKE ${like})
-    ORDER BY ${partyOrder(opts.sort)}`;
+    ORDER BY ${partyOrder(opts.sort)}
+    ${opts.limit ? sql`LIMIT ${opts.limit} OFFSET ${opts.offset ?? 0}` : sql``}`;
 
-  return rows.map((r: any) => ({
-    id: r.id, name: r.name, kind: r.kind, defaultTermsDays: r.default_terms_days,
-    phone: r.phone, email: r.email, gstin: r.gstin, notes: r.notes, isActive: r.is_active,
-    businessName: r.business_name, contactPerson: r.contact_person, address: r.address, pan: r.pan,
-    receivable: Number(r.receivable), payable: Number(r.payable), net: Number(r.net),
-    openMemosIn: r.open_in, openMemosOut: r.open_out,
-  }));
+  return rows.map(mapParty);
+}
+
+/** Server-side paginated parties list. */
+export async function getPartiesPage(opts: PartyFilters = {}): Promise<{ rows: Party[]; total: number }> {
+  const like = opts.search ? `%${opts.search}%` : null;
+  const limit = opts.limit ?? 50;
+  const offset = opts.offset ?? 0;
+
+  const where = sql`
+    WHERE (${opts.includeInactive ?? false}::boolean OR p.is_active)
+      AND (${like}::text IS NULL
+           OR p.name ILIKE ${like} OR p.business_name ILIKE ${like}
+           OR p.phone ILIKE ${like} OR p.gstin ILIKE ${like})`;
+
+  const [countRes] = await sql`SELECT count(*)::int AS total FROM parties p ${where}`;
+
+  const rows = await sql`
+    SELECT p.id, p.name, p.kind, p.default_terms_days, p.phone, p.email,
+           p.gstin, p.notes, p.is_active, p.business_name, p.contact_person, p.address, p.pan,
+           COALESCE(b.receivable,0) AS receivable,
+           COALESCE(b.payable,0)    AS payable,
+           COALESCE(b.net,0)        AS net,
+           COALESCE((SELECT count(*) FROM memos m
+                     WHERE m.party_id = p.id AND m.direction='in'  AND m.status='open'),0)::int AS open_in,
+           COALESCE((SELECT count(*) FROM memos m
+                     WHERE m.party_id = p.id AND m.direction='out' AND m.status='open'),0)::int AS open_out
+    FROM parties p
+    LEFT JOIN party_balances b ON b.party_id = p.id
+    ${where}
+    ORDER BY ${partyOrder(opts.sort)}
+    LIMIT ${limit} OFFSET ${offset}`;
+
+  return {
+    rows: rows.map(mapParty),
+    total: countRes ? Number(countRes.total) : 0,
+  };
 }
 
 /** Lightweight list for pickers. `kind` filters to who can play that role. */

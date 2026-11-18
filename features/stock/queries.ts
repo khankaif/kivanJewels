@@ -26,11 +26,76 @@ export type MemoStock = {
 
 /** Owned stock, one row per spec (size + colour + clarity + certification). */
 export type StockFilters = {
-  search?: string; limit?: number;
+  search?: string; limit?: number; offset?: number;
   stoneType?: string;
   /** A certification value ('Certified') or a lab ('IGI'); both narrow the list. */
   certified?: string;
 };
+
+export type OwnedUnitsPageResult = {
+  rows: StockUnit[];
+  total: number;
+  overallBalance: number;
+  overallExposure: number;
+  overallValue: number;
+};
+
+export async function getOwnedUnitsPage(opts: StockFilters = {}): Promise<OwnedUnitsPageResult> {
+  const like = opts.search ? `%${opts.search}%` : null;
+  const type = opts.stoneType || null;
+  const cert = opts.certified || null;
+  const limit = opts.limit ?? 50;
+  const offset = opts.offset ?? 0;
+
+  const [countRes, rows] = await Promise.all([
+    sql`
+      SELECT count(*)::int AS total,
+             COALESCE(SUM(balance), 0) AS overall_balance,
+             COALESCE(SUM(exposure), 0) AS overall_exposure,
+             COALESCE(SUM(balance * COALESCE(cost_rate, 0)), 0) AS overall_value
+      FROM lot_balances
+      WHERE source <> 'memo_in'
+        AND (balance > 0.0005 OR exposure > 0.0005)
+        AND (${like}::text IS NULL
+             OR lot_no ILIKE ${like} OR stone_type ILIKE ${like}
+             OR size_id ILIKE ${like} OR shape ILIKE ${like}
+             OR colour ILIKE ${like} OR clarity ILIKE ${like})
+        AND (${type}::text IS NULL OR stone_type = ${type})
+        AND (${cert}::text IS NULL OR certified = ${cert} OR lab = ${cert})`,
+    sql`
+      SELECT lot_id, lot_no, stone_type, shape,
+             size_id,
+             colour, clarity, lab, certified,
+             COALESCE(cost_rate, 0) AS cost_rate, balance, exposure
+      FROM lot_balances
+      WHERE source <> 'memo_in'
+        AND (balance > 0.0005 OR exposure > 0.0005)
+        AND (${like}::text IS NULL
+             OR lot_no ILIKE ${like} OR stone_type ILIKE ${like}
+             OR size_id ILIKE ${like} OR shape ILIKE ${like}
+             OR colour ILIKE ${like} OR clarity ILIKE ${like})
+        AND (${type}::text IS NULL OR stone_type = ${type})
+        AND (${cert}::text IS NULL OR certified = ${cert} OR lab = ${cert})
+      ORDER BY balance DESC
+      LIMIT ${limit}
+      OFFSET ${offset}`,
+  ]);
+
+  const [c] = countRes as any[];
+  return {
+    rows: (rows as any[]).map((r) => ({
+      lotId: r.lot_id, lotNo: r.lot_no, stoneType: r.stone_type, shape: r.shape,
+      sizeId: r.size_id, colour: r.colour, clarity: r.clarity,
+      lab: r.lab, certified: r.certified,
+      costRate: Number(r.cost_rate), balance: Number(r.balance), exposure: Number(r.exposure),
+      value: Number(r.balance) * Number(r.cost_rate),
+    })),
+    total: c ? Number(c.total) : 0,
+    overallBalance: c ? Number(c.overall_balance) : 0,
+    overallExposure: c ? Number(c.overall_exposure) : 0,
+    overallValue: c ? Number(c.overall_value) : 0,
+  };
+}
 
 export async function getOwnedUnits(opts: StockFilters = {}): Promise<StockUnit[]> {
   const like = opts.search ? `%${opts.search}%` : null;

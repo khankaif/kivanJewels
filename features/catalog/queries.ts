@@ -21,6 +21,37 @@ const map = (r: any): CatalogItem => ({
   quality: r.quality, mrp: num(r.mrp), images: r.images, published: r.published,
 });
 
+export type CatalogPageResult = {
+  rows: CatalogItem[];
+  total: number;
+  live: number;
+};
+
+/** Admin: paginated piece list, drafts included, newest first. */
+export async function getCatalogItemsPage(opts: { limit?: number; offset?: number } = {}): Promise<CatalogPageResult> {
+  const limit = opts.limit ?? 24;
+  const offset = opts.offset ?? 0;
+
+  const [counts, rows] = await Promise.all([
+    sql`
+      SELECT count(*)::int AS total,
+             count(*) FILTER (WHERE published)::int AS live
+      FROM catalog_items`,
+    sql`
+      SELECT * FROM catalog_items
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+      OFFSET ${offset}`,
+  ]);
+
+  const [c] = counts as any[];
+  return {
+    rows: (rows as any[]).map(map),
+    total: c ? Number(c.total) : 0,
+    live: c ? Number(c.live) : 0,
+  };
+}
+
 /** Admin: every piece, drafts included, newest first. */
 export async function getCatalogItems(): Promise<CatalogItem[]> {
   const rows = await sql`SELECT * FROM catalog_items ORDER BY created_at DESC`;

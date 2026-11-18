@@ -41,19 +41,22 @@ export function newId(code: string, s: SizeFields, taken: Set<string>) {
 /**
  * Single carat weight per stone, e.g. "0.014" or "0.0145".
  * If a legacy file supplies a range (e.g. "0.014-0.015"), Option A takes the minimum (0.014).
+ * Validates finite number, positive, max 100 ct, and rounds to 4 decimal places (matches DB numeric(7,4)).
  */
 export function parseCarats(raw: string): { min_ct: number; max_ct: number } | null {
-  const m = raw.trim().match(/^(\d*\.?\d+)\s*(?:[-–]\s*(\d*\.?\d+))?\s*(?:ct)?$/i);
+  const m = String(raw ?? '').trim().match(/^(\d*\.?\d+)\s*(?:[-–]\s*(\d*\.?\d+))?\s*(?:ct)?$/i);
   if (!m) return null;
-  const ct = Number(m[1]);
-  return ct > 0 && ct <= 100 ? { min_ct: ct, max_ct: ct } : null;
+  const num = Number(m[1]);
+  if (!Number.isFinite(num) || num <= 0 || num > 100) return null;
+  const ct = Math.round(num * 10000) / 10000;
+  return ct >= 0.0001 ? { min_ct: ct, max_ct: ct } : null;
 }
 
 /** Single nominal carat weight for this size. */
 export const nominalCarats = (s: Pick<SizeFields, 'min_ct' | 'max_ct'>) => s.min_ct;
 
 export const caratsLabel = (s: Pick<SizeFields, 'min_ct' | 'max_ct'>) =>
-`${trim(s.min_ct)} ct`;
+  `${trim(s.min_ct)} ct`;
 
 export const mmLabel = (s: Pick<SizeFields, 'length_mm' | 'width_mm' | 'width2_mm'>) =>
   s.width2_mm != null ? `${trim(s.length_mm)} × ${trim(s.width_mm)}/${trim(s.width2_mm)} mm`
@@ -64,7 +67,9 @@ const mmValue = (raw: string | undefined, label: string, required: boolean): num
   const t = String(raw ?? '').trim();
   if (!t) return required ? `${label} is required.` : null;
   const n = Number(t);
-  return Number.isFinite(n) && n > 0 && n < 1000 ? Math.round(n * 100) / 100 : `${label} "${t}" is not a size in mm.`;
+  if (!Number.isFinite(n) || n <= 0 || n >= 1000) return `${label} must be between 0.01 and 999.99 mm.`;
+  const val = Math.round(n * 100) / 100;
+  return val >= 0.01 ? val : `${label} must be at least 0.01 mm.`;
 };
 
 /** One size from a form or CSV row, or the reason it can't be one. */
@@ -81,8 +86,17 @@ export function readSize(
   const width2 = mmValue(get('width2_mm'), 'Narrow width', false);
   for (const v of [length, width, width2]) if (typeof v === 'string') return { error: v };
 
+  if (width2 !== null) {
+    if (shape.code !== 'TBAG') return { error: 'Only a tapered shape can have a narrow width.' };
+    if (typeof width === 'number' && typeof width2 === 'number' && width2 >= width) {
+      return { error: `Narrow width (${width2} mm) must be smaller than width (${width} mm).` };
+    }
+  } else if (shape.code === 'TBAG') {
+    return { error: 'A tapered baguette requires a narrow width.' };
+  }
+
   const carats = parseCarats(String(get('carats') ?? ''));
-  if (!carats) return { error: `Carats "${get('carats') ?? ''}" must be a number (e.g. 0.014 or 0.0145).` };
+  if (!carats) return { error: `Carats "${get('carats') ?? ''}" must be a number between 0.0001 and 100 ct.` };
 
   const activeRaw = String(get('active') ?? '').trim().toLowerCase();
   if (activeRaw && !['yes', 'no', 'y', 'n', '1', '0', 'true', 'false'].includes(activeRaw)) {

@@ -1,11 +1,14 @@
 import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { getParties, PARTY_SORTS } from '@/features/parties/queries';
+import { getPartiesPage, PARTY_SORTS } from '@/features/parties/queries';
 import { SortHead } from '@/components/layout/sort-head';
 import { parseSort } from '@/lib/sort';
 import { PartyDialog } from '@/features/parties/components/party-dialog';
@@ -18,16 +21,42 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 export const dynamic = 'force-dynamic';
 
+const PER_PAGE = 50;
+
 export default async function PartiesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; all?: string; new?: string; sort?: string }>;
+  searchParams: Promise<{ q?: string; all?: string; new?: string; sort?: string; page?: string }>;
 }) {
   const sp = await searchParams;
-  const { q, all, new: openNew } = sp;
+  const { q, all, new: openNew, page: pageStr } = sp;
   // Default order: largest balance either way, the parties that matter most today.
   const sort = parseSort(sp.sort, PARTY_SORTS, { col: 'net', dir: 'desc' });
-  const parties = await getParties({ search: q, includeInactive: all === '1', sort: sp.sort ? sort : undefined });
+
+  const rawPage = Math.max(1, Number(pageStr) || 1);
+  const offset = (rawPage - 1) * PER_PAGE;
+
+  const { rows: parties, total } = await getPartiesPage({
+    search: q,
+    includeInactive: all === '1',
+    sort: sp.sort ? sort : undefined,
+    limit: PER_PAGE,
+    offset,
+  });
+
+  const pages = Math.max(1, Math.ceil(total / PER_PAGE));
+  const page = Math.min(rawPage, pages);
+  const start = (page - 1) * PER_PAGE;
+
+  const makeHref = (p: number) => {
+    const nextSp = new URLSearchParams();
+    if (q) nextSp.set('q', q);
+    if (all) nextSp.set('all', all);
+    if (sp.sort) nextSp.set('sort', sp.sort);
+    if (p > 1) nextSp.set('page', String(p));
+    const qs = nextSp.toString();
+    return `/parties${qs ? `?${qs}` : ''}`;
+  };
 
   return (
     <div className="space-y-4">
@@ -40,7 +69,7 @@ export default async function PartiesPage({
       <Card>
         <CardHeader className="gap-3">
           <div>
-            <CardTitle>{parties.length} parties</CardTitle>
+            <CardTitle>{total} {total === 1 ? 'party' : 'parties'}</CardTitle>
             <CardDescription>Sorted by size of outstanding balance.</CardDescription>
           </div>
           <form className="flex gap-2">
@@ -114,6 +143,34 @@ export default async function PartiesPage({
             </TableBody>
           </Table>
         </CardContent>
+        {pages > 1 && (
+          <CardFooter className="flex items-center justify-between border-t py-3 text-sm">
+            <span className="text-muted-foreground">
+              Showing {start + 1}–{Math.min(start + PER_PAGE, total)} of {total} parties
+            </span>
+            <Pagination className="mx-0 w-auto">
+              <PaginationContent>
+                {page > 1 && (
+                  <PaginationItem>
+                    <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={makeHref(page - 1)} />}>
+                      <ChevronLeft data-icon="inline-start" /> Previous
+                    </Button>
+                  </PaginationItem>
+                )}
+                <span className="px-2 text-xs text-muted-foreground">
+                  Page {page} of {pages}
+                </span>
+                {page < pages && (
+                  <PaginationItem>
+                    <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={makeHref(page + 1)} />}>
+                      Next <ChevronRight data-icon="inline-end" />
+                    </Button>
+                  </PaginationItem>
+                )}
+              </PaginationContent>
+            </Pagination>
+          </CardFooter>
+        )}
       </Card>
     </div>
   );

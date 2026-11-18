@@ -21,7 +21,7 @@ function NumberField({ name, label, defaultValue, placeholder, required }: {
   return (
     <Field>
       <FieldLabel htmlFor={name}>{label}</FieldLabel>
-      <Input id={name} name={name} type="number" step="0.01" min="0.01" required={required}
+      <Input id={name} name={name} type="number" step="0.01" min="0.01" max="999.99" required={required}
         defaultValue={defaultValue ?? ''} placeholder={placeholder} />
     </Field>
   );

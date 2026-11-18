@@ -1,23 +1,57 @@
+import Link from 'next/link';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { PageHeader } from '@/components/layout/page-header';
 import { SectionTabs } from '@/components/layout/section-tabs';
 import { MastersNav } from '@/features/masters/components/masters-nav';
-import { getShapes, getSizes } from '@/features/masters/sizes/queries';
+import { getShapes, getSizesPage } from '@/features/masters/sizes/queries';
 import { caratsLabel, mmLabel } from '@/features/masters/sizes/chart';
 import { ImportSizes, ShapeSheet, SizeSheet } from '@/features/masters/sizes/components/size-forms';
 import { currentUser, isAdmin } from '@/lib/auth/server';
 
 export const dynamic = 'force-dynamic';
 
-export default async function SizesPage({ searchParams }: { searchParams: Promise<{ shape?: string }> }) {
-  const [{ shape: filter }, shapes, sizes, user] = await Promise.all([searchParams, getShapes(), getSizes(), currentUser()]);
+const PER_PAGE = 30;
+
+export default async function SizesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ shape?: string; page?: string }>;
+}) {
+  const [{ shape: rawShape, page: pageStr }, shapes, user] = await Promise.all([
+    searchParams, getShapes(), currentUser(),
+  ]);
   const admin = await isAdmin(user);
-  const rows = filter ? sizes.filter((s) => s.shape === filter) : sizes;
+  const validShapes = new Set(shapes.map((s) => s.shape));
+  const filter = rawShape && validShapes.has(rawShape) ? rawShape : undefined;
   const used = shapes.filter((s) => s.sizes > 0);
+
+  const rawPage = Math.max(1, Number(pageStr) || 1);
+  const offset = (rawPage - 1) * PER_PAGE;
+
+  const { rows, total } = await getSizesPage({
+    shape: filter,
+    limit: PER_PAGE,
+    offset,
+  });
+
+  const pages = Math.max(1, Math.ceil(total / PER_PAGE));
+  const page = Math.min(rawPage, pages);
+  const start = (page - 1) * PER_PAGE;
+
+  const makeHref = (p: number) => {
+    const sp = new URLSearchParams();
+    if (filter) sp.set('shape', filter);
+    if (p > 1) sp.set('page', String(p));
+    const qs = sp.toString();
+    return `/masters/diamonds${qs ? `?${qs}` : ''}`;
+  };
 
   return (
     <div className="space-y-4">
@@ -31,8 +65,8 @@ export default async function SizesPage({ searchParams }: { searchParams: Promis
         <CardHeader>
           <CardTitle>Size chart</CardTitle>
           <CardDescription>
-            {sizes.length
-              ? `${sizes.length} sizes across ${used.length} shapes: face-up mm and the carats one stone weighs.`
+            {total
+              ? `${total} sizes across ${used.length} shapes: face-up mm and the carats one stone weighs.`
               : 'No sizes yet. Import the client chart (Import CSV → Client chart sample).'}
           </CardDescription>
           {used.length > 1 && (
@@ -78,6 +112,34 @@ export default async function SizesPage({ searchParams }: { searchParams: Promis
             </TableBody>
           </Table>
         </CardContent>
+        {pages > 1 && (
+          <CardFooter className="flex items-center justify-between border-t py-3 text-sm">
+            <span className="text-muted-foreground">
+              Showing {start + 1}–{Math.min(start + PER_PAGE, total)} of {total} sizes
+            </span>
+            <Pagination className="mx-0 w-auto">
+              <PaginationContent>
+                {page > 1 && (
+                  <PaginationItem>
+                    <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={makeHref(page - 1)} />}>
+                      <ChevronLeft data-icon="inline-start" /> Previous
+                    </Button>
+                  </PaginationItem>
+                )}
+                <span className="px-2 text-xs text-muted-foreground">
+                  Page {page} of {pages}
+                </span>
+                {page < pages && (
+                  <PaginationItem>
+                    <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={makeHref(page + 1)} />}>
+                      Next <ChevronRight data-icon="inline-end" />
+                    </Button>
+                  </PaginationItem>
+                )}
+              </PaginationContent>
+            </Pagination>
+          </CardFooter>
+        )}
       </Card>
 
       <Card>
