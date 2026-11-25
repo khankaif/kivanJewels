@@ -57,7 +57,9 @@ export default async function PiecePage({ params }: PageProps<'/store/[slug]'>) 
               className={`relative aspect-[4/5] w-[88%] shrink-0 snap-center bg-muted sm:w-full lg:w-auto ${i === 0 ? 'lg:col-span-2' : ''}`}
             >
               <Image
-                src={src} alt={i === 0 ? item.title : ''} fill priority={i === 0}
+                src={src} alt={i === 0 ? item.title : ''} fill
+                loading={i === 0 ? 'eager' : undefined}
+                fetchPriority={i === 0 ? 'high' : undefined}
                 sizes={i === 0 ? '(min-width: 1024px) 55vw, 90vw' : '(min-width: 1024px) 28vw, 90vw'}
                 className="object-cover"
               />

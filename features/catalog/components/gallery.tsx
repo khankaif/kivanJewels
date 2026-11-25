@@ -43,37 +43,62 @@ export function Gallery({ items }: { items: GalleryItem[] }) {
         <Empty><EmptyDescription>New pieces are on their way.</EmptyDescription></Empty>
       ) : (
         <ul className="grid grid-cols-2 gap-x-4 gap-y-12 md:grid-cols-3 xl:grid-cols-4">
-          {shown.map((it, i) => (
-            <li key={it.slug}>
-              <Link href={`/${it.slug}`} className="group block space-y-3">
-                <div className="relative aspect-[4/5] overflow-hidden bg-muted">
-                  {it.cover ? (
-                    <>
-                      <Image
-                        src={it.cover} alt={it.title} fill priority={i < 4}
-                        sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
-                        className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-                      />
-                      {it.hover && (
+          {shown.map((it, i) => {
+            // The newest piece leads the full collection as a 2x2 tile only when
+            // enough cards fill both rows beside it; otherwise md:aspect-auto collapses.
+            const feature = !category && i === 0 && shown.length >= 5;
+            const leadWide = !category && i === 0 && shown.length >= 3 && shown.length < 5;
+            const sizes = feature || leadWide
+              ? '(min-width: 1280px) 50vw, (min-width: 768px) 66vw, 100vw'
+              : '(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw';
+            return (
+              <li
+                key={it.slug}
+                className={feature ? 'col-span-2 md:row-span-2' : leadWide ? 'col-span-2' : undefined}
+              >
+                <Link
+                  href={`/${it.slug}`}
+                  className={`${feature ? 'group flex h-full flex-col gap-3' : 'group block space-y-3'} transition-transform duration-200 active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground`}
+                >
+                  <div
+                    className={`relative overflow-hidden bg-muted ${
+                      feature
+                        ? 'aspect-[4/5] md:aspect-auto md:flex-1'
+                        : leadWide
+                          ? 'aspect-[3/2]'
+                          : 'aspect-[4/5]'
+                    }`}
+                  >
+                    {it.cover ? (
+                      <>
                         <Image
-                          src={it.hover} alt="" fill
-                          sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
-                          className="object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                          src={it.cover} alt={it.title} fill
+                          loading={i < 4 ? 'eager' : undefined}
+                          fetchPriority={i === 0 ? 'high' : undefined}
+                          sizes={sizes}
+                          className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
                         />
-                      )}
-                    </>
-                  ) : <Monogram />}
-                </div>
-                <div className="flex items-baseline justify-between gap-3">
-                  <div className="min-w-0">
-                    <h2 className="truncate text-sm font-medium">{it.title}</h2>
-                    <div className="text-xs text-muted-foreground">{it.category}</div>
+                        {it.hover && (
+                          <Image
+                            src={it.hover} alt="" fill
+                            sizes={sizes}
+                            className="object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                          />
+                        )}
+                      </>
+                    ) : <Monogram />}
                   </div>
-                  {it.mrp !== null && <div className="shrink-0 text-sm tabular-nums">{mrp(it.mrp)}</div>}
-                </div>
-              </Link>
-            </li>
-          ))}
+                  <div className="flex items-baseline justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="truncate text-sm font-medium">{it.title}</h2>
+                      <div className="text-xs text-muted-foreground">{it.category}</div>
+                    </div>
+                    {it.mrp !== null && <div className="shrink-0 text-sm tabular-nums">{mrp(it.mrp)}</div>}
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

@@ -323,6 +323,77 @@
   font-size: 0.9375rem;
 }
 
+/* Sticky-header offset for in-page links (WCAG 2.4.11), storefront only. */
+html:has(.store) {
+  color-scheme: light;
+  scroll-padding-top: 3.75rem;
+}
+
+/* Keep mt-24 on /[slug], but no gap after a full-bleed bottom panel on /. */
+.store main:has(> section:last-child[data-panel]) + footer {
+  margin-top: 0;
+}
+
+/*
+ * Storefront motion. Scroll choreography is GSAP (store-motion.tsx); these
+ * rules only define the static layout each tween moves between, so with no JS
+ * or reduced motion the page is complete and still.
+ */
+.store-progress {
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+
+/* Curtain reveal: GSAP tweens --r from 1 (fully clipped from the top) to 0. */
+[data-clip] {
+  clip-path: inset(calc(var(--r, 0) * 100%) 0 0 0);
+}
+
+/* Expanding panel: a full-bleed photo clipped to a centred 3:4 frame. GSAP
+   tweens --x from 0 (frame) to 1 (full screen) while the section is pinned. */
+.panel-expand {
+  --w: min(27rem, 74vw);
+  --h: calc(var(--w) * 4 / 3);
+  --x: 0;
+}
+.panel-expand [data-media] {
+  clip-path: inset(
+    max(0px, calc((100% - var(--h)) / 2 * (1 - var(--x))))
+    max(0px, calc((100% - var(--w)) / 2 * (1 - var(--x))))
+  );
+}
+.panel-expand [data-caption] {
+  position: absolute;
+  left: calc(50% - var(--w) / 2);
+  top: calc(50% + var(--h) / 2 + 0.75rem);
+  width: var(--w);
+}
+
+/* Hero intro: CSS, not GSAP, so it plays on first paint instead of after
+   hydration (no flash of the finished state). */
+@media (prefers-reduced-motion: no-preference) {
+  .hero-img {
+    animation: hero-img 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .hero-char {
+    display: inline-block;
+    animation: hero-char 1.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(0.35s + var(--i) * 45ms);
+  }
+  .hero-cue {
+    animation: hero-fade 1s 1.5s both;
+  }
+}
+@keyframes hero-img {
+  from { opacity: 0; transform: scale(1.14); }
+}
+@keyframes hero-char {
+  from { opacity: 0; transform: translateY(0.5em); }
+}
+@keyframes hero-fade {
+  from { opacity: 0; }
+}
+
 /* Printed documents: rules run across, never down, and cells sit flush left. */
 .print-lines [data-slot="table-head"],
 .print-lines [data-slot="table-cell"] {
