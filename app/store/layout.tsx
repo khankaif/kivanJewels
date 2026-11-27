@@ -33,7 +33,7 @@ export default function StoreLayout({ children }: LayoutProps<'/store'>) {
             href="/"
             className="flex shrink-0 items-center gap-2 font-medium uppercase tracking-[0.06em] min-[400px]:tracking-[0.12em] transition-opacity hover:opacity-75 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
           >
-            <Logo className="size-3.5 text-foreground" />
+            <Logo className="size-6" />
             <span>{BRAND}</span>
           </Link>
           <nav aria-label="Storefront" className="flex items-center gap-3 min-[400px]:gap-3.5 sm:gap-5">

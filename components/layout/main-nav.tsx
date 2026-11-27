@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   Images, LayoutGrid, LogOut, Package, ReceiptIndianRupee, Settings2, ShoppingBag,
 } from 'lucide-react';
-import { Logo } from '@/components/ui/logo';
+import { LogoBadge } from '@/components/ui/logo';
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarHeader,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
@@ -43,9 +43,7 @@ export function AppSidebar({ email }: { email: string }) {
     <Sidebar>
       <SidebarHeader className="gap-3 px-3 pt-4 pb-2">
         <Link href="/" className="flex items-center gap-2 px-1">
-          <span className="grid size-6 place-items-center rounded-md bg-primary text-primary-foreground">
-            <Logo className="size-3.5" />
-          </span>
+          <LogoBadge />
           <span className="text-sm font-semibold text-foreground">Kaivan Jewels</span>
         </Link>
         <CommandPalette />

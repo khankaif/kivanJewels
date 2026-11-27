@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   description: 'Kaivan Jewels — diamond trading, memos and accounts',
   icons: {
     icon: [
-      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
       { url: '/favicon.ico', sizes: 'any' },
     ],
     apple: '/apple-icon.png',

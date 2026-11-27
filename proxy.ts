@@ -30,5 +30,5 @@ export default function proxy(req: NextRequest) {
 export const config = {
   // Everything except the sign-in page, the auth API, and static assets.
   // There is no sign-up route: accounts come from Settings -> Staff.
-  matcher: ['/((?!sign-in|api/auth|_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!sign-in|api/auth|_next/static|_next/image|favicon.ico|icon\\.png|icon-192\\.png|icon-512\\.png|apple-icon\\.png).*)'],
 };
